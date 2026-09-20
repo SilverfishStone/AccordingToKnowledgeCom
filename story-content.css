@@ -1,0 +1,57 @@
+/* Shared by the public reader and the editor so a story looks the same in both.
+   Layered on top of Quill's snow stylesheet (list markers, alignment, indents). */
+
+.story-body { --story-text: #e7e9ea; --story-line: #2f3336; }
+
+.story-body.ql-container,
+.story-body.ql-snow { border: 0 !important; font-size: inherit; }
+
+.story-body .ql-editor {
+  padding: 0;
+  height: auto;
+  overflow: visible;
+  color: var(--story-text);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 18px;
+  line-height: 1.75;
+  tab-size: 4;
+}
+.story-body .ql-editor.ql-blank::before {
+  left: 0; right: 0; color: #71767b; font-style: italic;
+}
+
+.story-body .ql-editor p,
+.story-body .ql-editor ol,
+.story-body .ql-editor ul,
+.story-body .ql-editor blockquote { margin: 0 0 1em; }
+.story-body .ql-editor h1,
+.story-body .ql-editor h2,
+.story-body .ql-editor h3 { margin: 1.4em 0 .5em; line-height: 1.25; font-weight: 700; }
+.story-body .ql-editor h1 { font-size: 1.9em; }
+.story-body .ql-editor h2 { font-size: 1.5em; }
+.story-body .ql-editor h3 { font-size: 1.2em; }
+.story-body .ql-editor li { margin-bottom: .25em; }
+.story-body .ql-editor a { color: #8ab4ff; }
+.story-body .ql-editor blockquote {
+  border-left: 3px solid #8ab4ff; padding-left: 1em; color: #b7bcc0; font-style: italic;
+}
+.story-body .ql-editor pre.ql-syntax {
+  background: #16181c; color: #e7e9ea; border: 1px solid var(--story-line);
+  border-radius: 8px; padding: 12px 14px; overflow-x: auto; font-size: 15px; margin: 0 0 1em;
+}
+.story-body .ql-editor code { background: #16181c; border-radius: 4px; padding: 1px 5px; font-size: .9em; }
+.story-body .ql-editor img { max-width: 100%; height: auto; border-radius: 8px; }
+.story-body .ql-editor hr {
+  border: 0; text-align: center; height: 2em; margin: 1.2em 0; overflow: visible;
+}
+.story-body .ql-editor hr::before {
+  content: "\2726  \2726  \2726"; color: #71767b; letter-spacing: .5em; font-size: 14px;
+}
+
+/* fonts (names must match the whitelist in write/write.js) */
+.ql-font-sans      { font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif; }
+.ql-font-serif     { font-family: Georgia, "Times New Roman", serif; }
+.ql-font-palatino  { font-family: "Palatino Linotype", Palatino, "Book Antiqua", serif; }
+.ql-font-garamond  { font-family: Garamond, "EB Garamond", "Palatino Linotype", serif; }
+.ql-font-monospace { font-family: "Courier New", Courier, monospace; }
+.ql-font-cursive   { font-family: "Segoe Script", "Brush Script MT", "Comic Sans MS", cursive; }

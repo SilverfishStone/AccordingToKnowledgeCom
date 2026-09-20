@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="theme-color" content="#000000" />
+  <title>Story editor · According to Knowledge</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%23000'/%3E%3Cpath d='M12 3l2.6 6.2 6.4.5-4.9 4.2 1.5 6.3L12 16.9 6.4 20.2l1.5-6.3L3 9.7l6.4-.5z' fill='%238ab4ff'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" />
+  <link rel="stylesheet" href="../story-content.css" />
+  <link rel="stylesheet" href="write.css" />
+</head>
+<body class="locked">
+
+  <!-- ═════════ Sign-in gate ═════════ -->
+  <section class="gate" id="gate" aria-labelledby="gate-h">
+    <form class="gate-card" id="gate-form" autocomplete="off">
+      <h1 id="gate-h">Story editor</h1>
+      <p class="dim">This page is only for the site's author. Connect with a GitHub token that has write access to the site's repository. Without one, nothing can be saved or published.</p>
+
+      <label>Repository owner
+        <input id="g-owner" required spellcheck="false" />
+      </label>
+      <label>Repository name
+        <input id="g-repo" required spellcheck="false" />
+      </label>
+      <label>Branch
+        <input id="g-branch" required spellcheck="false" />
+      </label>
+      <label>GitHub token
+        <input id="g-token" type="password" required spellcheck="false" autocomplete="off" placeholder="github_pat_…" />
+      </label>
+      <label class="check"><input id="g-remember" type="checkbox" checked /> Remember me on this device</label>
+
+      <p class="form-error" id="g-error" role="alert" hidden></p>
+      <button class="btn primary" id="g-submit" type="submit">Connect</button>
+
+      <details class="help">
+        <summary>How do I get a token?</summary>
+        <ol>
+          <li>GitHub → Settings → Developer settings → Personal access tokens → <b>Fine-grained tokens</b> → Generate new token.</li>
+          <li>Repository access: <b>Only select repositories</b>, and pick this site's repo.</li>
+          <li>Permissions → Repository permissions → <b>Contents: Read and write</b>. Nothing else is needed.</li>
+          <li>Set an expiry, generate, and paste the token above.</li>
+        </ol>
+        <p class="dim">The token is kept in this browser only, and is sent to api.github.com and nowhere else. Untick "Remember me" on a shared computer, and use Disconnect in the ⋯ menu when you're done.</p>
+      </details>
+    </form>
+  </section>
+
+  <!-- ═════════ Editor ═════════ -->
+  <div class="app" id="app">
+    <header class="bar">
+      <a class="bar-link" href="../" title="Back to the site">← Site</a>
+      <button class="bar-btn only-narrow" id="btn-side" type="button" aria-label="Show story list" aria-expanded="false">☰</button>
+      <span class="status" id="status" role="status" aria-live="polite"></span>
+      <span class="spacer"></span>
+      <button class="bar-btn" id="btn-focus" type="button" title="Hide everything but the page (F11-style)" aria-pressed="false">Focus</button>
+      <button class="bar-btn" id="btn-preview" type="button" title="See it the way readers will" aria-pressed="false">Preview</button>
+      <button class="bar-btn" id="btn-save" type="button" title="Save draft (Ctrl+S)">Save draft</button>
+      <button class="bar-btn primary" id="btn-publish" type="button">Publish</button>
+      <details class="menu">
+        <summary aria-label="More actions">⋯</summary>
+        <div class="menu-list">
+          <button type="button" id="m-export">Download as .html</button>
+          <button type="button" id="m-unpublish">Unpublish from site</button>
+          <button type="button" id="m-delete">Delete local draft</button>
+          <hr />
+          <button type="button" id="m-refresh">Refresh story list</button>
+          <button type="button" id="m-disconnect">Disconnect this device</button>
+        </div>
+      </details>
+    </header>
+
+    <div class="wrap">
+      <aside class="side" id="side" aria-label="Your stories">
+        <button class="btn primary block" id="btn-new" type="button">+ New story</button>
+        <div class="side-note dim" id="side-note"></div>
+        <div id="story-items"></div>
+      </aside>
+
+      <main class="main">
+        <div class="sheet">
+          <input class="title-input" id="title" placeholder="Title" maxlength="140" aria-label="Story title" autocomplete="off" />
+          <textarea class="summary-input" id="summary" rows="2" maxlength="280" placeholder="A line or two shown on the stories list (optional)" aria-label="Summary"></textarea>
+
+          <div id="toolbar">
+            <span class="ql-formats">
+              <button type="button" class="ql-undo" title="Undo (Ctrl+Z)"><svg viewBox="0 0 18 18"><polygon class="ql-fill ql-stroke" points="6 10 4 12 2 10 6 10"/><path class="ql-stroke" d="M8.09,13.91A4.6,4.6,0,0,0,9,14,5,5,0,1,0,4,9"/></svg></button>
+              <button type="button" class="ql-redo" title="Redo (Ctrl+Y)"><svg viewBox="0 0 18 18"><polygon class="ql-fill ql-stroke" points="12 10 14 12 16 10 12 10"/><path class="ql-stroke" d="M9.91,13.91A4.6,4.6,0,0,1,9,14a5,5,0,1,1,5-5"/></svg></button>
+            </span>
+            <span class="ql-formats">
+              <select class="ql-header" title="Paragraph style">
+                <option value="1">Heading 1</option>
+                <option value="2">Heading 2</option>
+                <option value="3">Heading 3</option>
+                <option selected>Paragraph</option>
+              </select>
+              <select class="ql-font" title="Font">
+                <option selected>Georgia</option>
+                <option value="sans">Sans</option>
+                <option value="palatino">Palatino</option>
+                <option value="garamond">Garamond</option>
+                <option value="monospace">Typewriter</option>
+                <option value="cursive">Script</option>
+              </select>
+              <select class="ql-size" title="Font size">
+                <option selected>18</option>
+                <option value="12px">12</option>
+                <option value="14px">14</option>
+                <option value="16px">16</option>
+                <option value="20px">20</option>
+                <option value="24px">24</option>
+                <option value="28px">28</option>
+                <option value="36px">36</option>
+                <option value="48px">48</option>
+                <option value="64px">64</option>
+              </select>
+            </span>
+            <span class="ql-formats">
+              <button type="button" class="ql-bold" title="Bold (Ctrl+B)"></button>
+              <button type="button" class="ql-italic" title="Italic (Ctrl+I)"></button>
+              <button type="button" class="ql-underline" title="Underline (Ctrl+U)"></button>
+              <button type="button" class="ql-strike" title="Strikethrough"></button>
+              <button type="button" class="ql-script" value="sub" title="Subscript"></button>
+              <button type="button" class="ql-script" value="super" title="Superscript"></button>
+            </span>
+            <span class="ql-formats">
+              <select class="ql-color" title="Text color"></select>
+              <select class="ql-background" title="Highlight color"></select>
+              <label class="custom-color" title="Any text color"><span>A</span><input type="color" id="c-text" value="#8ab4ff" /></label>
+              <label class="custom-color hl" title="Any highlight color"><span>▮</span><input type="color" id="c-bg" value="#5b4b00" /></label>
+            </span>
+            <span class="ql-formats">
+              <select class="ql-align" title="Alignment">
+                <option selected></option>
+                <option value="center"></option>
+                <option value="right"></option>
+                <option value="justify"></option>
+              </select>
+              <button type="button" class="ql-list" value="ordered" title="Numbered list"></button>
+              <button type="button" class="ql-list" value="bullet" title="Bulleted list"></button>
+              <button type="button" class="ql-list" value="check" title="Checklist"></button>
+              <button type="button" class="ql-indent" value="-1" title="Decrease indent"></button>
+              <button type="button" class="ql-indent" value="+1" title="Increase indent"></button>
+            </span>
+            <span class="ql-formats">
+              <button type="button" class="ql-blockquote" title="Quote"></button>
+              <button type="button" class="ql-code-block" title="Code block"></button>
+              <button type="button" class="ql-link" title="Link (Ctrl+K)"></button>
+              <button type="button" class="ql-image" title="Image from a web address"></button>
+              <button type="button" class="ql-divider" title="Scene break"><svg viewBox="0 0 18 18"><line class="ql-stroke" x1="3" x2="15" y1="9" y2="9"/><line class="ql-stroke" x1="3" x2="5" y1="4" y2="4"/><line class="ql-stroke" x1="13" x2="15" y1="14" y2="14"/></svg></button>
+              <button type="button" class="ql-clean" title="Clear formatting"></button>
+            </span>
+          </div>
+
+          <div id="editor" class="story-body"></div>
+          <div id="preview" class="story-body ql-snow" hidden><div class="ql-editor"></div></div>
+        </div>
+        <footer class="foot" id="foot"></footer>
+      </main>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
+  <script src="write.js"></script>
+</body>
+</html>
