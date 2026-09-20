@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tool · According to Knowledge</title>
+  <meta name="theme-color" content="#000000" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%23000'/%3E%3Cpath d='M12 3l2.6 6.2 6.4.5-4.9 4.2 1.5 6.3L12 16.9 6.4 20.2l1.5-6.3L3 9.7l6.4-.5z' fill='%238ab4ff'/%3E%3C/svg%3E" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      display: flex; flex-direction: column;
+      background: #000; color: #e7e9ea;
+      font: 15px/1.4 "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+    :focus-visible { outline: 2px solid #8ab4ff; outline-offset: 2px; }
+    .bar {
+      flex: none; height: 48px; display: flex; align-items: center; gap: 14px; padding: 0 12px;
+      border-bottom: 1px solid #2f3336; background: #000;
+    }
+    .back {
+      display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px;
+      border: 1px solid #536471; border-radius: 6px; font-weight: 600; font-size: 14px; white-space: nowrap;
+    }
+    .back:hover { background: rgba(231, 233, 234, .08); }
+    .title { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .alone { color: #71767b; font-size: 13px; white-space: nowrap; }
+    .alone:hover { color: #e7e9ea; }
+    iframe { flex: 1; width: 100%; border: 0; background: #0f0f0e; }
+    .missing { padding: 48px 20px; text-align: center; color: #71767b; }
+    .missing a { color: #8ab4ff; }
+    @media (max-width: 520px) { .alone { display: none; } }
+  </style>
+</head>
+<body>
+  <header class="bar">
+    <a class="back" id="back" href="./">← Back to main site</a>
+    <span class="title" id="title">Tool</span>
+    <a class="alone" id="alone" href="#" hidden>Open on its own ↗</a>
+  </header>
+  <iframe id="frame" title="Tool" hidden></iframe>
+  <p class="missing" id="missing" hidden>That tool couldn't be found. <a href="./">Back to the main site</a></p>
+
+  <script src="site-data.js"></script>
+  <script>
+    (() => {
+      const id = new URLSearchParams(location.search).get("id");
+      const tool = SITE.tools.find((t) => t.id === id && t.embed);
+      const $ = (s) => document.querySelector(s);
+
+      // "Back" returns to wherever you came from on this site; otherwise to the home page.
+      $("#back").addEventListener("click", (e) => {
+        try {
+          if (document.referrer && new URL(document.referrer).origin === location.origin && history.length > 1) {
+            e.preventDefault(); history.back();
+          }
+        } catch {}
+      });
+
+      if (!tool) { $("#missing").hidden = false; $("#title").textContent = "Not found"; return; }
+      document.title = tool.title + " · " + SITE.name;
+      $("#title").textContent = tool.title;
+      $("#frame").title = tool.title;
+      $("#frame").src = tool.url;
+      $("#frame").hidden = false;
+      $("#alone").href = tool.url;
+      $("#alone").hidden = false;
+    })();
+  </script>
+</body>
+</html>

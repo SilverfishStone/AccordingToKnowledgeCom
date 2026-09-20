@@ -8,8 +8,9 @@ const SITE = {
   author: "Silver",
 
   /* LEFT PANEL — tools.
-     embed: true  -> opens inside the middle panel (must be a page on this site)
-     embed: false -> opens in a new tab (use for other websites)          */
+     embed: true  -> opens on its own page (tool.html) with a "Back to main site"
+                     button. The url must be a page on this site.
+     embed: false -> opens the other website in a new tab                    */
   tools: [
     {
       id: "priorities-chart",
@@ -30,36 +31,10 @@ const SITE = {
     // Copy a block above to add another tool.
   ],
 
-  /* RIGHT PANEL — article highlights. Leave `url` empty until the post exists;
-     the card shows as "coming soon" instead of a dead link.                  */
-  posts: [
-    {
-      title: "Why I build tools instead of just writing opinions",
-      topic: "Making",
-      date: "Sep 18, 2026",
-      read: "5 min read",
-      url: "",
-    },
-    {
-      title: "How to rank what actually matters: a severity framework",
-      topic: "Thinking",
-      date: "Sep 11, 2026",
-      read: "8 min read",
-      url: "",
-    },
-    {
-      title: "Disagreeing in good faith online",
-      topic: "Faith & Conversation",
-      date: "Sep 3, 2026",
-      read: "6 min read",
-      url: "",
-    },
-    {
-      title: "Notes on learning in public",
-      topic: "Learning",
-      date: "Aug 27, 2026",
-      read: "4 min read",
-      url: "",
-    },
-  ],
+  /* RIGHT PANEL — article highlights.
+     While this list is empty the panel shows a "work in progress" notice.
+     Add an entry and the notice is replaced by the article list, e.g.:
+       { title: "My first article", topic: "Thinking", date: "Oct 1, 2026",
+         read: "5 min read", url: "articles/first.html" },                    */
+  posts: [],
 };

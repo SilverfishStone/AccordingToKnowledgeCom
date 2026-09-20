@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>According to Knowledge</title>
-  <meta name="description" content="Silver's home on the web: custom tools, articles, and the goals behind them." />
+  <meta name="description" content="Stories, tools, and the thinking behind them." />
   <meta name="theme-color" content="#000000" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%23000'/%3E%3Cpath d='M12 3l2.6 6.2 6.4.5-4.9 4.2 1.5 6.3L12 16.9 6.4 20.2l1.5-6.3L3 9.7l6.4-.5z' fill='%238ab4ff'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="styles.css" />
@@ -30,216 +30,139 @@
 
         <h2 class="side-title">Tools</h2>
         <nav class="tool-list" id="tool-list" aria-label="My tools"></nav>
-
-        <a class="pill-btn" href="#contact">Request a tool</a>
-
-        <a class="me-chip" href="#about">
-          <span class="avatar sm" aria-hidden="true">S</span>
-          <span class="me-text">
-            <strong>Silver</strong>
-            <span>According to Knowledge</span>
-          </span>
-        </a>
       </div>
     </aside>
 
-    <!-- ═════════ MIDDLE: navigation / about ═════════ -->
+    <!-- ═════════ MIDDLE: the site ═════════ -->
     <main class="feed" id="panel-mid">
       <header class="feed-head">
         <nav class="tabs" aria-label="Site sections">
-          <a href="#home" data-tab="home"><span>Home</span></a>
-          <a href="#stories" data-tab="stories"><span>Stories</span></a>
-          <a href="#about" data-tab="about"><span>About</span></a>
-          <a href="#goals" data-tab="goals"><span>Goals</span></a>
-          <a href="#contact" data-tab="contact"><span>Contact</span></a>
+          <a href="#home" data-tab="home">Home</a>
+          <a href="#stories" data-tab="stories">Stories</a>
+          <a href="#about" data-tab="about">About</a>
+          <a href="#goals" data-tab="goals">Goals</a>
+          <a href="#contact" data-tab="contact">Contact</a>
         </nav>
       </header>
 
       <!-- HOME -->
-      <section class="view" data-view="home" aria-labelledby="h-home">
-        <div class="banner" aria-hidden="true"></div>
-        <div class="profile">
-          <span class="avatar xl" aria-hidden="true">S</span>
+      <section class="view page" data-view="home" aria-labelledby="h-home">
+        <div class="hero">
+          <p class="eyebrow">Welcome</p>
           <h1 id="h-home">According to Knowledge</h1>
-          <p class="handle">by Silver</p>
-          <p class="bio">Welcome. This is my corner of the internet: tools I've built, things I'm learning, and the goals behind it all. Grab a tool on the left, skim the latest articles on the right, or start here.</p>
-          <div class="meta">
-            <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>Somewhere on the road</span>
-            <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>accordingtoknowledge.com</span>
-          </div>
-          <div class="cta-row">
-            <a class="btn primary" href="#stories">Read my stories</a>
-            <a class="btn" href="#tool/priorities-chart">Try a tool</a>
-            <a class="btn" href="#about">About me</a>
-            <a class="btn show-mobile" href="#articles" data-panel-link="right">Articles</a>
-          </div>
+          <p class="lede">Stories I've written, tools I've built, and the thinking behind them. Take a look around.</p>
+          <p class="ornament" aria-hidden="true">✦ ✦ ✦</p>
         </div>
 
-        <h2 class="section-label">Start here</h2>
+        <nav class="toc" aria-label="Where to start">
+          <a class="toc-row" href="#stories">
+            <span class="toc-num">01</span>
+            <span class="toc-main"><strong>Stories</strong><span>Short fiction, newest first.</span></span>
+            <span class="toc-go" aria-hidden="true">→</span>
+          </a>
+          <a class="toc-row" href="#about">
+            <span class="toc-num">02</span>
+            <span class="toc-main"><strong>About</strong><span>Who's behind the site and what I care about.</span></span>
+            <span class="toc-go" aria-hidden="true">→</span>
+          </a>
+          <a class="toc-row" href="#goals">
+            <span class="toc-num">03</span>
+            <span class="toc-main"><strong>Goals</strong><span>What I'm working toward.</span></span>
+            <span class="toc-go" aria-hidden="true">→</span>
+          </a>
+          <a class="toc-row" href="#contact">
+            <span class="toc-num">04</span>
+            <span class="toc-main"><strong>Contact</strong><span>Ideas, feedback, or a tool you wish existed.</span></span>
+            <span class="toc-go" aria-hidden="true">→</span>
+          </a>
+        </nav>
 
-        <a class="post link-post" href="#stories">
-          <span class="avatar" aria-hidden="true">S</span>
-          <div class="post-body">
-            <div class="post-head"><strong>Read my short stories</strong><span class="dim">· Stories</span></div>
-            <p>Fiction and other short writing, newest first.</p>
-            <span class="post-go">Browse stories →</span>
-          </div>
+        <a class="featured" id="featured-story" href="#stories" hidden>
+          <span class="eyebrow">Latest story</span>
+          <span class="featured-title" id="featured-title"></span>
+          <span class="featured-meta" id="featured-meta"></span>
+          <span class="featured-summary" id="featured-summary"></span>
+          <span class="more">Read it →</span>
         </a>
-        <a class="post link-post" href="#about">
-          <span class="avatar" aria-hidden="true">S</span>
-          <div class="post-body">
-            <div class="post-head"><strong>Who am I?</strong><span class="dim">· About</span></div>
-            <p>A short introduction: what I care about, how I think, and why this site exists.</p>
-            <span class="post-go">Read more →</span>
-          </div>
-        </a>
-        <a class="post link-post" href="#goals">
-          <span class="avatar" aria-hidden="true">S</span>
-          <div class="post-body">
-            <div class="post-head"><strong>What am I working toward?</strong><span class="dim">· Goals</span></div>
-            <p>The projects and outcomes I'm aiming at, and how you can follow along or help.</p>
-            <span class="post-go">See the goals →</span>
-          </div>
-        </a>
-        <a class="post link-post" href="#tool/priorities-chart">
-          <span class="avatar" aria-hidden="true">S</span>
-          <div class="post-body">
-            <div class="post-head"><strong>Try the Priorities Chart Maker</strong><span class="dim">· Tool</span></div>
-            <p>Sort social issues by severity on an interactive bullseye, then export it as an image.</p>
-            <span class="post-go">Open the tool →</span>
-          </div>
-        </a>
+
+        <p class="note">My tools are in the panel on the left, and article highlights on the right. On a phone, use the bar at the bottom.</p>
       </section>
 
       <!-- STORIES (list) -->
-      <section class="view" data-view="stories" aria-labelledby="h-stories" hidden>
-        <div class="view-intro">
-          <h1 id="h-stories">Stories</h1>
-          <p class="dim">Short stories, newest first.</p>
-        </div>
+      <section class="view page" data-view="stories" aria-labelledby="h-stories" hidden>
+        <h1 class="page-title" id="h-stories">Stories</h1>
+        <p class="page-sub">Short stories, newest first.</p>
         <div id="story-list" aria-live="polite"></div>
       </section>
 
       <!-- STORY (reader) -->
       <section class="view" data-view="story" aria-label="Story" hidden>
-        <div class="tool-bar">
-          <a class="icon-btn" href="#stories" aria-label="Back to all stories">
-            <svg viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></svg>
-          </a>
-          <div class="tool-bar-title"><strong>Story</strong></div>
+        <div class="reader-bar">
+          <a class="back-link" href="#stories">← All stories</a>
         </div>
         <article class="story" id="story-box" aria-live="polite"></article>
       </section>
 
       <!-- ABOUT -->
-      <section class="view" data-view="about" aria-labelledby="h-about" hidden>
-        <div class="view-intro">
-          <h1 id="h-about">About</h1>
-          <p class="dim">A little about the person behind the tools.</p>
+      <section class="view page" data-view="about" aria-labelledby="h-about" hidden>
+        <h1 class="page-title" id="h-about">About</h1>
+        <p class="page-sub">A little about the person behind the site.</p>
+
+        <div class="prose">
+          <p>Hi, I'm Silver. I like understanding how things fit together, and then building small, useful things that make that understanding easier to share.</p>
+          <p>This site is where those things live. Some are tools you can use right now, some are stories, and others will be articles where I think out loud.</p>
+
+          <h2>What I care about</h2>
+          <ul class="chips">
+            <li>Learning in public</li>
+            <li>Faith &amp; good-faith conversation</li>
+            <li>Making tools</li>
+            <li>Clear thinking</li>
+          </ul>
+
+          <h2>Finding your way around</h2>
+          <p><b>Left:</b> my tools and other sites. <b>Middle:</b> stories, and this guide to the site. <b>Right:</b> article highlights.</p>
         </div>
-
-        <article class="post">
-          <span class="avatar" aria-hidden="true">S</span>
-          <div class="post-body">
-            <div class="post-head"><strong>Silver</strong><span class="dim">· Hello</span></div>
-            <p>Hi, I'm Silver. I like understanding how things fit together, and then building small, useful things that make that understanding easier to share.</p>
-            <p>This site is where those things live. Some are tools you can use right now; others are articles where I think out loud.</p>
-          </div>
-        </article>
-
-        <article class="post">
-          <span class="avatar" aria-hidden="true">S</span>
-          <div class="post-body">
-            <div class="post-head"><strong>What I care about</strong></div>
-            <ul class="chips">
-              <li>Learning in public</li>
-              <li>Faith &amp; good-faith conversation</li>
-              <li>Making tools</li>
-              <li>Clear thinking</li>
-            </ul>
-          </div>
-        </article>
-
-        <article class="post">
-          <span class="avatar" aria-hidden="true">S</span>
-          <div class="post-body">
-            <div class="post-head"><strong>How to use this site</strong></div>
-            <p><b>Left:</b> my tools and other sites. <b>Middle:</b> this guide: about me, my goals, and how to reach me. <b>Right:</b> article highlights.</p>
-          </div>
-        </article>
       </section>
 
       <!-- GOALS -->
-      <section class="view" data-view="goals" aria-labelledby="h-goals" hidden>
-        <div class="view-intro">
-          <h1 id="h-goals">Goals</h1>
-          <p class="dim">What I'm working toward. Updated as things change.</p>
-        </div>
+      <section class="view page" data-view="goals" aria-labelledby="h-goals" hidden>
+        <h1 class="page-title" id="h-goals">Goals</h1>
+        <p class="page-sub">What I'm working toward. Updated as things change.</p>
 
-        <article class="post">
-          <span class="goal-num" aria-hidden="true">1</span>
-          <div class="post-body">
-            <div class="post-head"><strong>Build tools that make ideas easier to see</strong></div>
+        <ol class="goals">
+          <li>
+            <h2>Build tools that make ideas easier to see</h2>
             <p>Turn abstract questions into things you can click, drag, and export, starting with the Priorities Chart Maker.</p>
             <div class="progress" role="img" aria-label="Progress: early"><i style="width:30%"></i></div>
-          </div>
-        </article>
-        <article class="post">
-          <span class="goal-num" aria-hidden="true">2</span>
-          <div class="post-body">
-            <div class="post-head"><strong>Write regularly and honestly</strong></div>
-            <p>Publish articles that show my reasoning, including where I'm unsure or was wrong.</p>
+          </li>
+          <li>
+            <h2>Write regularly and honestly</h2>
+            <p>Publish stories and articles that show my reasoning, including where I'm unsure or was wrong.</p>
             <div class="progress" role="img" aria-label="Progress: just started"><i style="width:15%"></i></div>
-          </div>
-        </article>
-        <article class="post">
-          <span class="goal-num" aria-hidden="true">3</span>
-          <div class="post-body">
-            <div class="post-head"><strong>Grow a community of good-faith conversation</strong></div>
+          </li>
+          <li>
+            <h2>Grow a community of good-faith conversation</h2>
             <p>Make a space, through In Good Faith and this site, where people can disagree without contempt.</p>
             <div class="progress" role="img" aria-label="Progress: early"><i style="width:20%"></i></div>
-          </div>
-        </article>
+          </li>
+        </ol>
       </section>
 
       <!-- CONTACT -->
-      <section class="view" data-view="contact" aria-labelledby="h-contact" hidden>
-        <div class="view-intro">
-          <h1 id="h-contact">Contact</h1>
-          <p class="dim">Ideas, feedback, or a tool you wish existed? I'd like to hear it.</p>
-        </div>
+      <section class="view page" data-view="contact" aria-labelledby="h-contact" hidden>
+        <h1 class="page-title" id="h-contact">Contact</h1>
+        <p class="page-sub">Ideas, feedback, or a tool you wish existed? I'd like to hear it.</p>
 
-        <article class="post">
-          <span class="avatar" aria-hidden="true">S</span>
-          <div class="post-body">
-            <div class="post-head"><strong>Get in touch</strong></div>
-            <p>Tell me what you'd like to see, or what's broken.</p>
-            <!-- Add your preferred contact method here, e.g. <a href="mailto:you@example.com">. -->
-            <p class="dim">Contact details coming soon.</p>
-          </div>
-        </article>
-        <article class="post">
-          <span class="avatar" aria-hidden="true">S</span>
-          <div class="post-body">
-            <div class="post-head"><strong>Elsewhere</strong></div>
-            <p><a class="text-link" href="https://ingoodfaith.site" target="_blank" rel="noopener">ingoodfaith.site ↗</a></p>
-          </div>
-        </article>
-      </section>
+        <div class="prose">
+          <h2>Get in touch</h2>
+          <p>Tell me what you'd like to see, or what's broken.</p>
+          <!-- Add your preferred contact method here, e.g. <a href="mailto:you@example.com">. -->
+          <p class="dim">Contact details coming soon.</p>
 
-      <!-- TOOL (embedded) -->
-      <section class="view view-tool" data-view="tool" aria-label="Tool" hidden>
-        <div class="tool-bar">
-          <a class="icon-btn" href="#home" aria-label="Back to home">
-            <svg viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></svg>
-          </a>
-          <div class="tool-bar-title">
-            <strong id="tool-title">Tool</strong>
-            <span class="dim">Running inside this page</span>
-          </div>
-          <a class="btn sm" id="tool-newtab" href="#" target="_blank" rel="noopener">Open in new tab ↗</a>
+          <h2>Elsewhere</h2>
+          <p><a class="text-link" href="https://ingoodfaith.site" target="_blank" rel="noopener">ingoodfaith.site ↗</a></p>
         </div>
-        <iframe id="tool-frame" title="Tool" loading="lazy"></iframe>
       </section>
 
       <p class="not-found" id="not-found" hidden>That page doesn't exist. <a class="text-link" href="#home">Go home</a></p>
@@ -248,18 +171,28 @@
     <!-- ═════════ RIGHT: articles ═════════ -->
     <aside class="side side-right" id="panel-articles" aria-label="Articles">
       <div class="side-inner">
-        <label class="search">
+
+        <!-- shown until there are articles -->
+        <section class="card wip" id="wip-card">
+          <p class="wip-badge">Work in progress</p>
+          <h2>Still being built</h2>
+          <p>This site is a work in progress. Articles will show up here as I write them. In the meantime, the stories and tools are ready to explore.</p>
+          <div class="wip-bar" aria-hidden="true"></div>
+        </section>
+
+        <!-- shown once SITE.posts has entries -->
+        <label class="search" id="search-wrap" hidden>
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
           <input id="search" type="search" placeholder="Search articles" autocomplete="off" />
         </label>
 
-        <section class="card">
+        <section class="card" id="articles-card" hidden>
           <h2>Article highlights</h2>
           <div id="post-list"></div>
           <p class="empty" id="post-empty" hidden>No articles match your search.</p>
         </section>
 
-        <section class="card">
+        <section class="card" id="topics-card" hidden>
           <h2>Topics</h2>
           <div class="topic-row" id="topic-row"></div>
         </section>

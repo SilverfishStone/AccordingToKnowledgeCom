@@ -14,7 +14,7 @@
   /* ───────── left: tools ───────── */
   const toolList = $("#tool-list");
   toolList.innerHTML = SITE.tools.map((t) => {
-    const href = t.embed ? `#tool/${t.id}` : t.url;
+    const href = t.embed ? `tool.html?id=${encodeURIComponent(t.id)}` : t.url;
     const ext  = t.embed ? "" : ' target="_blank" rel="noopener"';
     return `<a class="tool" data-tool="${esc(t.id)}" href="${esc(href)}"${ext}>
       ${svg(t.icon)}
@@ -25,39 +25,45 @@
     </a>`;
   }).join("");
 
-  /* ───────── right: articles ───────── */
+  /* ───────── right: articles (or the work-in-progress notice) ───────── */
   const postList = $("#post-list");
   const postEmpty = $("#post-empty");
   const search = $("#search");
   const topicRow = $("#topic-row");
   let activeTopic = "";
 
-  const topics = [...new Set(SITE.posts.map((p) => p.topic))];
-  topicRow.innerHTML = topics.map((t) => `<button type="button" class="topic" aria-pressed="false" data-topic="${esc(t)}">${esc(t)}</button>`).join("");
+  const hasPosts = SITE.posts.length > 0;
+  $("#wip-card").hidden = hasPosts;
+  $("#search-wrap").hidden = !hasPosts;
+  $("#articles-card").hidden = !hasPosts;
+  $("#topics-card").hidden = !hasPosts;
 
-  function renderPosts() {
-    const q = search.value.trim().toLowerCase();
-    const list = SITE.posts.filter((p) =>
-      (!activeTopic || p.topic === activeTopic) &&
-      (!q || (p.title + " " + p.topic).toLowerCase().includes(q)));
-    postList.innerHTML = list.map((p) => {
-      const inner = `<div class="kicker"><b>${esc(p.topic)}</b><span>· ${esc(p.date)}</span><span>· ${esc(p.read)}</span></div>
-        <div class="title">${esc(p.title)}</div>${p.url ? "" : '<span class="soon">Coming soon</span>'}`;
-      return p.url
-        ? `<a class="post-card" href="${esc(p.url)}">${inner}</a>`
-        : `<div class="post-card">${inner}</div>`;
-    }).join("");
-    postEmpty.hidden = list.length > 0;
-  }
-  search.addEventListener("input", renderPosts);
-  topicRow.addEventListener("click", (e) => {
-    const b = e.target.closest(".topic");
-    if (!b) return;
-    activeTopic = activeTopic === b.dataset.topic ? "" : b.dataset.topic;
-    $$(".topic", topicRow).forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.topic === activeTopic)));
+  if (hasPosts) {
+    const topics = [...new Set(SITE.posts.map((p) => p.topic).filter(Boolean))];
+    topicRow.innerHTML = topics.map((t) => `<button type="button" class="topic" aria-pressed="false" data-topic="${esc(t)}">${esc(t)}</button>`).join("");
+
+    const renderPosts = () => {
+      const q = search.value.trim().toLowerCase();
+      const list = SITE.posts.filter((p) =>
+        (!activeTopic || p.topic === activeTopic) &&
+        (!q || ((p.title || "") + " " + (p.topic || "")).toLowerCase().includes(q)));
+      postList.innerHTML = list.map((p) => {
+        const kicker = [p.topic && `<b>${esc(p.topic)}</b>`, p.date && `<span>${esc(p.date)}</span>`, p.read && `<span>${esc(p.read)}</span>`].filter(Boolean).join("");
+        const inner = `<div class="kicker">${kicker}</div><div class="title">${esc(p.title)}</div>`;
+        return p.url ? `<a class="post-card" href="${esc(p.url)}">${inner}</a>` : `<div class="post-card">${inner}</div>`;
+      }).join("");
+      postEmpty.hidden = list.length > 0;
+    };
+    search.addEventListener("input", renderPosts);
+    topicRow.addEventListener("click", (e) => {
+      const b = e.target.closest(".topic");
+      if (!b) return;
+      activeTopic = activeTopic === b.dataset.topic ? "" : b.dataset.topic;
+      $$(".topic", topicRow).forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.topic === activeTopic)));
+      renderPosts();
+    });
     renderPosts();
-  });
-  renderPosts();
+  }
   $("#year").textContent = new Date().getFullYear();
 
   /* ───────── stories (published from /write/) ───────── */
@@ -112,7 +118,9 @@
   }
 
   const latestEl = $("#latest-story");
+  const featuredEl = $("#featured-story");
   function renderLatest(list, error) {
+    featuredEl.hidden = true;
     if (error) { latestEl.hidden = true; return; }
     latestEl.hidden = false;
     if (!list.length) {
@@ -126,20 +134,23 @@
     latestEl.dataset.slug = s.slug;
     $("#latest-title").textContent = s.title || "Untitled";
     $("#latest-meta").textContent = metaLine(s);
+
+    featuredEl.href = "#story/" + s.slug;
+    $("#featured-title").textContent = s.title || "Untitled";
+    $("#featured-meta").textContent = metaLine(s);
+    $("#featured-summary").textContent = s.summary || "";
+    featuredEl.hidden = false;
   }
 
   function renderStoryList(list, error) {
     const box = $("#story-list");
     if (error) { box.innerHTML = '<p class="empty-note">Couldn\'t load the stories right now. Try again in a moment.</p>'; return; }
     if (!list.length) { box.innerHTML = '<p class="empty-note">No stories yet. The first one is on its way.</p>'; return; }
-    box.innerHTML = list.map((s) => `<a class="post link-post story-card" href="#story/${esc(s.slug)}">
-      <span class="avatar" aria-hidden="true">S</span>
-      <div class="post-body">
-        <div class="post-head"><strong>${esc(s.title || "Untitled")}</strong></div>
-        <div class="dim story-meta">${esc(metaLine(s))}</div>
-        ${s.summary ? `<p>${esc(s.summary)}</p>` : ""}
-        <span class="post-go">Read story →</span>
-      </div>
+    box.innerHTML = list.map((s) => `<a class="entry" href="#story/${esc(s.slug)}">
+      <h2>${esc(s.title || "Untitled")}</h2>
+      <span class="entry-meta">${esc(metaLine(s))}</span>
+      ${s.summary ? `<p>${esc(s.summary)}</p>` : ""}
+      <span class="more">Read story →</span>
     </a>`).join("");
   }
 
@@ -159,7 +170,7 @@
       if (mine !== storyToken) return;
 
       const title = document.createElement("h1"); title.textContent = story.title || "Untitled";
-      const meta = document.createElement("p"); meta.className = "dim story-meta";
+      const meta = document.createElement("p"); meta.className = "story-meta";
       meta.textContent = metaLine(story) + (story.updated && story.updated !== story.published ? ` · Updated ${fmtDate(story.updated)}` : "");
       const body = document.createElement("div"); body.className = "story-body ql-snow";
       const inner = document.createElement("div"); inner.className = "ql-editor";
@@ -188,21 +199,16 @@
   /* ───────── middle: hash router ───────── */
   const views = $$(".view");
   const tabs = $$(".tabs a");
-  const frame = $("#tool-frame");
   const notFound = $("#not-found");
   const PAGES = ["home", "stories", "about", "goals", "contact"];
 
   function route() {
     const hash = location.hash.replace(/^#\/?/, "") || "home";
-    let view = "", toolId = "", storySlug = "";
+    let view = "", storySlug = "";
 
     if (PAGES.includes(hash)) view = hash;
-    else if (hash.startsWith("tool/")) { view = "tool"; toolId = hash.slice(5); }
     else if (hash.startsWith("story/")) { view = "story"; storySlug = hash.slice(6); }
     else if (hash === "articles") { setPanel("right"); return; }
-
-    const tool = SITE.tools.find((t) => t.id === toolId && t.embed);
-    if (view === "tool" && !tool) view = "";
 
     views.forEach((v) => { v.hidden = v.dataset.view !== view; });
     notFound.hidden = view !== "";
@@ -211,20 +217,12 @@
       a.classList.toggle("active", on);
       on ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current");
     });
-    $$(".tool", toolList).forEach((a) => a.classList.toggle("active", a.dataset.tool === toolId && !!tool));
-
-    if (tool) {
-      $("#tool-title").textContent = tool.title;
-      $("#tool-newtab").href = tool.url;
-      frame.title = tool.title;
-      if (frame.getAttribute("src") !== tool.url) frame.src = tool.url;
-    }
 
     if (view === "story") renderStory(storySlug);
     if (view === "stories") loadIndex().then((l) => renderStoryList(l), () => renderStoryList([], true));
     markLatest();
 
-    document.title = (view === "tool" ? tool.title : view === "story" ? "Story" : view ? view[0].toUpperCase() + view.slice(1) : "Not found") + " · " + SITE.name;
+    document.title = (view === "story" ? "Story" : view ? view[0].toUpperCase() + view.slice(1) : "Not found") + " · " + SITE.name;
     window.scrollTo(0, 0);
     setPanel("mid");
   }
@@ -237,7 +235,6 @@
     window.scrollTo(0, 0);
   }
   $$(".bottom-bar button").forEach((b) => b.addEventListener("click", () => setPanel(b.dataset.show)));
-  $$("[data-panel-link]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); setPanel(a.dataset.panelLink); }));
 
   route();
 
