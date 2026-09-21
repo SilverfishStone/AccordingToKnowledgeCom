@@ -1,5 +1,22 @@
 [
   {
+    "added": "2026-09-21T15:17:09.690Z",
+    "file": "gallery/images/silverfox.png",
+    "thumb": "gallery/thumbs/silverfox.jpg",
+    "width": 3072,
+    "height": 3042,
+    "date": "2026-09-19",
+    "slug": "silverfox",
+    "title": "Silverfox",
+    "categories": [
+      "My Digital Art"
+    ],
+    "tags": [
+      "digital art",
+      "fox"
+    ]
+  },
+  {
     "added": "2026-09-21T15:14:27.403Z",
     "file": "gallery/images/happy-little-gator.png",
     "thumb": "gallery/thumbs/happy-little-gator.jpg",
