@@ -294,10 +294,11 @@
   }
 
   const Font = Quill.import("formats/font");
-  Font.whitelist = ["sans", "serif", "palatino", "garamond", "monospace", "cursive"];
+  // no font class = Calibri, the site's reading font
+  Font.whitelist = ["calibri-light", "times", "cambria", "serif", "sans", "palatino", "garamond", "monospace", "cursive"];
   Quill.register(Font, true);
   const Size = Quill.import("attributors/style/size");
-  Size.whitelist = ["12px", "14px", "16px", "20px", "24px", "28px", "36px", "48px", "64px"];
+  Size.whitelist = ["12px", "14px", "16px", "18px", "20px", "22px", "24px", "28px", "36px", "48px", "64px"];
   Quill.register(Size, true);
   const BlockEmbed = Quill.import("blots/block/embed");
   class Divider extends BlockEmbed {}
@@ -333,6 +334,12 @@
     },
   });
 
+  // Ctrl+E centers the current paragraph (press again to undo), like Word
+  quill.keyboard.addBinding({ key: "e", shortKey: true }, (range) => {
+    quill.format("align", quill.getFormat(range).align === "center" ? false : "center", "user");
+    return false;
+  });
+
   // custom (any-color) pickers: remember the selection, since the native dialog steals focus
   let lastRange = null;
   quill.on("selection-change", (range) => { if (range) lastRange = range; });
@@ -362,7 +369,7 @@
   let mode = "write";
 
   const normalize = (d) => ({
-    kind: "story", subtitle: "", series: "", pendingSeries: false, seriesTitle: "", seriesSummary: "", chapter: null, categories: [], extra: {},
+    kind: "story", subtitle: "", series: "", pendingSeries: false, seriesTitle: "", seriesSummary: "", chapter: null, categories: [], pinned: false, extra: {},
     ...d,
   });
   for (const id of Object.keys(drafts)) drafts[id] = normalize(drafts[id]);
@@ -436,7 +443,9 @@
     for (const n of lists.flat()) { const k = String(n).trim(); if (k && !seen.has(k.toLowerCase())) seen.set(k.toLowerCase(), k); }
     return [...seen.values()];
   }
-  const knownCategories = () => uniqueNames([(window.SITE && SITE.categories) || [], ...remote.article.map((a) => a.categories || []), cur ? cur.categories : []]);
+  // site-data.js declares SITE with `const`, so it is a global name but not a property of window
+  const SITE_CFG = (typeof SITE !== "undefined" && SITE) || {};
+  const knownCategories = () => uniqueNames([SITE_CFG.categories || [], ...remote.article.map((a) => a.categories || []), cur ? cur.categories : []]);
   const has = (list, name) => list.some((x) => x.toLowerCase() === name.toLowerCase());
 
   function renderMeta() {
@@ -464,7 +473,9 @@
     // categories
     $("#cat-chips").innerHTML = knownCategories().map((c) =>
       `<button type="button" class="cat" data-cat="${esc(c)}" aria-pressed="${has(cur.categories, c)}">${esc(c)}</button>`).join("");
+    $("#pin-article").checked = !!cur.pinned;
   }
+  $("#pin-article").addEventListener("change", (e) => { if (cur) { cur.pinned = e.target.checked; onEdit(); } });
 
   $$('input[name="kind"]').forEach((r) => r.addEventListener("change", () => {
     if (!cur || cur.slug || !r.checked) return;
@@ -534,11 +545,11 @@
     const item = (d) => `<div class="item-row">
       <button type="button" class="item${cur && d.id === cur.id ? " active" : ""}" data-id="${esc(d.id)}">
         <span class="item-title">${esc(d.title.trim() || "Untitled")}</span>
-        <span class="item-meta">${kindBadge(d.kind)}${status(d)}<span>${esc(fmtDate(d.updated))}</span></span></button>
+        <span class="item-meta">${kindBadge(d.kind)}${status(d)}${d.slug && d.pinned ? '<span class="badge pin">Pinned</span>' : ""}<span>${esc(fmtDate(d.updated))}</span></span></button>
       <button type="button" class="item-del" data-del="${esc(d.id)}" title="Delete this draft" aria-label="Delete draft: ${esc(d.title.trim() || "Untitled")}">${TRASH}</button></div>`;
     const rItem = (s) => `<div class="item-row"><button type="button" class="item" data-kind="${s.kind}" data-slug="${esc(s.slug)}">
       <span class="item-title">${esc(s.title || "Untitled")}</span>
-      <span class="item-meta">${kindBadge(s.kind)}<span class="badge live">Live</span><span>${esc(fmtDate(s.published))}</span></span></button></div>`;
+      <span class="item-meta">${kindBadge(s.kind)}<span class="badge live">Live</span>${s.pinned ? '<span class="badge pin">Pinned</span>' : ""}<span>${esc(fmtDate(s.published))}</span></span></button></div>`;
 
     $("#story-items").innerHTML =
       (local.length ? `<div class="group-label">Drafts &amp; edits</div>${local.map(item).join("")}` : "") +
@@ -612,6 +623,7 @@
         slug: s.slug || slug, published: s.published || null,
         series: s.series || "", chapter: s.chapter || null,
         categories: Array.isArray(s.categories) ? s.categories : [],
+        pinned: kind === "article" && !!(remote.article.find((a) => a.slug === slug) || {}).pinned,
         extra: s.source ? { source: s.source } : {},
       });
       drafts[d.id] = d; persist();
@@ -732,14 +744,16 @@
       const sub = subtitleEl.value.trim();
       if (sub) meta.subtitle = sub;
       if (kind === "story") { if (cur.series) { meta.series = cur.series; meta.chapter = cur.chapter; } }
-      else meta.categories = cur.categories.slice();
-      const doc = { ...meta, ...(kind === "article" && cur.extra && cur.extra.source ? { source: cur.extra.source } : {}), html, delta };
+      else { meta.categories = cur.categories.slice(); if (cur.pinned) meta.pinned = true; }
+      const { pinned: _pinned, ...docMeta } = meta;   // "pinned" lives only in the index, so un-pinning never has to touch other files
+      const doc = { ...docMeta, ...(kind === "article" && cur.extra && cur.extra.source ? { source: cur.extra.source } : {}), html, delta };
 
       const path = filePath(kind, slug);
       const existing = await getFile(path);
       await putFile(path, JSON.stringify(doc), `${verb} ${label.toLowerCase()}: ${title}`, existing && existing.sha);
 
       remote[kind] = await updateList(indexPath(kind), (l) => {
+        if (meta.pinned) l.forEach((s) => { if (s.slug !== slug) delete s.pinned; });   // only one pinned article
         const i = l.findIndex((s) => s.slug === slug);
         if (i >= 0) l[i] = meta; else l.push(meta);
         return l;
@@ -846,7 +860,7 @@ body{max-width:720px;margin:40px auto;padding:0 20px;font:18px/1.75 Georgia,seri
   let previewUrl = null;
 
   const normTag = (s) => String(s).trim().replace(/^#+/, "").replace(/\s+/g, " ").slice(0, 40);
-  const knownGalleryCategories = () => uniqueNames([(window.SITE && SITE.galleryCategories) || [], ...gal.map((g) => g.categories || []), gcur ? gcur.categories : []]);
+  const knownGalleryCategories = () => uniqueNames([SITE_CFG.galleryCategories || [], ...gal.map((g) => g.categories || []), gcur ? gcur.categories : []]);
 
   function renderGalleryChips() {
     if (!gcur) return;
@@ -901,7 +915,7 @@ body{max-width:720px;margin:40px auto;padding:0 20px;font:18px/1.75 Georgia,seri
     const e = (gcur && gcur.entry) || {};
     gFields.title.value = e.title || ""; gFields.caption.value = e.caption || ""; gFields.date.value = e.date || "";
     gFields.location.value = e.location || ""; gFields.details.value = e.details || ""; gFields.alt.value = e.alt || "";
-    $("#g-keep").checked = false; $("#g-file").value = "";
+    $("#g-keep").checked = false; $("#g-file").value = ""; $("#g-pin").checked = !!e.pinned;
     revokePreview();
     if (gcur && gcur.entry) setPreviewImage(ROOT + e.thumb, `${e.width || "?"} × ${e.height || "?"} · Choose a file below only if you want to replace the image.`);
     else setPreviewImage(null);
@@ -923,7 +937,7 @@ body{max-width:720px;margin:40px auto;padding:0 20px;font:18px/1.75 Georgia,seri
     $("#gallery-items").innerHTML = gal.length
       ? `<div class="group-label">In the gallery</div>` + gal.map((g) => `<div class="item-row"><button type="button" class="item gitem${gcur && gcur.slug === g.slug ? " active" : ""}" data-gslug="${esc(g.slug)}">
           <img class="gthumb" src="${esc(ROOT + g.thumb)}" alt="" loading="lazy">
-          <span><span class="item-title">${esc(g.title)}</span><span class="item-meta"><span>${esc(fmtDate(g.added))}</span></span></span></button></div>`).join("")
+          <span><span class="item-title">${esc(g.title)}</span><span class="item-meta">${g.pinned ? '<span class="badge pin">Pinned</span>' : ""}<span>${esc(fmtDate(g.added))}</span></span></span></button></div>`).join("")
       : '<p class="side-note dim">Nothing in the gallery yet.</p>';
   }
   $("#gallery-items").addEventListener("click", (e) => {
@@ -1031,10 +1045,15 @@ body{max-width:720px;margin:40px auto;padding:0 20px;font:18px/1.75 Georgia,seri
       const optional = { caption: gFields.caption.value.trim(), alt: gFields.alt.value.trim(), date: gFields.date.value, location: gFields.location.value.trim(), details: gFields.details.value.trim() };
       for (const k of Object.keys(optional)) { if (optional[k]) entry[k] = optional[k]; else delete entry[k]; }
       Object.assign(entry, { slug, title, categories: gcur.categories.slice(), tags: gcur.tags.slice() });
+      const pinned = $("#g-pin").checked;
+      if (pinned) entry.pinned = true; else delete entry.pinned;
 
       setGBusy(true, "Saving details…");
-      gal = await updateList(GALLERY_PATH, (l) => { const i = l.findIndex((g) => g.slug === slug); if (i >= 0) l[i] = entry; else l.push(entry); return l; },
-        `${editing ? "Update" : "Add"} gallery image: ${title}`, byAdded);
+      gal = await updateList(GALLERY_PATH, (l) => {
+        if (pinned) l.forEach((g) => { if (g.slug !== slug) delete g.pinned; });   // only one pinned image
+        const i = l.findIndex((g) => g.slug === slug); if (i >= 0) l[i] = entry; else l.push(entry);
+        return l;
+      }, `${editing ? "Update" : "Add"} gallery image: ${title}`, byAdded);
       gcur = { slug, entry, file: null, categories: entry.categories.slice(), tags: entry.tags.slice() };
       fillGalleryForm(); renderGalleryList(); renderStatus();
       toast(`${editing ? "Saved" : "Uploaded"}. GitHub Pages usually shows it on the site within a minute or two.`, "ok");

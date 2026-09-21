@@ -1,6 +1,13 @@
 /* Shared by the public reader and the editor so a story looks the same in both.
    Layered on top of Quill's snow stylesheet (list markers, alignment, indents). */
 
+/* Calibri is the house reading font. Carlito (metric-compatible) and Tinos/Caladea are
+   loaded from Google Fonts by the pages, so phones and Linux machines without the
+   Microsoft fonts still get the same shapes and line breaks. */
+:root {
+  --reading-font: Calibri, Carlito, "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+}
+
 .story-body { --story-text: #e7e9ea; --story-line: #2f3336; }
 
 .story-body.ql-container,
@@ -11,9 +18,9 @@
   height: auto;
   overflow: visible;
   color: var(--story-text);
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 18px;
-  line-height: 1.75;
+  font-family: var(--reading-font);
+  font-size: 19px;
+  line-height: 1.7;
   tab-size: 4;
 }
 .story-body .ql-editor.ql-blank::before {
@@ -48,7 +55,10 @@
   content: "\2726  \2726  \2726"; color: #71767b; letter-spacing: .5em; font-size: 14px;
 }
 
-/* fonts (names must match the whitelist in write/write.js) */
+/* fonts (names must match the whitelist in write/write.js; no class = Calibri) */
+.ql-font-calibri-light { font-family: "Calibri Light", Calibri, Carlito, "Segoe UI", sans-serif; }
+.ql-font-times     { font-family: "Times New Roman", Tinos, "Liberation Serif", Times, serif; }
+.ql-font-cambria   { font-family: Cambria, Caladea, Georgia, serif; }
 .ql-font-sans      { font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif; }
 .ql-font-serif     { font-family: Georgia, "Times New Roman", serif; }
 .ql-font-palatino  { font-family: "Palatino Linotype", Palatino, "Book Antiqua", serif; }

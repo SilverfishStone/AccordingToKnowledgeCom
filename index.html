@@ -7,6 +7,9 @@
   <meta name="description" content="Articles, stories, and tools by Silver." />
   <meta name="theme-color" content="#0c101a" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%23000'/%3E%3Cpath d='M12 3l2.6 6.2 6.4.5-4.9 4.2 1.5 6.3L12 16.9 6.4 20.2l1.5-6.3L3 9.7l6.4-.5z' fill='%238ab4ff'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Carlito:ital,wght@0,400;0,700;1,400;1,700&family=Tinos:ital,wght@0,400;0,700;1,400;1,700&family=Caladea:ital,wght@0,400;0,700;1,400;1,700&display=swap" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="story-content.css" />
 </head>
@@ -16,11 +19,12 @@
   <!-- ═════════ Control-panel bar (full width) ═════════ -->
   <header class="console">
     <div class="console-inner">
-      <a class="plate brand" href="#articles" aria-label="According to Knowledge, home">
+      <a class="plate brand" href="#home" aria-label="According to Knowledge, home">
         <span>According to Knowledge</span>
       </a>
 
       <nav class="keys" aria-label="Site sections">
+        <a class="key" href="#home" data-tab="home"><i class="led" aria-hidden="true"></i><span>Home</span></a>
         <a class="key" href="#articles" data-tab="articles"><i class="led" aria-hidden="true"></i><span>Articles</span></a>
         <a class="key" href="#stories" data-tab="stories"><i class="led" aria-hidden="true"></i><span>Stories</span></a>
         <a class="key" href="#gallery" data-tab="gallery"><i class="led" aria-hidden="true"></i><span>Gallery</span></a>
@@ -47,6 +51,38 @@
 
     <!-- ═════════ MIDDLE ═════════ -->
     <main class="feed" id="panel-mid">
+
+      <!-- HOME -->
+      <section class="view page home" data-view="home" aria-labelledby="h-home">
+        <div class="home-about">
+          <p class="eyebrow">About me</p>
+          <h1 id="h-home" class="about-text"></h1>
+        </div>
+
+        <div class="home-block" id="home-pinned" hidden>
+          <p class="eyebrow">Pinned article</p>
+          <a class="featured" id="pinned-link" href="#articles">
+            <span class="featured-title" id="pinned-title"></span>
+            <span class="entry-sub" id="pinned-sub"></span>
+            <span class="tags" id="pinned-tags"></span>
+            <span class="featured-summary" id="pinned-summary"></span>
+            <span class="more">Read the article →</span>
+          </a>
+        </div>
+
+        <a class="gallery-key" id="home-gallery" href="#gallery">
+          <img id="home-gallery-img" alt="" hidden />
+          <span class="gallery-key-label">
+            <strong>Gallery</strong>
+            <small id="home-gallery-cap">Art and photography</small>
+          </span>
+        </a>
+
+        <section class="rules" aria-labelledby="h-rules">
+          <h2 id="h-rules"></h2>
+          <ol id="rules-list"></ol>
+        </section>
+      </section>
 
       <!-- ARTICLES (list) -->
       <section class="view page" data-view="articles" aria-labelledby="h-articles">

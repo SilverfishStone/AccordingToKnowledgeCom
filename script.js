@@ -207,6 +207,7 @@
       const shown = cat ? articles.filter((a) => a.categories.some((n) => slugify(n) === cat.slug)) : articles;
       if (!shown.length) { list.innerHTML = note("No articles yet. They'll appear here as I publish them."); return; }
       list.innerHTML = shown.map((a) => `<a class="entry" href="#article/${esc(a.slug)}">
+        ${a.pinned ? '<span class="entry-kicker">Pinned</span>' : ""}
         <h2>${esc(a.title)}</h2>
         ${a.subtitle ? `<span class="entry-sub">${esc(a.subtitle)}</span>` : ""}
         <span class="entry-meta">${esc(metaLine(a))}</span>
@@ -442,19 +443,54 @@
     }
   }
 
+  /* ───────── home: about, pinned article, gallery button, the rules ───────── */
+  const boldify = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  $("#h-home").textContent = SITE.about || "";
+  $("#h-rules").textContent = SITE.rulesTitle || "Rules";
+  $("#rules-list").innerHTML = (SITE.rules || []).map((r) => `<li><span>${boldify(r)}</span></li>`).join("");
+
+  async function showHome() {
+    const [articles, gallery] = await Promise.allSettled([loadArticles(), loadGallery()]);
+
+    // the pinned article (or, until one is pinned, the newest)
+    const list = articles.status === "fulfilled" ? articles.value : [];
+    const a = list.find((x) => x.pinned) || list[0];
+    $("#home-pinned").hidden = !a;
+    if (a) {
+      $("#home-pinned .eyebrow").textContent = a.pinned ? "Pinned article" : "Latest article";
+      $("#pinned-link").href = "#article/" + a.slug;
+      $("#pinned-title").textContent = a.title || "Untitled";
+      $("#pinned-sub").textContent = a.subtitle || "";
+      $("#pinned-tags").innerHTML = a.categories.map((c) => `<span class="tag">${esc(c)}</span>`).join("");
+      $("#pinned-summary").textContent = a.summary || "";
+    }
+
+    // the gallery button shows the pinned image (or, until one is pinned, the newest)
+    const items = gallery.status === "fulfilled" ? gallery.value : [];
+    const g = items.find((x) => x.pinned) || items[0];
+    const img = $("#home-gallery-img");
+    img.hidden = !g;
+    $("#home-gallery").classList.toggle("has-image", !!g);
+    if (g) {
+      img.src = g.thumb; img.alt = g.alt || g.title;
+      $("#home-gallery-cap").textContent = (g.pinned ? "Best work: " : "Latest: ") + g.title;
+    } else $("#home-gallery-cap").textContent = "Art and photography";
+  }
+
   /* ───────── middle: hash router ───────── */
   const views = $$(".view");
   const keys = $$(".key");
   const notFound = $("#not-found");
-  const TAB = { articles: "articles", article: "articles", stories: "stories", story: "stories", series: "stories", gallery: "gallery", image: "gallery", contact: "contact" };
-  const TITLE = { articles: "Articles", stories: "Stories", gallery: "Gallery", contact: "Contact", article: "Article", story: "Story", series: "Series", image: "Image" };
+  const TAB = { home: "home", articles: "articles", article: "articles", stories: "stories", story: "stories", series: "stories", gallery: "gallery", image: "gallery", contact: "contact" };
+  const TITLE = { home: "Home", articles: "Articles", stories: "Stories", gallery: "Gallery", contact: "Contact", article: "Article", story: "Story", series: "Series", image: "Image" };
 
   function route() {
     const raw = location.hash.replace(/^#\/?/, "");
     const [a = "", b = "", c = ""] = raw.split("/");
     let view = "", arg = "", arg2 = "";
 
-    if (!raw || (["home", "about", "goals", "articles"].includes(a) && !b)) view = "articles";
+    if (!raw || (["home", "about", "goals"].includes(a) && !b)) view = "home";
+    else if (a === "articles" && !b) view = "articles";
     else if (a === "gallery" && !b) view = "gallery";
     else if (a === "gallery" && (b === "category" || b === "tag") && c) { view = "gallery"; arg = b; arg2 = decodeURIComponent(c); }
     else if (a === "image" && b) { view = "image"; arg = b; }
@@ -473,6 +509,13 @@
       on ? k.setAttribute("aria-current", "page") : k.removeAttribute("aria-current");
     });
 
+    // reading a story or article: two panels, so the text gets the room
+    const reading = view === "article" || view === "story";
+    document.body.classList.toggle("reading", reading);
+    document.body.classList.toggle("hide-left", reading && SITE.readingHides !== "right");
+    document.body.classList.toggle("hide-right", reading && SITE.readingHides === "right");
+
+    if (view === "home") showHome();
     if (view === "gallery") showGallery(arg, arg2);
     if (view === "image") showImage(arg);
     if (view === "articles") showArticles(arg);

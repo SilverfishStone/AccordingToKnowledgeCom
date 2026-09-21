@@ -7,6 +7,9 @@
   <meta name="theme-color" content="#000000" />
   <title>Editor · According to Knowledge</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%23000'/%3E%3Cpath d='M12 3l2.6 6.2 6.4.5-4.9 4.2 1.5 6.3L12 16.9 6.4 20.2l1.5-6.3L3 9.7l6.4-.5z' fill='%238ab4ff'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Carlito:ital,wght@0,400;0,700;1,400;1,700&family=Tinos:ital,wght@0,400;0,700;1,400;1,700&family=Caladea:ital,wght@0,400;0,700;1,400;1,700&display=swap" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" />
   <link rel="stylesheet" href="../story-content.css" />
   <link rel="stylesheet" href="write.css" />
@@ -133,6 +136,9 @@
                 <input id="new-cat" type="text" maxlength="60" placeholder="New category, then Enter" autocomplete="off" />
                 <button class="bar-btn" id="btn-add-cat" type="button">Add</button>
               </div>
+              <div class="meta-row">
+                <label class="pin"><input type="checkbox" id="pin-article" /> Pin to the home page <span class="meta-hint">(only one article is pinned at a time)</span></label>
+              </div>
             </div>
           </section>
 
@@ -149,7 +155,11 @@
                 <option selected>Paragraph</option>
               </select>
               <select class="ql-font" title="Font">
-                <option selected>Georgia</option>
+                <option selected>Calibri</option>
+                <option value="calibri-light">Calibri Light</option>
+                <option value="times">Times New Roman</option>
+                <option value="cambria">Cambria</option>
+                <option value="serif">Georgia</option>
                 <option value="sans">Sans</option>
                 <option value="palatino">Palatino</option>
                 <option value="garamond">Garamond</option>
@@ -157,11 +167,13 @@
                 <option value="cursive">Script</option>
               </select>
               <select class="ql-size" title="Font size">
-                <option selected>18</option>
+                <option selected>19</option>
                 <option value="12px">12</option>
                 <option value="14px">14</option>
                 <option value="16px">16</option>
+                <option value="18px">18</option>
                 <option value="20px">20</option>
+                <option value="22px">22</option>
                 <option value="24px">24</option>
                 <option value="28px">28</option>
                 <option value="36px">36</option>
@@ -184,12 +196,10 @@
               <label class="custom-color hl" title="Any highlight color"><span>▮</span><input type="color" id="c-bg" value="#5b4b00" /></label>
             </span>
             <span class="ql-formats">
-              <select class="ql-align" title="Alignment">
-                <option selected></option>
-                <option value="center"></option>
-                <option value="right"></option>
-                <option value="justify"></option>
-              </select>
+              <button type="button" class="ql-align" value="" title="Align left"></button>
+              <button type="button" class="ql-align" value="center" title="Center (Ctrl+E)"></button>
+              <button type="button" class="ql-align" value="right" title="Align right"></button>
+              <button type="button" class="ql-align" value="justify" title="Justify"></button>
               <button type="button" class="ql-list" value="ordered" title="Numbered list"></button>
               <button type="button" class="ql-list" value="bullet" title="Bulleted list"></button>
               <button type="button" class="ql-list" value="check" title="Checklist"></button>
@@ -258,6 +268,7 @@
                 </div>
               </section>
 
+              <label class="check"><input type="checkbox" id="g-pin" /> Pin as my best work (its thumbnail is shown on the home page; only one is pinned at a time)</label>
               <label class="check"><input type="checkbox" id="g-keep" /> Keep the original file as it is (no resizing; keeps any camera or location data inside it)</label>
               <p class="dim g-note" id="g-note">Photos are resized to at most 2400 px on the long side and re-saved without camera or location data, and a small thumbnail is made for the grid.</p>
               <p class="form-error" id="ge-error" role="alert" hidden></p>

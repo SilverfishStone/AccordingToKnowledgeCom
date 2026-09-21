@@ -95,7 +95,7 @@ body:not(.locked) .gate { display: none; }
 }
 .item:hover { background: var(--hover); }
 .item.active { background: rgba(138,180,255,.1); border-color: rgba(138,180,255,.4); }
-.item-title { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: Georgia, serif; }
+.item-title { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: var(--reading-font); }
 .item-meta { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--dim); margin-top: 2px; }
 .badge { padding: 0 8px; border-radius: 999px; border: 1px solid var(--line); font-size: 11px; }
 .badge.live { color: #7ee2a8; border-color: rgba(126,226,168,.4); }
@@ -106,7 +106,7 @@ body:not(.locked) .gate { display: none; }
 .sheet { max-width: 760px; margin: 0 auto; padding-top: 24px; }
 .title-input {
   width: 100%; background: none; border: 0; outline: 0; padding: 4px 0;
-  font-family: Georgia, "Times New Roman", serif; font-size: 36px; font-weight: 700; line-height: 1.2;
+  font-family: var(--reading-font); font-size: 38px; font-weight: 700; line-height: 1.2;
 }
 .title-input::placeholder, .summary-input::placeholder { color: #4a4f54; }
 .summary-input {
@@ -143,30 +143,30 @@ body:not(.locked) .gate { display: none; }
 .ql-snow .ql-tooltip input[type=text] { background: #000; color: var(--text); border: 1px solid var(--line); }
 .ql-snow .ql-tooltip a { color: var(--accent); }
 
-/* picker labels: font */
-.ql-snow .ql-picker.ql-font { width: 104px; }
+/* picker labels: font (no value = Calibri, the default) */
+.ql-snow .ql-picker.ql-font { width: 134px; }
 .ql-snow .ql-picker.ql-font .ql-picker-label::before,
-.ql-snow .ql-picker.ql-font .ql-picker-item::before { content: "Georgia"; }
-.ql-snow .ql-picker.ql-font .ql-picker-label[data-value=sans]::before,      .ql-snow .ql-picker.ql-font .ql-picker-item[data-value=sans]::before      { content: "Sans"; }
-.ql-snow .ql-picker.ql-font .ql-picker-label[data-value=palatino]::before,  .ql-snow .ql-picker.ql-font .ql-picker-item[data-value=palatino]::before  { content: "Palatino"; }
-.ql-snow .ql-picker.ql-font .ql-picker-label[data-value=garamond]::before,  .ql-snow .ql-picker.ql-font .ql-picker-item[data-value=garamond]::before  { content: "Garamond"; }
-.ql-snow .ql-picker.ql-font .ql-picker-label[data-value=monospace]::before, .ql-snow .ql-picker.ql-font .ql-picker-item[data-value=monospace]::before { content: "Typewriter"; }
-.ql-snow .ql-picker.ql-font .ql-picker-label[data-value=cursive]::before,   .ql-snow .ql-picker.ql-font .ql-picker-item[data-value=cursive]::before   { content: "Script"; }
-.ql-snow .ql-picker.ql-font .ql-picker-item::before { font-family: var(--font); }
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value=palatino]::before  { font-family: "Palatino Linotype", Palatino, serif; }
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value=garamond]::before  { font-family: Garamond, serif; }
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value=monospace]::before { font-family: "Courier New", monospace; }
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value=cursive]::before   { font-family: "Segoe Script", "Brush Script MT", cursive; }
-.ql-snow .ql-picker.ql-font .ql-picker-item:not([data-value])::before { font-family: Georgia, serif; }
+.ql-snow .ql-picker.ql-font .ql-picker-item::before { content: "Calibri"; font-family: Calibri, Carlito, sans-serif; }
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value=calibri-light]::before, .ql-snow .ql-picker.ql-font .ql-picker-item[data-value=calibri-light]::before { content: "Calibri Light"; font-family: "Calibri Light", Calibri, Carlito, sans-serif; }
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value=times]::before, .ql-snow .ql-picker.ql-font .ql-picker-item[data-value=times]::before { content: "Times New Roman"; font-family: "Times New Roman", Tinos, serif; }
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value=cambria]::before, .ql-snow .ql-picker.ql-font .ql-picker-item[data-value=cambria]::before { content: "Cambria"; font-family: Cambria, Caladea, serif; }
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value=serif]::before, .ql-snow .ql-picker.ql-font .ql-picker-item[data-value=serif]::before { content: "Georgia"; font-family: Georgia, serif; }
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value=sans]::before, .ql-snow .ql-picker.ql-font .ql-picker-item[data-value=sans]::before { content: "Sans"; font-family: "Segoe UI", system-ui, sans-serif; }
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value=palatino]::before, .ql-snow .ql-picker.ql-font .ql-picker-item[data-value=palatino]::before { content: "Palatino"; font-family: "Palatino Linotype", Palatino, serif; }
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value=garamond]::before, .ql-snow .ql-picker.ql-font .ql-picker-item[data-value=garamond]::before { content: "Garamond"; font-family: Garamond, serif; }
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value=monospace]::before, .ql-snow .ql-picker.ql-font .ql-picker-item[data-value=monospace]::before { content: "Typewriter"; font-family: "Courier New", monospace; }
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value=cursive]::before, .ql-snow .ql-picker.ql-font .ql-picker-item[data-value=cursive]::before { content: "Script"; font-family: "Segoe Script", "Brush Script MT", cursive; }
 
-/* picker labels: size (value 18 = the default) */
+/* picker labels: size (value 19 = the default) */
 .ql-snow .ql-picker.ql-size { width: 58px; }
 .ql-snow .ql-picker.ql-size .ql-picker-label::before,
-.ql-snow .ql-picker.ql-size .ql-picker-item::before { content: "18"; }
+.ql-snow .ql-picker.ql-size .ql-picker-item::before { content: "19"; }
 .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="12px"]::before, .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="12px"]::before { content: "12"; }
 .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="14px"]::before, .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="14px"]::before { content: "14"; }
 .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="16px"]::before, .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="16px"]::before { content: "16"; }
+.ql-snow .ql-picker.ql-size .ql-picker-label[data-value="18px"]::before, .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="18px"]::before { content: "18"; }
 .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="20px"]::before, .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="20px"]::before { content: "20"; }
+.ql-snow .ql-picker.ql-size .ql-picker-label[data-value="22px"]::before, .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="22px"]::before { content: "22"; }
 .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="24px"]::before, .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="24px"]::before { content: "24"; }
 .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="28px"]::before, .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="28px"]::before { content: "28"; }
 .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="36px"]::before, .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="36px"]::before { content: "36"; }
@@ -225,7 +225,7 @@ body.focus .bar:hover, body.focus .bar:focus-within { opacity: 1; }
 .new-row .btn { padding: 0 10px; }
 .subtitle-input {
   width: 100%; background: none; border: 0; outline: 0; padding: 2px 0 6px;
-  font-family: Georgia, "Times New Roman", serif; font-size: 20px; font-style: italic; color: #b7bcc0;
+  font-family: var(--reading-font); font-size: 22px; font-style: italic; color: #b7bcc0;
 }
 .subtitle-input::placeholder { color: #4a4f54; }
 
@@ -329,3 +329,7 @@ body:not(.mode-gallery) .gallery-editor { display: none; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
 .cat .x { margin-left: 6px; opacity: .6; }
 .cat.tag[aria-pressed] { border-color: var(--accent); color: var(--accent); background: rgba(138, 180, 255, .1); }
+
+.pin { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text); }
+.pin .meta-hint { margin-left: 2px; }
+.badge.pin { color: #ffc46b; border-color: rgba(255, 196, 107, .45); }
