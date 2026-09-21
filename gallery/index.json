@@ -1,1 +1,21 @@
-[]
+[
+  {
+    "added": "2026-09-21T15:14:27.403Z",
+    "file": "gallery/images/happy-little-gator.png",
+    "thumb": "gallery/thumbs/happy-little-gator.jpg",
+    "width": 4080,
+    "height": 3060,
+    "caption": "Baby alligator going for a ride with mama",
+    "date": "2026-09-21",
+    "slug": "happy-little-gator",
+    "title": "Happy Little Gator",
+    "categories": [
+      "My Digital Art"
+    ],
+    "tags": [
+      "gator",
+      "alligator",
+      "digital art"
+    ]
+  }
+]
