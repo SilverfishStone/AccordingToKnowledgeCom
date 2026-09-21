@@ -1,6 +1,6 @@
 /* ------------------------------------------------------------------
-   Edit this file to change what shows in the left (tools) and right
-   (articles) panels. The middle panel text lives in index.html.
+   Edit this file to change the tools shown in the left panel.
+   Articles and stories are published from /write/ and don't live here.
    ------------------------------------------------------------------ */
 
 const SITE = {
@@ -31,10 +31,8 @@ const SITE = {
     // Copy a block above to add another tool.
   ],
 
-  /* RIGHT PANEL — article highlights.
-     While this list is empty the panel shows a "work in progress" notice.
-     Add an entry and the notice is replaced by the article list, e.g.:
-       { title: "My first article", topic: "Thinking", date: "Oct 1, 2026",
-         read: "5 min read", url: "articles/first.html" },                    */
-  posts: [],
+  /* Starter category list offered in the editor when you file an article.
+     Any category already used by a published article is offered too, and you
+     can type new ones in the editor, so this is only a convenience.          */
+  categories: ["Mormons", "Comparative Religion", "Apologetics"],
 };

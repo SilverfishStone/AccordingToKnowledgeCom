@@ -3,11 +3,18 @@
 
   const $  = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-  /* Where stories are published. Change if the repo moves. */
+  /* Where things are published. Change if the repo moves. */
   const DEFAULTS = { owner: "SilverfishStone", repo: "AccordingToKnowledgeCom", branch: "main" };
-  const INDEX_PATH = "stories/index.json";
+  const KINDS = {
+    story:   { label: "Story",   dir: "stories" },
+    article: { label: "Article", dir: "articles" },
+  };
+  const indexPath = (kind) => `${KINDS[kind].dir}/index.json`;
+  const filePath  = (kind, slug) => `${KINDS[kind].dir}/${slug}.json`;
+  const SERIES_PATH = "stories/series.json";
+  const RESERVED = new Set(["index", "series"]);
   const K = {
     drafts: "atk.drafts.v1",
     cfg: "atk.gh.cfg.v1",
@@ -43,6 +50,8 @@
   const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
   const fmtDate = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }); };
   const fmtTime = (d) => d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const slugify = (t) => String(t).toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60).replace(/-+$/, "");
 
   /* ───────── base64 (UTF-8 safe) ───────── */
   const b64 = (str) => {
@@ -54,6 +63,20 @@
   const unb64 = (str) => {
     const bin = atob(str.replace(/\s/g, ""));
     return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+  };
+
+  /* Images already on the site are stored as paths relative to the site root
+     ("articles/images/x.png"). This page lives in /write/, so show them with the
+     root prefixed, and take it off again when publishing. */
+  const ROOT = new URL("../", location.href).href;
+  const isRel = (u) => !/^(?:[a-z][a-z0-9+.-]*:|\/|#)/i.test(u);
+  const toEditorUrl = (u) => (isRel(u) ? ROOT + u : u);
+  const toSiteUrl = (u) => (u.startsWith(ROOT) ? u.slice(ROOT.length) : u);
+  const mapHtml = (html, fn) => html.replace(/(<img\b[^>]*?\bsrc=")([^"]*)(")/gi, (_, a, u, c) => a + fn(u) + c);
+  const mapDelta = (delta, fn) => {
+    const d = JSON.parse(JSON.stringify(delta || { ops: [] }));
+    for (const op of d.ops || []) if (op.insert && typeof op.insert === "object" && typeof op.insert.image === "string") op.insert.image = fn(op.insert.image);
+    return d;
   };
 
   /* ───────── GitHub ───────── */
@@ -109,20 +132,21 @@
     gh(contentsPath(path), { method: "DELETE", body: { message, sha, branch: cfg.branch } });
 
   const byNewest = (a, b) => new Date(b.published) - new Date(a.published);
-  async function readIndex() {
-    const f = await getFile(INDEX_PATH);
+  async function readList(path) {
+    const f = await getFile(path);
     if (!f) return [];
     const list = JSON.parse(f.text);
     return Array.isArray(list) ? list : [];
   }
-  /* Read-modify-write of stories/index.json, retrying if someone else committed in between. */
-  async function updateIndex(mutate, message) {
+  /* Read-modify-write of a JSON list file, retrying if something else committed in between. */
+  async function updateList(path, mutate, message, sort) {
     for (let attempt = 0; ; attempt++) {
-      const f = await getFile(INDEX_PATH);
+      const f = await getFile(path);
       const list = f ? JSON.parse(f.text) : [];
-      const next = mutate(Array.isArray(list) ? list : []).sort(byNewest);
+      let next = mutate(Array.isArray(list) ? list : []);
+      if (sort) next = next.sort(sort);
       try {
-        await putFile(INDEX_PATH, JSON.stringify(next, null, 2) + "\n", message, f && f.sha);
+        await putFile(path, JSON.stringify(next, null, 2) + "\n", message, f && f.sha);
         return next;
       } catch (e) {
         if ((e.status === 409 || e.status === 422) && attempt < 2) continue;
@@ -130,6 +154,7 @@
       }
     }
   }
+  const listProblem = (err) => (err instanceof SyntaxError ? "One of the index files in the repo isn't valid JSON, so nothing was changed. Fix it in the repo first." : err.message);
 
   /* ───────── gate ───────── */
   const gateForm = $("#gate-form");
@@ -231,15 +256,25 @@
   wireColor("#c-bg", "background");
 
   /* ───────── drafts ───────── */
-  const titleEl = $("#title"), summaryEl = $("#summary");
+  const titleEl = $("#title"), subtitleEl = $("#subtitle"), summaryEl = $("#summary");
   let drafts = store.getJSON(K.drafts) || {};   // id -> draft
-  let remote = [];                              // published index entries
+  let remote = { story: [], article: [] };      // published index entries
+  let seriesList = [];                          // stories/series.json
   let cur = null;                               // the open draft
   let previewOn = false;
   let busy = false;
   let savedAt = null;
 
-  const newDraft = () => ({ id: uid(), title: "", summary: "", delta: { ops: [] }, slug: null, published: null, created: Date.now(), updated: Date.now(), changed: false });
+  const normalize = (d) => ({
+    kind: "story", subtitle: "", series: "", pendingSeries: false, seriesTitle: "", seriesSummary: "", chapter: null, categories: [], extra: {},
+    ...d,
+  });
+  for (const id of Object.keys(drafts)) drafts[id] = normalize(drafts[id]);
+
+  const newDraft = (kind = "story") => normalize({
+    id: uid(), kind, title: "", summary: "", delta: { ops: [] }, slug: null, published: null,
+    created: Date.now(), updated: Date.now(), changed: false,
+  });
   const bodyHasContent = () => quill.getText().trim() || quill.getContents().ops.some((o) => o.insert && typeof o.insert === "object");
   const hasContent = () => titleEl.value.trim() || summaryEl.value.trim() || bodyHasContent();
   const countWords = () => { const t = quill.getText().trim(); return t ? t.split(/\s+/).length : 0; };
@@ -249,6 +284,7 @@
   function saveLocal({ quiet } = {}) {
     if (!cur) return true;
     cur.title = titleEl.value;
+    cur.subtitle = subtitleEl.value;
     cur.summary = summaryEl.value;
     cur.delta = quill.getContents();
     cur.updated = Date.now();
@@ -272,6 +308,7 @@
   }
   quill.on("text-change", (_d, _o, source) => { if (source !== "silent") onEdit(); else renderFoot(); });
   titleEl.addEventListener("input", onEdit);
+  subtitleEl.addEventListener("input", onEdit);
   summaryEl.addEventListener("input", onEdit);
 
   function renderFoot() {
@@ -289,9 +326,100 @@
     el.textContent = saved + " · " + live;
   }
 
+  /* ───────── type / series / categories ───────── */
+  const NEW_SERIES = "__new__";
+  const seriesSelect = $("#series-select"), chapterEl = $("#chapter");
+
+  const nextChapter = (seriesSlug) => {
+    const nums = remote.story.filter((s) => s.series === seriesSlug).map((s) => Number(s.chapter) || 0);
+    return (nums.length ? Math.max(...nums) : 0) + 1;
+  };
+  function knownCategories() {
+    const seen = new Map();
+    const add = (n) => { const k = String(n).trim(); if (k && !seen.has(k.toLowerCase())) seen.set(k.toLowerCase(), k); };
+    (window.SITE && SITE.categories || []).forEach(add);
+    remote.article.forEach((a) => (a.categories || []).forEach(add));
+    (cur ? cur.categories : []).forEach(add);
+    return [...seen.values()];
+  }
+
+  function renderMeta() {
+    if (!cur) return;
+    const isArticle = cur.kind === "article";
+    $$('input[name="kind"]').forEach((r) => { r.checked = r.value === cur.kind; r.disabled = !!cur.slug; });
+    $("#kind-hint").textContent = cur.slug ? "Already published, so its type is fixed." : "";
+    $("#story-meta").hidden = isArticle;
+    $("#article-meta").hidden = !isArticle;
+    subtitleEl.hidden = !isArticle;
+    quill.root.setAttribute("data-placeholder", isArticle ? "Start writing…" : "Once upon a time…");
+
+    // series
+    const pendingNew = cur.pendingSeries || (cur.series && !seriesList.some((s) => s.slug === cur.series));
+    seriesSelect.innerHTML =
+      `<option value="">Standalone (not in a series)</option>` +
+      seriesList.map((s) => `<option value="${esc(s.slug)}">${esc(s.title)}</option>`).join("") +
+      `<option value="${NEW_SERIES}">+ New series…</option>`;
+    seriesSelect.value = pendingNew ? NEW_SERIES : (cur.series || "");
+    $("#new-series-row").hidden = !pendingNew && seriesSelect.value !== NEW_SERIES;
+    $("#new-series-title").value = cur.seriesTitle || "";
+    $("#new-series-summary").value = cur.seriesSummary || "";
+    chapterEl.value = cur.chapter || "";
+    chapterEl.disabled = !cur.series && seriesSelect.value !== NEW_SERIES;
+
+    // categories
+    $("#cat-chips").innerHTML = knownCategories().map((c) =>
+      `<button type="button" class="cat" data-cat="${esc(c)}" aria-pressed="${cur.categories.some((x) => x.toLowerCase() === c.toLowerCase())}">${esc(c)}</button>`).join("");
+  }
+
+  $$('input[name="kind"]').forEach((r) => r.addEventListener("change", () => {
+    if (!cur || cur.slug || !r.checked) return;
+    cur.kind = r.value; onEdit(); renderMeta();
+  }));
+  seriesSelect.addEventListener("change", () => {
+    if (!cur) return;
+    const v = seriesSelect.value;
+    cur.pendingSeries = v === NEW_SERIES;
+    if (v === NEW_SERIES) {
+      cur.series = slugify(cur.seriesTitle || "");
+      $("#new-series-row").hidden = false;
+      chapterEl.disabled = false;
+      if (!cur.chapter) { cur.chapter = 1; chapterEl.value = 1; }
+      $("#new-series-title").focus();
+    } else {
+      cur.series = v; cur.seriesTitle = ""; cur.seriesSummary = "";
+      $("#new-series-row").hidden = true;
+      chapterEl.disabled = !v;
+      if (v && !cur.chapter) { cur.chapter = nextChapter(v); chapterEl.value = cur.chapter; }
+      if (!v) { cur.chapter = null; chapterEl.value = ""; }
+    }
+    onEdit();
+  });
+  $("#new-series-title").addEventListener("input", (e) => { cur.seriesTitle = e.target.value; cur.series = slugify(e.target.value); onEdit(); });
+  $("#new-series-summary").addEventListener("input", (e) => { cur.seriesSummary = e.target.value; onEdit(); });
+  chapterEl.addEventListener("input", () => { const n = parseInt(chapterEl.value, 10); cur.chapter = n > 0 ? n : null; onEdit(); });
+
+  function toggleCategory(name) {
+    const i = cur.categories.findIndex((x) => x.toLowerCase() === name.toLowerCase());
+    if (i >= 0) cur.categories.splice(i, 1); else cur.categories.push(name);
+    onEdit(); renderMeta();
+  }
+  $("#cat-chips").addEventListener("click", (e) => { const b = e.target.closest(".cat"); if (b && cur) toggleCategory(b.dataset.cat); });
+  function addCategory() {
+    const input = $("#new-cat"), name = input.value.trim().replace(/\s+/g, " ");
+    if (!name || !cur) return;
+    if (!slugify(name)) { toast("Use letters or numbers in the category name.", "err"); return; }
+    const existing = knownCategories().find((c) => c.toLowerCase() === name.toLowerCase());
+    if (!cur.categories.some((x) => x.toLowerCase() === (existing || name).toLowerCase())) cur.categories.push(existing || name);
+    input.value = ""; onEdit(); renderMeta();
+  }
+  $("#btn-add-cat").addEventListener("click", addCategory);
+  $("#new-cat").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addCategory(); } });
+
+  /* ───────── list + open/new ───────── */
   function renderChrome() {
     $("#btn-publish").textContent = cur && cur.slug ? "Update" : "Publish";
     $("#m-unpublish").disabled = !(cur && cur.slug);
+    renderMeta();
     renderStatus();
     renderFoot();
   }
@@ -300,16 +428,18 @@
     const local = Object.values(drafts).sort((a, b) => b.updated - a.updated);
     // a brand-new empty draft isn't saved yet, but should still show as the open item
     if (cur && !drafts[cur.id]) local.unshift(cur);
-    const taken = new Set(local.map((d) => d.slug).filter(Boolean));
-    const remoteOnly = remote.filter((s) => !taken.has(s.slug));
+    const taken = new Set(local.filter((d) => d.slug).map((d) => d.kind + ":" + d.slug));
+    const remoteOnly = ["article", "story"].flatMap((k) => remote[k].map((s) => ({ ...s, kind: k })))
+      .filter((s) => !taken.has(s.kind + ":" + s.slug)).sort(byNewest);
 
-    const badge = (d) => !d.slug ? '<span class="badge">Draft</span>' : d.changed ? '<span class="badge edited">Live · edited</span>' : '<span class="badge live">Live</span>';
+    const status = (d) => !d.slug ? '<span class="badge">Draft</span>' : d.changed ? '<span class="badge edited">Live · edited</span>' : '<span class="badge live">Live</span>';
+    const kindBadge = (k) => `<span class="badge kind">${KINDS[k].label}</span>`;
     const item = (d) => `<button type="button" class="item${cur && d.id === cur.id ? " active" : ""}" data-id="${esc(d.id)}">
       <span class="item-title">${esc(d.title.trim() || "Untitled")}</span>
-      <span class="item-meta">${badge(d)}<span>${esc(fmtDate(d.updated))}</span></span></button>`;
-    const rItem = (s) => `<button type="button" class="item" data-slug="${esc(s.slug)}">
+      <span class="item-meta">${kindBadge(d.kind)}${status(d)}<span>${esc(fmtDate(d.updated))}</span></span></button>`;
+    const rItem = (s) => `<button type="button" class="item" data-kind="${s.kind}" data-slug="${esc(s.slug)}">
       <span class="item-title">${esc(s.title || "Untitled")}</span>
-      <span class="item-meta"><span class="badge live">Live</span><span>${esc(fmtDate(s.published))}</span></span></button>`;
+      <span class="item-meta">${kindBadge(s.kind)}<span class="badge live">Live</span><span>${esc(fmtDate(s.published))}</span></span></button>`;
 
     $("#story-items").innerHTML =
       (local.length ? `<div class="group-label">Drafts &amp; edits</div>${local.map(item).join("")}` : "") +
@@ -319,6 +449,7 @@
 
   function loadIntoUI() {
     titleEl.value = cur.title || "";
+    subtitleEl.value = cur.subtitle || "";
     summaryEl.value = cur.summary || "";
     quill.setContents(cur.delta && cur.delta.ops ? cur.delta : { ops: [] }, "silent");
     quill.history.clear();
@@ -341,28 +472,34 @@
     cur = drafts[id];
     loadIntoUI();
   }
-  function newStory() {
+  function newOne(kind) {
     leaveCurrent();
-    cur = newDraft();
+    cur = newDraft(kind);
     loadIntoUI();
     titleEl.focus();
   }
 
-  async function openRemote(slug) {
+  async function openRemote(kind, slug) {
     if (busy) return;
     leaveCurrent();
     setBusy(true, "Opening…");
     try {
-      const f = await getFile(`stories/${slug}.json`);
-      if (!f) throw new Error("That story's file is missing from the repo.");
+      const f = await getFile(filePath(kind, slug));
+      if (!f) throw new Error(`That ${KINDS[kind].label.toLowerCase()}'s file is missing from the repo.`);
       const s = JSON.parse(f.text);
-      const delta = s.delta && s.delta.ops ? s.delta : quill.clipboard.convert({ html: String(s.html || "") });
-      const d = { ...newDraft(), title: s.title || "", summary: s.summary || "", delta, slug: s.slug || slug, published: s.published || null };
+      const delta = mapDelta(s.delta && s.delta.ops ? s.delta : quill.clipboard.convert({ html: mapHtml(String(s.html || ""), toEditorUrl) }), toEditorUrl);
+      const d = normalize({
+        ...newDraft(kind), title: s.title || "", subtitle: s.subtitle || "", summary: s.summary || "", delta,
+        slug: s.slug || slug, published: s.published || null,
+        series: s.series || "", chapter: s.chapter || null,
+        categories: Array.isArray(s.categories) ? s.categories : [],
+        extra: s.source ? { source: s.source } : {},
+      });
       drafts[d.id] = d; persist();
       cur = d;
       loadIntoUI();
     } catch (err) {
-      toast(err.message, "err");
+      toast(listProblem(err), "err");
     } finally { setBusy(false); }
   }
 
@@ -370,9 +507,10 @@
     const b = e.target.closest(".item");
     if (!b) return;
     document.body.classList.remove("side-open");
-    if (b.dataset.id) openDraft(b.dataset.id); else openRemote(b.dataset.slug);
+    if (b.dataset.id) openDraft(b.dataset.id); else openRemote(b.dataset.kind, b.dataset.slug);
   });
-  $("#btn-new").addEventListener("click", () => { document.body.classList.remove("side-open"); newStory(); });
+  $("#btn-new-story").addEventListener("click", () => { document.body.classList.remove("side-open"); newOne("story"); });
+  $("#btn-new-article").addEventListener("click", () => { document.body.classList.remove("side-open"); newOne("article"); });
   $("#btn-side").addEventListener("click", () => {
     const open = document.body.classList.toggle("side-open");
     $("#btn-side").setAttribute("aria-expanded", String(open));
@@ -394,7 +532,7 @@
   });
 
   /* ───────── save / publish / unpublish / delete / export ───────── */
-  const actionBtns = ["#btn-save", "#btn-publish", "#btn-new"];
+  const actionBtns = ["#btn-save", "#btn-publish", "#btn-new-story", "#btn-new-article"];
   function setBusy(on, label) {
     busy = on;
     actionBtns.forEach((s) => { $(s).disabled = on; });
@@ -412,57 +550,85 @@
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); $("#btn-save").click(); }
   });
 
-  const slugify = (t) => t.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60).replace(/-+$/, "") || "story";
-
-  async function freeSlug(title, list) {
-    const base = slugify(title);
+  async function freeSlug(kind, title, list) {
+    const base = slugify(title) || KINDS[kind].label.toLowerCase();
     const used = new Set(list.map((s) => s.slug));
     for (let n = 1; n < 50; n++) {
       const cand = (n === 1 ? base : `${base}-${n}`);
-      if (cand === "index" || used.has(cand)) continue;
-      if (!(await getFile(`stories/${cand}.json`))) return cand;
+      if (RESERVED.has(cand) || used.has(cand)) continue;
+      if (!(await getFile(filePath(kind, cand)))) return cand;
     }
     throw new Error("Couldn't find a free web address for this title. Try a different title.");
   }
 
+  /* problems worth telling the author about before anything is sent */
+  function checkBeforePublish() {
+    const title = titleEl.value.trim();
+    if (!title) { titleEl.focus(); return "Give it a title first."; }
+    if (!bodyHasContent()) return "There's nothing written yet.";
+    if (cur.kind === "story" && (cur.pendingSeries || cur.series)) {
+      const isNew = cur.pendingSeries || !seriesList.some((s) => s.slug === cur.series);
+      if (isNew && (!cur.seriesTitle.trim() || !cur.series)) { $("#new-series-title").focus(); return "Give the new series a title, or choose “Standalone”."; }
+      if (!(cur.chapter > 0)) { chapterEl.focus(); return "Enter this story's chapter number (1 or higher)."; }
+    }
+    return "";
+  }
+
   $("#btn-publish").addEventListener("click", async () => {
     if (busy || !cur) return;
+    const problem = checkBeforePublish();
+    if (problem) { toast(problem, "err"); return; }
+    const kind = cur.kind, label = KINDS[kind].label;
     const title = titleEl.value.trim();
-    if (!title) { toast("Give the story a title first.", "err"); titleEl.focus(); return; }
-    if (!bodyHasContent()) { toast("The story is empty.", "err"); return; }
     const verb = cur.slug ? "Update" : "Publish";
-    if (!confirm(`${verb} “${title}” on the public site?`)) return;
+
+    const clash = kind === "story" && cur.series && remote.story.find((s) => s.series === cur.series && Number(s.chapter) === cur.chapter && s.slug !== cur.slug);
+    const where = kind === "story" && cur.series ? ` as chapter ${cur.chapter} of “${(seriesList.find((s) => s.slug === cur.series) || { title: cur.seriesTitle }).title}”` : "";
+    if (!confirm(`${verb} “${title}”${where} on the public site?${clash ? `\n\nHeads up: “${clash.title}” is already chapter ${cur.chapter} of this series.` : ""}`)) return;
 
     clearTimeout(autosave);
     saveLocal({ quiet: true });
     setBusy(true, verb === "Publish" ? "Publishing…" : "Updating…");
     try {
-      const list = await readIndex();
-      const slug = cur.slug || await freeSlug(title, list);
+      // a brand-new series is registered first, so a chapter never points at a series that doesn't exist
+      if (kind === "story" && cur.series && !seriesList.some((s) => s.slug === cur.series)) {
+        seriesList = await updateList(SERIES_PATH, (l) => (l.some((s) => s.slug === cur.series) ? l : [...l, { slug: cur.series, title: cur.seriesTitle.trim(), summary: cur.seriesSummary.trim() }]),
+          `Add series: ${cur.seriesTitle.trim()}`);
+      }
+
+      const list = await readList(indexPath(kind));
+      const slug = cur.slug || await freeSlug(kind, title, list);
       const now = new Date().toISOString();
       const published = cur.published || now;
-      const html = quill.root.innerHTML;
+      const html = mapHtml(quill.root.innerHTML, toSiteUrl);
+      const delta = mapDelta(quill.getContents(), toSiteUrl);
       const words = countWords();
       const summary = summaryEl.value.trim();
 
-      const story = { slug, title, summary, published, updated: now, words, html, delta: quill.getContents() };
-      const path = `stories/${slug}.json`;
+      const meta = { slug, title, summary, published, updated: now, words };
+      if (kind === "story") { if (cur.series) { meta.series = cur.series; meta.chapter = cur.chapter; } }
+      else {
+        const sub = subtitleEl.value.trim();
+        if (sub) meta.subtitle = sub;
+        meta.categories = cur.categories.slice();
+      }
+      const doc = { ...meta, ...(kind === "article" && cur.extra && cur.extra.source ? { source: cur.extra.source } : {}), html, delta };
+
+      const path = filePath(kind, slug);
       const existing = await getFile(path);
-      await putFile(path, JSON.stringify(story), `${verb} story: ${title}`, existing && existing.sha);
+      await putFile(path, JSON.stringify(doc), `${verb} ${label.toLowerCase()}: ${title}`, existing && existing.sha);
 
-      remote = await updateIndex((l) => {
-        const entry = { slug, title, summary, published, updated: now, words };
+      remote[kind] = await updateList(indexPath(kind), (l) => {
         const i = l.findIndex((s) => s.slug === slug);
-        if (i >= 0) l[i] = entry; else l.push(entry);
+        if (i >= 0) l[i] = meta; else l.push(meta);
         return l;
-      }, `${verb} story index: ${title}`);
+      }, `${verb} ${label.toLowerCase()} index: ${title}`, byNewest);
 
-      cur.slug = slug; cur.published = published; cur.changed = false;
+      cur.slug = slug; cur.published = published; cur.changed = false; cur.pendingSeries = false;
       saveLocal({ quiet: true });
       toast(`${verb === "Publish" ? "Published" : "Updated"}. GitHub Pages usually shows it on the site within a minute or two.`, "ok");
     } catch (err) {
-      toast((err instanceof SyntaxError ? "stories/index.json isn't valid JSON, so nothing was changed. Fix it in the repo first." : err.message) + " Your draft is still saved here.", "err");
+      toast(listProblem(err) + " Your draft is still saved here.", "err");
     } finally {
       setBusy(false);
       renderList();
@@ -472,18 +638,18 @@
   $("#m-unpublish").addEventListener("click", async () => {
     closeMenu();
     if (busy || !cur || !cur.slug) return;
-    if (!confirm(`Take “${cur.title || "this story"}” off the public site? Your local draft is kept, and you can publish it again later.`)) return;
+    if (!confirm(`Take “${cur.title || "this"}” off the public site? Your local draft is kept, and you can publish it again later.`)) return;
     setBusy(true, "Unpublishing…");
     try {
-      const slug = cur.slug;
-      const f = await getFile(`stories/${slug}.json`);
-      if (f) await deleteFile(`stories/${slug}.json`, f.sha, `Unpublish story: ${cur.title}`);
-      remote = await updateIndex((l) => l.filter((s) => s.slug !== slug), `Unpublish story index: ${cur.title}`);
+      const kind = cur.kind, slug = cur.slug, label = KINDS[kind].label.toLowerCase();
+      const f = await getFile(filePath(kind, slug));
+      if (f) await deleteFile(filePath(kind, slug), f.sha, `Unpublish ${label}: ${cur.title}`);
+      remote[kind] = await updateList(indexPath(kind), (l) => l.filter((s) => s.slug !== slug), `Unpublish ${label} index: ${cur.title}`, byNewest);
       cur.slug = null; cur.published = null; cur.changed = false;
       saveLocal({ quiet: true });
       toast("Unpublished. It stays here as a draft.", "ok");
     } catch (err) {
-      toast(err.message, "err");
+      toast(listProblem(err), "err");
     } finally { setBusy(false); renderList(); }
   });
 
@@ -494,7 +660,7 @@
     delete drafts[cur.id]; persist();
     cur = null;
     const next = Object.values(drafts).sort((a, b) => b.updated - a.updated)[0];
-    if (next) { cur = next; loadIntoUI(); } else newStory();
+    if (next) { cur = next; loadIntoUI(); } else newOne("story");
     toast("Draft deleted.");
   });
 
@@ -508,14 +674,14 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css">
 <style>
 body{max-width:720px;margin:40px auto;padding:0 20px;font:18px/1.75 Georgia,serif;color:#111}
-.ql-editor{padding:0;overflow:visible;height:auto}.ql-editor p{margin:0 0 1em}
+.ql-editor{padding:0;overflow:visible;height:auto}.ql-editor p{margin:0 0 1em}.ql-editor img{max-width:100%}
 .ql-font-sans{font-family:system-ui,sans-serif}.ql-font-serif{font-family:Georgia,serif}
 .ql-font-palatino{font-family:"Palatino Linotype",Palatino,serif}.ql-font-garamond{font-family:Garamond,serif}
 .ql-font-monospace{font-family:"Courier New",monospace}.ql-font-cursive{font-family:"Segoe Script","Brush Script MT",cursive}
 </style></head><body class="ql-snow"><h1>${esc(title)}</h1><div class="ql-editor">${body}</div></body></html>`;
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([doc], { type: "text/html" }));
-    a.download = slugify(title) + ".html";
+    a.download = (slugify(title) || "draft") + ".html";
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   });
@@ -536,12 +702,15 @@ body{max-width:720px;margin:40px auto;padding:0 20px;font:18px/1.75 Georgia,seri
 
   async function refreshRemote(announce) {
     try {
-      remote = (await readIndex()).sort(byNewest);
-      if (announce) toast("Story list refreshed.", "ok");
+      const [stories, articles, series] = await Promise.all([readList(indexPath("story")), readList(indexPath("article")), readList(SERIES_PATH)]);
+      remote = { story: stories.sort(byNewest), article: articles.sort(byNewest) };
+      seriesList = series;
+      if (announce) toast("Lists refreshed.", "ok");
     } catch (err) {
-      toast("Couldn't load the published list: " + (err instanceof SyntaxError ? "stories/index.json isn't valid JSON." : err.message), "err");
+      toast("Couldn't load what's published: " + listProblem(err), "err");
     }
     renderList();
+    renderMeta();
   }
 
   /* ───────── lock / unlock ───────── */
@@ -552,7 +721,7 @@ body{max-width:720px;margin:40px auto;padding:0 20px;font:18px/1.75 Georgia,seri
     if (started) { refreshRemote(); return; }
     started = true;
     const lastId = store.getJSON(K.cur);
-    cur = (lastId && drafts[lastId]) || Object.values(drafts).sort((a, b) => b.updated - a.updated)[0] || newDraft();
+    cur = (lastId && drafts[lastId]) || Object.values(drafts).sort((a, b) => b.updated - a.updated)[0] || newDraft("story");
     loadIntoUI();
     refreshRemote();
   }

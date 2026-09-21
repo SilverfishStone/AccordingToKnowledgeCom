@@ -219,3 +219,41 @@ body.focus .bar:hover, body.focus .bar:focus-within { opacity: 1; }
   .title-input { font-size: 28px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ── type / series / categories panel ── */
+.new-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.new-row .btn { padding: 0 10px; }
+.subtitle-input {
+  width: 100%; background: none; border: 0; outline: 0; padding: 2px 0 6px;
+  font-family: Georgia, "Times New Roman", serif; font-size: 20px; font-style: italic; color: #b7bcc0;
+}
+.subtitle-input::placeholder { color: #4a4f54; }
+
+.meta-panel { display: grid; gap: 10px; margin: 6px 0 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: #0b0d10; }
+.meta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.meta-label { flex: none; min-width: 5.2em; font: 700 11px/1 "Cascadia Mono", Consolas, monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
+.meta-hint { font-size: 12px; color: var(--dim); }
+.meta-panel select, .meta-panel input[type=text], .meta-panel input[type=number] {
+  height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: #000; color: var(--text); font-size: 14px;
+}
+.meta-panel select { max-width: 100%; }
+.meta-panel input[type=number] { width: 78px; }
+.meta-panel input[type=text] { flex: 1; min-width: 160px; }
+.meta-panel select:focus, .meta-panel input:focus { border-color: var(--accent); outline: none; }
+
+.seg { display: inline-flex; border: 1px solid #536471; border-radius: 999px; overflow: hidden; }
+.seg label { cursor: pointer; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg span { display: block; padding: 6px 16px; font-size: 14px; font-weight: 600; color: var(--dim); }
+.seg input:checked + span { background: var(--accent); color: var(--accent-fg); }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: -2px; }
+.seg input:disabled + span { opacity: .55; cursor: not-allowed; }
+
+.cat-chips { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
+.cat {
+  padding: 4px 12px; border: 1px solid var(--line); border-radius: 4px; background: transparent; font-size: 13px; color: #c5c9cc;
+}
+.cat:hover { border-color: #536471; }
+.cat[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: rgba(138, 180, 255, .1); }
+.badge.kind { color: var(--accent); border-color: rgba(138, 180, 255, .4); }
+body.focus .meta-panel, body.focus .subtitle-input { display: none; }

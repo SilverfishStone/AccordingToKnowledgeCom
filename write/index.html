@@ -75,15 +75,53 @@
 
     <div class="wrap">
       <aside class="side" id="side" aria-label="Your stories">
-        <button class="btn primary block" id="btn-new" type="button">+ New story</button>
+        <div class="new-row"><button class="btn primary" id="btn-new-story" type="button">+ Story</button><button class="btn primary" id="btn-new-article" type="button">+ Article</button></div>
         <div class="side-note dim" id="side-note"></div>
         <div id="story-items"></div>
       </aside>
 
       <main class="main">
         <div class="sheet">
-          <input class="title-input" id="title" placeholder="Title" maxlength="140" aria-label="Story title" autocomplete="off" />
-          <textarea class="summary-input" id="summary" rows="2" maxlength="280" placeholder="A line or two shown on the stories list (optional)" aria-label="Summary"></textarea>
+          <input class="title-input" id="title" placeholder="Title" maxlength="140" aria-label="Title" autocomplete="off" />
+          <input class="subtitle-input" id="subtitle" placeholder="Subtitle (optional)" maxlength="160" aria-label="Subtitle" autocomplete="off" hidden />
+          <textarea class="summary-input" id="summary" rows="2" maxlength="280" placeholder="A line or two shown on the list page (optional)" aria-label="Summary"></textarea>
+
+          <section class="meta-panel" id="meta-panel" aria-label="Where this is filed">
+            <div class="meta-row">
+              <span class="meta-label">Type</span>
+              <div class="seg" role="radiogroup" aria-label="Type of writing">
+                <label><input type="radio" name="kind" value="story" /><span>Story</span></label>
+                <label><input type="radio" name="kind" value="article" /><span>Article</span></label>
+              </div>
+              <span class="meta-hint" id="kind-hint"></span>
+            </div>
+
+            <div id="story-meta">
+              <div class="meta-row">
+                <label class="meta-label" for="series-select">Series</label>
+                <select id="series-select"></select>
+                <label class="meta-label" for="chapter">Chapter</label>
+                <input id="chapter" type="number" min="1" step="1" inputmode="numeric" placeholder="#" />
+              </div>
+              <div class="meta-row" id="new-series-row" hidden>
+                <label class="meta-label" for="new-series-title">New series</label>
+                <input id="new-series-title" type="text" maxlength="100" placeholder="Series title" autocomplete="off" />
+                <input id="new-series-summary" type="text" maxlength="200" placeholder="Short description (optional)" autocomplete="off" />
+              </div>
+            </div>
+
+            <div id="article-meta" hidden>
+              <div class="meta-row">
+                <span class="meta-label">Categories</span>
+                <div class="cat-chips" id="cat-chips"></div>
+              </div>
+              <div class="meta-row">
+                <label class="meta-label" for="new-cat">Add</label>
+                <input id="new-cat" type="text" maxlength="60" placeholder="New category, then Enter" autocomplete="off" />
+                <button class="bar-btn" id="btn-add-cat" type="button">Add</button>
+              </div>
+            </div>
+          </section>
 
           <div id="toolbar">
             <span class="ql-formats">
@@ -167,6 +205,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
+  <script src="../site-data.js"></script>
   <script src="write.js"></script>
 </body>
 </html>
