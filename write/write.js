@@ -14,12 +14,24 @@
   const indexPath = (kind) => `${KINDS[kind].dir}/index.json`;
   const filePath  = (kind, slug) => `${KINDS[kind].dir}/${slug}.json`;
   const SERIES_PATH = "stories/series.json";
+  const GALLERY_PATH = "gallery/index.json";
   const RESERVED = new Set(["index", "series"]);
   const K = {
     drafts: "atk.drafts.v1",
     cfg: "atk.gh.cfg.v1",
     tok: "atk.gh.token.v1",
     cur: "atk.current.v1",
+    ok: "atk.editor.ok",
+  };
+
+  /* Password gate. Only a salted, slow hash is stored here, never the password.
+     This keeps casual visitors out of the editor UI; it is not real security (anyone can
+     read this file). What actually protects the site is the GitHub token, which is needed
+     to publish and is never stored in the repo. */
+  const PASS = {
+    salt: "atk-write-v1:35ae82797929880a57e14d88",
+    hash: "344e03c5b181d10d7ee195f5a2b5a25b1d219cbe31d92c861eddc7b6611daf35",
+    iterations: 200000,
   };
 
   /* ───────── storage (every access guarded; browsers can block it) ───────── */
@@ -36,6 +48,9 @@
     } catch { return false; }
   };
   const clearToken = () => { try { sessionStorage.removeItem(K.tok); localStorage.removeItem(K.tok); } catch {} };
+  const isUnlocked = () => { try { return (sessionStorage.getItem(K.ok) || localStorage.getItem(K.ok)) === PASS.hash; } catch { return false; } };
+  const setUnlocked = (remember) => { try { sessionStorage.removeItem(K.ok); localStorage.removeItem(K.ok); (remember ? localStorage : sessionStorage).setItem(K.ok, PASS.hash); } catch {} };
+  const clearUnlocked = () => { try { sessionStorage.removeItem(K.ok); localStorage.removeItem(K.ok); } catch {} };
 
   /* ───────── UI helpers ───────── */
   const toastEl = $("#toast");
@@ -50,6 +65,7 @@
   const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
   const fmtDate = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }); };
   const fmtTime = (d) => d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const fmtBytes = (n) => (n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB");
   const slugify = (t) => String(t).toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60).replace(/-+$/, "");
 
@@ -64,6 +80,12 @@
     const bin = atob(str.replace(/\s/g, ""));
     return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
   };
+  const blobToB64 = (blob) => new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result).split(",")[1]);
+    r.onerror = () => rej(new Error("Couldn't read the image file."));
+    r.readAsDataURL(blob);
+  });
 
   /* Images already on the site are stored as paths relative to the site root
      ("articles/images/x.png"). This page lives in /write/, so show them with the
@@ -106,7 +128,7 @@
     return res.status === 204 ? null : res.json();
   }
   function explain(status) {
-    if (status === 401) return "GitHub rejected the token (expired or revoked). Disconnect and connect again.";
+    if (status === 401) return "GitHub rejected the token (expired or revoked). Use ⋯ → Connect to GitHub to enter a new one.";
     if (status === 403) return "GitHub denied that. The token needs “Contents: Read and write” on this repo (or you've hit a rate limit).";
     if (status === 404) return "GitHub couldn't find that. Check the owner, repo and branch, and that the token can access the repo.";
     if (status === 409 || status === 422) return "GitHub reported a conflict (something changed at the same time). Try again.";
@@ -114,7 +136,17 @@
   }
   const contentsPath = (p) => "/contents/" + p.split("/").map(encodeURIComponent).join("/");
 
+  /* Reading works without a token: it uses the published site itself. */
+  async function getPublic(path) {
+    let res;
+    try { res = await fetch(ROOT + path + "?_=" + Date.now(), { cache: "no-store" }); }
+    catch { const e = new Error("Couldn't reach the site. Check your connection."); e.status = 0; throw e; }
+    if (res.status === 404) return null;
+    if (!res.ok) { const e = new Error("The site returned an error (" + res.status + ")."); e.status = res.status; throw e; }
+    return { sha: null, text: await res.text() };
+  }
   async function getFile(path) {
+    if (!getToken()) return getPublic(path);
     try {
       const j = await gh(`${contentsPath(path)}?ref=${encodeURIComponent(cfg.branch)}`);
       if (j.encoding === "base64" && j.content != null && j.content !== "") return { sha: j.sha, text: unb64(j.content) };
@@ -126,12 +158,18 @@
       throw e;
     }
   }
-  const putFile = (path, text, message, sha) =>
-    gh(contentsPath(path), { method: "PUT", body: { message, content: b64(text), branch: cfg.branch, ...(sha ? { sha } : {}) } });
+  async function getSha(path) {
+    try { return (await gh(`${contentsPath(path)}?ref=${encodeURIComponent(cfg.branch)}`)).sha; }
+    catch (e) { if (e.status === 404) return null; throw e; }
+  }
+  const putB64 = (path, content, message, sha) =>
+    gh(contentsPath(path), { method: "PUT", body: { message, content, branch: cfg.branch, ...(sha ? { sha } : {}) } });
+  const putFile = (path, text, message, sha) => putB64(path, b64(text), message, sha);
   const deleteFile = (path, sha, message) =>
     gh(contentsPath(path), { method: "DELETE", body: { message, sha, branch: cfg.branch } });
 
   const byNewest = (a, b) => new Date(b.published) - new Date(a.published);
+  const byAdded = (a, b) => new Date(b.added) - new Date(a.added);
   async function readList(path) {
     const f = await getFile(path);
     if (!f) return [];
@@ -156,41 +194,97 @@
   }
   const listProblem = (err) => (err instanceof SyntaxError ? "One of the index files in the repo isn't valid JSON, so nothing was changed. Fix it in the repo first." : err.message);
 
-  /* ───────── gate ───────── */
+  /* ───────── password gate ───────── */
   const gateForm = $("#gate-form");
   const gErr = $("#g-error");
-  $("#g-owner").value = cfg.owner || DEFAULTS.owner;
-  $("#g-repo").value = cfg.repo || DEFAULTS.repo;
-  $("#g-branch").value = cfg.branch || DEFAULTS.branch;
+
+  async function hashPassword(pw) {
+    if (!(window.crypto && crypto.subtle)) throw new Error("This browser can't check the password here (it needs a secure https page).");
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey("raw", enc.encode(pw), "PBKDF2", false, ["deriveBits"]);
+    const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt: enc.encode(PASS.salt), iterations: PASS.iterations, hash: "SHA-256" }, key, 256);
+    return [...new Uint8Array(bits)].map((x) => x.toString(16).padStart(2, "0")).join("");
+  }
 
   gateForm.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const next = { owner: $("#g-owner").value.trim(), repo: $("#g-repo").value.trim(), branch: $("#g-branch").value.trim() };
-    const token = $("#g-token").value.trim();
-    const btn = $("#g-submit");
+    const btn = $("#g-submit"), input = $("#g-password");
     gErr.hidden = true; btn.disabled = true; btn.textContent = "Checking…";
+    try {
+      const ok = (await hashPassword(input.value)) === PASS.hash;
+      if (!ok) {
+        await new Promise((r) => setTimeout(r, 700));   // slow down guessing a little
+        gErr.textContent = "That password isn't right.";
+        gErr.hidden = false; input.select();
+        return;
+      }
+      input.value = "";
+      setUnlocked($("#g-remember").checked);
+      enterEditor();
+    } catch (err) {
+      gErr.textContent = err.message; gErr.hidden = false;
+    } finally {
+      btn.disabled = false; btn.textContent = "Unlock";
+    }
+  });
+
+  /* ───────── GitHub connection: only asked for when something needs to be published ───────── */
+  const dlg = $("#connect-dialog"), cErr = $("#c-error");
+  let connectResolve = null;
+  function openConnectDialog() {
+    $("#c-owner").value = cfg.owner || DEFAULTS.owner;
+    $("#c-repo").value = cfg.repo || DEFAULTS.repo;
+    $("#c-branch").value = cfg.branch || DEFAULTS.branch;
+    $("#c-token").value = "";
+    cErr.hidden = true;
+    return new Promise((resolve) => {
+      connectResolve = resolve;
+      if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
+      $("#c-token").focus();
+    });
+  }
+  function closeConnect(result) {
+    const done = connectResolve; connectResolve = null;
+    if (dlg.open) dlg.close();
+    if (done) done(result);
+  }
+  dlg.addEventListener("cancel", (e) => { e.preventDefault(); closeConnect(false); });
+  $("#c-cancel").addEventListener("click", () => closeConnect(false));
+  $("#connect-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const next = { owner: $("#c-owner").value.trim(), repo: $("#c-repo").value.trim(), branch: $("#c-branch").value.trim() };
+    const token = $("#c-token").value.trim();
+    const btn = $("#c-submit");
+    cErr.hidden = true; btn.disabled = true; btn.textContent = "Checking…";
     const prev = cfg; cfg = next;
-    const prevTok = getToken(); setToken(token, $("#g-remember").checked);
+    const prevTok = getToken(); setToken(token, $("#c-remember").checked);
     let step = "repo";
     try {
       const repo = await gh("");
-      if (repo && repo.permissions && repo.permissions.push === false) {
-        const err = new Error("This token can read the repository but not write to it."); throw err;
-      }
+      if (repo && repo.permissions && repo.permissions.push === false) throw new Error("This token can read the repository but not write to it.");
       step = "branch";
       await gh("/branches/" + encodeURIComponent(next.branch));
       store.setJSON(K.cfg, next);
-      $("#g-token").value = "";
-      unlock();
+      $("#c-token").value = "";
+      renderConnectState();
+      closeConnect(true);
+      refreshRemote();      // now with fresh data straight from GitHub
     } catch (err) {
       cfg = prev;
       if (prevTok) setToken(prevTok, true); else clearToken();
-      gErr.textContent = err.status === 404 && step === "branch" ? `The branch “${next.branch}” doesn't exist in that repository.` : err.message;
-      gErr.hidden = false;
+      cErr.textContent = err.status === 404 && step === "branch" ? `The branch “${next.branch}” doesn't exist in that repository.` : err.message;
+      cErr.hidden = false;
     } finally {
       btn.disabled = false; btn.textContent = "Connect";
     }
   });
+  async function ensureConnected() {
+    if (getToken()) return true;
+    return openConnectDialog();
+  }
+  function renderConnectState() {
+    $("#m-connect").textContent = getToken() ? "Disconnect GitHub" : "Connect to GitHub…";
+  }
 
   /* ───────── editor setup ───────── */
   if (!window.Quill) {
@@ -260,10 +354,12 @@
   let drafts = store.getJSON(K.drafts) || {};   // id -> draft
   let remote = { story: [], article: [] };      // published index entries
   let seriesList = [];                          // stories/series.json
+  let gal = [];                                 // gallery/index.json
   let cur = null;                               // the open draft
   let previewOn = false;
   let busy = false;
   let savedAt = null;
+  let mode = "write";
 
   const normalize = (d) => ({
     kind: "story", subtitle: "", series: "", pendingSeries: false, seriesTitle: "", seriesSummary: "", chapter: null, categories: [], extra: {},
@@ -319,6 +415,7 @@
   function renderStatus(cls = "", override = "") {
     const el = $("#status");
     el.className = "status " + cls;
+    if (mode === "gallery") { el.textContent = override || `${gal.length} image${gal.length === 1 ? "" : "s"} in the gallery`; return; }
     if (override) { el.textContent = override; return; }
     if (!cur) { el.textContent = ""; return; }
     const saved = savedAt ? "Saved on this device " + fmtTime(savedAt) : "Not saved yet";
@@ -326,7 +423,7 @@
     el.textContent = saved + " · " + live;
   }
 
-  /* ───────── type / series / categories ───────── */
+  /* ───────── type / series / categories (writing) ───────── */
   const NEW_SERIES = "__new__";
   const seriesSelect = $("#series-select"), chapterEl = $("#chapter");
 
@@ -334,14 +431,13 @@
     const nums = remote.story.filter((s) => s.series === seriesSlug).map((s) => Number(s.chapter) || 0);
     return (nums.length ? Math.max(...nums) : 0) + 1;
   };
-  function knownCategories() {
+  function uniqueNames(lists) {
     const seen = new Map();
-    const add = (n) => { const k = String(n).trim(); if (k && !seen.has(k.toLowerCase())) seen.set(k.toLowerCase(), k); };
-    (window.SITE && SITE.categories || []).forEach(add);
-    remote.article.forEach((a) => (a.categories || []).forEach(add));
-    (cur ? cur.categories : []).forEach(add);
+    for (const n of lists.flat()) { const k = String(n).trim(); if (k && !seen.has(k.toLowerCase())) seen.set(k.toLowerCase(), k); }
     return [...seen.values()];
   }
+  const knownCategories = () => uniqueNames([(window.SITE && SITE.categories) || [], ...remote.article.map((a) => a.categories || []), cur ? cur.categories : []]);
+  const has = (list, name) => list.some((x) => x.toLowerCase() === name.toLowerCase());
 
   function renderMeta() {
     if (!cur) return;
@@ -350,7 +446,6 @@
     $("#kind-hint").textContent = cur.slug ? "Already published, so its type is fixed." : "";
     $("#story-meta").hidden = isArticle;
     $("#article-meta").hidden = !isArticle;
-    subtitleEl.hidden = !isArticle;
     quill.root.setAttribute("data-placeholder", isArticle ? "Start writing…" : "Once upon a time…");
 
     // series
@@ -368,7 +463,7 @@
 
     // categories
     $("#cat-chips").innerHTML = knownCategories().map((c) =>
-      `<button type="button" class="cat" data-cat="${esc(c)}" aria-pressed="${cur.categories.some((x) => x.toLowerCase() === c.toLowerCase())}">${esc(c)}</button>`).join("");
+      `<button type="button" class="cat" data-cat="${esc(c)}" aria-pressed="${has(cur.categories, c)}">${esc(c)}</button>`).join("");
   }
 
   $$('input[name="kind"]').forEach((r) => r.addEventListener("change", () => {
@@ -409,13 +504,13 @@
     if (!name || !cur) return;
     if (!slugify(name)) { toast("Use letters or numbers in the category name.", "err"); return; }
     const existing = knownCategories().find((c) => c.toLowerCase() === name.toLowerCase());
-    if (!cur.categories.some((x) => x.toLowerCase() === (existing || name).toLowerCase())) cur.categories.push(existing || name);
+    if (!has(cur.categories, existing || name)) cur.categories.push(existing || name);
     input.value = ""; onEdit(); renderMeta();
   }
   $("#btn-add-cat").addEventListener("click", addCategory);
   $("#new-cat").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addCategory(); } });
 
-  /* ───────── list + open/new ───────── */
+  /* ───────── list + open/new/delete ───────── */
   function renderChrome() {
     $("#btn-publish").textContent = cur && cur.slug ? "Update" : "Publish";
     $("#m-unpublish").disabled = !(cur && cur.slug);
@@ -423,6 +518,8 @@
     renderStatus();
     renderFoot();
   }
+
+  const TRASH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12"/><path d="M9 7V4h6v3"/></svg>';
 
   function renderList() {
     const local = Object.values(drafts).sort((a, b) => b.updated - a.updated);
@@ -434,17 +531,21 @@
 
     const status = (d) => !d.slug ? '<span class="badge">Draft</span>' : d.changed ? '<span class="badge edited">Live · edited</span>' : '<span class="badge live">Live</span>';
     const kindBadge = (k) => `<span class="badge kind">${KINDS[k].label}</span>`;
-    const item = (d) => `<button type="button" class="item${cur && d.id === cur.id ? " active" : ""}" data-id="${esc(d.id)}">
-      <span class="item-title">${esc(d.title.trim() || "Untitled")}</span>
-      <span class="item-meta">${kindBadge(d.kind)}${status(d)}<span>${esc(fmtDate(d.updated))}</span></span></button>`;
-    const rItem = (s) => `<button type="button" class="item" data-kind="${s.kind}" data-slug="${esc(s.slug)}">
+    const item = (d) => `<div class="item-row">
+      <button type="button" class="item${cur && d.id === cur.id ? " active" : ""}" data-id="${esc(d.id)}">
+        <span class="item-title">${esc(d.title.trim() || "Untitled")}</span>
+        <span class="item-meta">${kindBadge(d.kind)}${status(d)}<span>${esc(fmtDate(d.updated))}</span></span></button>
+      <button type="button" class="item-del" data-del="${esc(d.id)}" title="Delete this draft" aria-label="Delete draft: ${esc(d.title.trim() || "Untitled")}">${TRASH}</button></div>`;
+    const rItem = (s) => `<div class="item-row"><button type="button" class="item" data-kind="${s.kind}" data-slug="${esc(s.slug)}">
       <span class="item-title">${esc(s.title || "Untitled")}</span>
-      <span class="item-meta">${kindBadge(s.kind)}<span class="badge live">Live</span><span>${esc(fmtDate(s.published))}</span></span></button>`;
+      <span class="item-meta">${kindBadge(s.kind)}<span class="badge live">Live</span><span>${esc(fmtDate(s.published))}</span></span></button></div>`;
 
     $("#story-items").innerHTML =
       (local.length ? `<div class="group-label">Drafts &amp; edits</div>${local.map(item).join("")}` : "") +
       (remoteOnly.length ? `<div class="group-label">Published</div>${remoteOnly.map(rItem).join("")}` : "");
-    $("#side-note").textContent = `Drafts stay in this browser. Publishing commits to ${cfg.owner}/${cfg.repo}.`;
+    $("#side-note").textContent = mode === "gallery"
+      ? "Gallery images are published straight away (there are no drafts)."
+      : `Drafts stay in this browser. Publishing commits to ${cfg.owner}/${cfg.repo}.`;
   }
 
   function loadIntoUI() {
@@ -479,13 +580,31 @@
     titleEl.focus();
   }
 
+  function deleteDraft(id) {
+    const d = cur && cur.id === id ? cur : drafts[id];
+    if (!d) return;
+    const name = (d.title || "").trim() || "Untitled";
+    const msg = d.slug
+      ? `Delete your local copy of “${name}”? The published version stays on the site.`
+      : `Delete the draft “${name}”? This can't be undone.`;
+    if (!confirm(msg)) return;
+    clearTimeout(autosave);
+    delete drafts[id]; persist();
+    if (cur && cur.id === id) {
+      cur = null;
+      const next = Object.values(drafts).sort((a, b) => b.updated - a.updated)[0];
+      if (next) { cur = next; loadIntoUI(); } else newOne(d.kind);
+    } else renderList();
+    toast("Draft deleted.");
+  }
+
   async function openRemote(kind, slug) {
     if (busy) return;
     leaveCurrent();
     setBusy(true, "Opening…");
     try {
       const f = await getFile(filePath(kind, slug));
-      if (!f) throw new Error(`That ${KINDS[kind].label.toLowerCase()}'s file is missing from the repo.`);
+      if (!f) throw new Error(`That ${KINDS[kind].label.toLowerCase()}'s file is missing from the site.`);
       const s = JSON.parse(f.text);
       const delta = mapDelta(s.delta && s.delta.ops ? s.delta : quill.clipboard.convert({ html: mapHtml(String(s.html || ""), toEditorUrl) }), toEditorUrl);
       const d = normalize({
@@ -504,6 +623,8 @@
   }
 
   $("#story-items").addEventListener("click", (e) => {
+    const del = e.target.closest(".item-del");
+    if (del) { deleteDraft(del.dataset.del); return; }
     const b = e.target.closest(".item");
     if (!b) return;
     document.body.classList.remove("side-open");
@@ -531,7 +652,7 @@
     $("#btn-focus").setAttribute("aria-pressed", String(on));
   });
 
-  /* ───────── save / publish / unpublish / delete / export ───────── */
+  /* ───────── save / publish / unpublish / export ───────── */
   const actionBtns = ["#btn-save", "#btn-publish", "#btn-new-story", "#btn-new-article"];
   function setBusy(on, label) {
     busy = on;
@@ -547,7 +668,7 @@
     if (saveLocal()) toast("Draft saved on this device.", "ok");
   });
   document.addEventListener("keydown", (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); $("#btn-save").click(); }
+    if (mode === "write" && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); $("#btn-save").click(); }
   });
 
   async function freeSlug(kind, title, list) {
@@ -578,6 +699,8 @@
     if (busy || !cur) return;
     const problem = checkBeforePublish();
     if (problem) { toast(problem, "err"); return; }
+    if (!(await ensureConnected())) { toast("Publishing needs a GitHub connection. Your draft is saved here.", "err"); return; }
+
     const kind = cur.kind, label = KINDS[kind].label;
     const title = titleEl.value.trim();
     const verb = cur.slug ? "Update" : "Publish";
@@ -606,12 +729,10 @@
       const summary = summaryEl.value.trim();
 
       const meta = { slug, title, summary, published, updated: now, words };
+      const sub = subtitleEl.value.trim();
+      if (sub) meta.subtitle = sub;
       if (kind === "story") { if (cur.series) { meta.series = cur.series; meta.chapter = cur.chapter; } }
-      else {
-        const sub = subtitleEl.value.trim();
-        if (sub) meta.subtitle = sub;
-        meta.categories = cur.categories.slice();
-      }
+      else meta.categories = cur.categories.slice();
       const doc = { ...meta, ...(kind === "article" && cur.extra && cur.extra.source ? { source: cur.extra.source } : {}), html, delta };
 
       const path = filePath(kind, slug);
@@ -638,6 +759,7 @@
   $("#m-unpublish").addEventListener("click", async () => {
     closeMenu();
     if (busy || !cur || !cur.slug) return;
+    if (!(await ensureConnected())) return;
     if (!confirm(`Take “${cur.title || "this"}” off the public site? Your local draft is kept, and you can publish it again later.`)) return;
     setBusy(true, "Unpublishing…");
     try {
@@ -653,16 +775,7 @@
     } finally { setBusy(false); renderList(); }
   });
 
-  $("#m-delete").addEventListener("click", () => {
-    closeMenu();
-    if (!cur || !confirm(`Delete this local draft${cur.slug ? " copy? (The published version stays on the site.)" : "? This can't be undone."}`)) return;
-    clearTimeout(autosave);
-    delete drafts[cur.id]; persist();
-    cur = null;
-    const next = Object.values(drafts).sort((a, b) => b.updated - a.updated)[0];
-    if (next) { cur = next; loadIntoUI(); } else newOne("story");
-    toast("Draft deleted.");
-  });
+  $("#m-delete").addEventListener("click", () => { closeMenu(); if (cur) deleteDraft(cur.id); });
 
   $("#m-export").addEventListener("click", () => {
     closeMenu();
@@ -687,11 +800,17 @@ body{max-width:720px;margin:40px auto;padding:0 20px;font:18px/1.75 Georgia,seri
   });
 
   $("#m-refresh").addEventListener("click", () => { closeMenu(); refreshRemote(true); });
-  $("#m-disconnect").addEventListener("click", () => {
+  $("#m-connect").addEventListener("click", async () => {
     closeMenu();
-    if (!confirm("Disconnect this device? Your drafts stay here, but you'll need the token again to publish.")) return;
+    if (getToken()) {
+      if (!confirm("Disconnect GitHub on this device? Your drafts stay here, and you can still write. You'll be asked for the token again next time you publish.")) return;
+      clearToken(); renderConnectState(); toast("Disconnected from GitHub.");
+    } else await ensureConnected();
+  });
+  $("#m-lock").addEventListener("click", () => {
+    closeMenu();
     leaveCurrent();
-    clearToken();
+    clearUnlocked();
     lock();
   });
 
@@ -702,22 +821,265 @@ body{max-width:720px;margin:40px auto;padding:0 20px;font:18px/1.75 Georgia,seri
 
   async function refreshRemote(announce) {
     try {
-      const [stories, articles, series] = await Promise.all([readList(indexPath("story")), readList(indexPath("article")), readList(SERIES_PATH)]);
+      const [stories, articles, series, gallery] = await Promise.all([
+        readList(indexPath("story")), readList(indexPath("article")), readList(SERIES_PATH), readList(GALLERY_PATH)]);
       remote = { story: stories.sort(byNewest), article: articles.sort(byNewest) };
       seriesList = series;
+      gal = gallery.sort(byAdded);
       if (announce) toast("Lists refreshed.", "ok");
     } catch (err) {
       toast("Couldn't load what's published: " + listProblem(err), "err");
     }
     renderList();
     renderMeta();
+    renderGalleryList();
+    renderStatus();
   }
 
-  /* ───────── lock / unlock ───────── */
-  function lock() { document.body.classList.add("locked"); }
+  /* ═════════ gallery ═════════ */
+  const MAX_EDGE = 2400, THUMB_EDGE = 640, MAX_BYTES = 25 * 1024 * 1024;
+  const EXT = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" };
+  let gcur = null;      // { slug, entry, file, categories[], tags[] }
+  let gbusy = false;
+  const gErrEl = $("#ge-error");
+  const gFields = { title: $("#g-title"), caption: $("#g-caption"), date: $("#g-date"), location: $("#g-location"), details: $("#g-details"), alt: $("#g-alt") };
+  let previewUrl = null;
+
+  const normTag = (s) => String(s).trim().replace(/^#+/, "").replace(/\s+/g, " ").slice(0, 40);
+  const knownGalleryCategories = () => uniqueNames([(window.SITE && SITE.galleryCategories) || [], ...gal.map((g) => g.categories || []), gcur ? gcur.categories : []]);
+
+  function renderGalleryChips() {
+    if (!gcur) return;
+    $("#g-cat-chips").innerHTML = knownGalleryCategories().map((c) =>
+      `<button type="button" class="cat" data-cat="${esc(c)}" aria-pressed="${has(gcur.categories, c)}">${esc(c)}</button>`).join("");
+    $("#g-tag-chips").innerHTML = gcur.tags.length
+      ? gcur.tags.map((t) => `<button type="button" class="cat tag" data-tag="${esc(t)}" aria-pressed="true" title="Click to remove">#${esc(t)}<span class="x" aria-hidden="true">×</span></button>`).join("")
+      : '<span class="meta-hint">No tags yet</span>';
+    $("#g-tag-list").innerHTML = uniqueNames(gal.map((g) => g.tags || [])).map((t) => `<option value="${esc(t)}">`).join("");
+  }
+  $("#g-cat-chips").addEventListener("click", (e) => {
+    const b = e.target.closest(".cat"); if (!b || !gcur) return;
+    const i = gcur.categories.findIndex((x) => x.toLowerCase() === b.dataset.cat.toLowerCase());
+    if (i >= 0) gcur.categories.splice(i, 1); else gcur.categories.push(b.dataset.cat);
+    renderGalleryChips();
+  });
+  $("#g-tag-chips").addEventListener("click", (e) => {
+    const b = e.target.closest(".cat"); if (!b || !gcur || !b.dataset.tag) return;
+    gcur.tags = gcur.tags.filter((t) => t.toLowerCase() !== b.dataset.tag.toLowerCase());
+    renderGalleryChips();
+  });
+  function addGalleryCategory() {
+    const input = $("#g-new-cat"), name = input.value.trim().replace(/\s+/g, " ");
+    if (!name || !gcur) return;
+    if (!slugify(name)) { toast("Use letters or numbers in the category name.", "err"); return; }
+    const existing = knownGalleryCategories().find((c) => c.toLowerCase() === name.toLowerCase());
+    if (!has(gcur.categories, existing || name)) gcur.categories.push(existing || name);
+    input.value = ""; renderGalleryChips();
+  }
+  function addGalleryTags() {
+    const input = $("#g-new-tag"); if (!gcur) return;
+    for (const raw of input.value.split(",")) {
+      const t = normTag(raw);
+      if (t && slugify(t) && !has(gcur.tags, t)) gcur.tags.push(t);
+    }
+    input.value = ""; renderGalleryChips();
+  }
+  $("#g-add-cat").addEventListener("click", addGalleryCategory);
+  $("#g-new-cat").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addGalleryCategory(); } });
+  $("#g-add-tag").addEventListener("click", addGalleryTags);
+  $("#g-new-tag").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addGalleryTags(); } });
+
+  function showGalleryError(msg) { gErrEl.textContent = msg; gErrEl.hidden = !msg; }
+  function setPreviewImage(src, info) {
+    const box = $("#g-preview");
+    if (!src) { box.hidden = true; return; }
+    $("#g-preview-img").src = src; $("#g-preview-info").textContent = info || ""; box.hidden = false;
+  }
+  function revokePreview() { if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null; } }
+
+  function fillGalleryForm() {
+    const e = (gcur && gcur.entry) || {};
+    gFields.title.value = e.title || ""; gFields.caption.value = e.caption || ""; gFields.date.value = e.date || "";
+    gFields.location.value = e.location || ""; gFields.details.value = e.details || ""; gFields.alt.value = e.alt || "";
+    $("#g-keep").checked = false; $("#g-file").value = "";
+    revokePreview();
+    if (gcur && gcur.entry) setPreviewImage(ROOT + e.thumb, `${e.width || "?"} × ${e.height || "?"} · Choose a file below only if you want to replace the image.`);
+    else setPreviewImage(null);
+    $("#ge-h").textContent = gcur && gcur.slug ? "Edit gallery image" : "Add to the gallery";
+    $("#file-hint").textContent = gcur && gcur.slug ? "Replace the image file (optional)" : "Choose an image (JPEG, PNG, WebP or GIF)";
+    $("#g-publish").textContent = gcur && gcur.slug ? "Save changes" : "Upload & publish";
+    $("#g-remove").hidden = !(gcur && gcur.slug);
+    showGalleryError("");
+    renderGalleryChips();
+  }
+  function newImage() { gcur = { slug: null, entry: null, file: null, categories: [], tags: [] }; fillGalleryForm(); renderGalleryList(); gFields.title.focus(); }
+  function openImage(slug) {
+    const entry = gal.find((g) => g.slug === slug); if (!entry) return;
+    gcur = { slug, entry, file: null, categories: (entry.categories || []).slice(), tags: (entry.tags || []).slice() };
+    fillGalleryForm(); renderGalleryList(); window.scrollTo(0, 0);
+  }
+
+  function renderGalleryList() {
+    $("#gallery-items").innerHTML = gal.length
+      ? `<div class="group-label">In the gallery</div>` + gal.map((g) => `<div class="item-row"><button type="button" class="item gitem${gcur && gcur.slug === g.slug ? " active" : ""}" data-gslug="${esc(g.slug)}">
+          <img class="gthumb" src="${esc(ROOT + g.thumb)}" alt="" loading="lazy">
+          <span><span class="item-title">${esc(g.title)}</span><span class="item-meta"><span>${esc(fmtDate(g.added))}</span></span></span></button></div>`).join("")
+      : '<p class="side-note dim">Nothing in the gallery yet.</p>';
+  }
+  $("#gallery-items").addEventListener("click", (e) => {
+    const b = e.target.closest(".gitem"); if (!b) return;
+    document.body.classList.remove("side-open"); openImage(b.dataset.gslug);
+  });
+  $("#btn-new-image").addEventListener("click", () => { document.body.classList.remove("side-open"); newImage(); });
+
+  /* decoding + resizing happen here, in the browser, before anything is uploaded */
+  async function decodeImage(file) {
+    if (window.createImageBitmap) {
+      try { const b = await createImageBitmap(file, { imageOrientation: "from-image" }); return { src: b, width: b.width, height: b.height, close: () => b.close && b.close() }; } catch { /* fall back */ }
+    }
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error("That file isn't an image this browser can read.")); i.src = url; });
+      return { src: img, width: img.naturalWidth, height: img.naturalHeight, close() {} };
+    } finally { URL.revokeObjectURL(url); }
+  }
+  function canvasBlob(dec, w, h, mime, quality, bg) {
+    const c = document.createElement("canvas"); c.width = w; c.height = h;
+    const g = c.getContext("2d");
+    if (bg) { g.fillStyle = bg; g.fillRect(0, 0, w, h); }
+    g.imageSmoothingQuality = "high"; g.drawImage(dec.src, 0, 0, w, h);
+    return new Promise((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error("This browser couldn't prepare that image."))), mime, quality));
+  }
+  async function processImage(file, keepOriginal) {
+    const dec = await decodeImage(file);
+    try {
+      let blob = file, w = dec.width, h = dec.height;
+      // GIFs are kept as-is (re-encoding would drop the animation)
+      if (!keepOriginal && file.type !== "image/gif") {
+        const s = Math.min(1, MAX_EDGE / Math.max(dec.width, dec.height));
+        w = Math.round(dec.width * s); h = Math.round(dec.height * s);
+        blob = await canvasBlob(dec, w, h, file.type === "image/png" ? "image/png" : file.type === "image/webp" ? "image/webp" : "image/jpeg", 0.9);
+      }
+      if (blob.size > MAX_BYTES) throw new Error(`That image is ${fmtBytes(blob.size)}, over the 25 MB limit. Try a smaller file.`);
+      const ts = Math.min(1, THUMB_EDGE / Math.max(dec.width, dec.height));
+      const thumb = await canvasBlob(dec, Math.max(1, Math.round(dec.width * ts)), Math.max(1, Math.round(dec.height * ts)), "image/jpeg", 0.82, "#0b0d10");
+      return { blob, ext: EXT[file.type], width: w, height: h, thumb };
+    } finally { dec.close(); }
+  }
+
+  $("#g-file").addEventListener("change", async (e) => {
+    const file = e.target.files && e.target.files[0]; if (!file || !gcur) return;
+    showGalleryError("");
+    if (!EXT[file.type]) { showGalleryError("Please choose a JPEG, PNG, WebP or GIF image."); e.target.value = ""; return; }
+    gcur.file = file;
+    revokePreview(); previewUrl = URL.createObjectURL(file);
+    setPreviewImage(previewUrl, `${file.name} · ${fmtBytes(file.size)}`);
+    try {
+      const dec = await decodeImage(file);
+      setPreviewImage(previewUrl, `${file.name} · ${dec.width} × ${dec.height} · ${fmtBytes(file.size)}`);
+      dec.close();
+    } catch (err) { showGalleryError(err.message); }
+    if (!gFields.title.value.trim()) gFields.title.value = file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim().replace(/^./, (c) => c.toUpperCase());
+  });
+
+  function setGBusy(on, label) {
+    gbusy = on;
+    $("#g-publish").disabled = on; $("#g-remove").disabled = on; $("#btn-new-image").disabled = on;
+    if (on) $("#g-publish").textContent = label;
+    else $("#g-publish").textContent = gcur && gcur.slug ? "Save changes" : "Upload & publish";
+  }
+
+  async function freeGallerySlug(title, list) {
+    const base = slugify(title) || "image";
+    const used = new Set(list.map((g) => g.slug));
+    for (let n = 1; n < 50; n++) {
+      const cand = n === 1 ? base : `${base}-${n}`;
+      if (used.has(cand)) continue;
+      if (!(await getSha(`gallery/thumbs/${cand}.jpg`))) return cand;
+    }
+    throw new Error("Couldn't find a free name for this image. Try a different title.");
+  }
+
+  $("#g-publish").addEventListener("click", async () => {
+    if (gbusy || !gcur) return;
+    const title = gFields.title.value.trim();
+    if (!title) { showGalleryError("Give the image a title."); gFields.title.focus(); return; }
+    if (!gcur.slug && !gcur.file) { showGalleryError("Choose an image to upload."); return; }
+    showGalleryError("");
+    if (!(await ensureConnected())) { showGalleryError("Publishing needs a GitHub connection."); return; }
+
+    const editing = !!gcur.slug;
+    setGBusy(true, editing ? "Saving…" : "Uploading…");
+    try {
+      let list = await readList(GALLERY_PATH);
+      const slug = gcur.slug || await freeGallerySlug(title, list);
+      const entry = gcur.entry ? { ...gcur.entry } : { added: new Date().toISOString() };
+      const oldFile = gcur.entry && gcur.entry.file;
+
+      if (gcur.file) {
+        setGBusy(true, "Preparing image…");
+        const p = await processImage(gcur.file, $("#g-keep").checked);
+        const imgPath = `gallery/images/${slug}.${p.ext}`, thumbPath = `gallery/thumbs/${slug}.jpg`;
+        setGBusy(true, "Uploading image…");
+        await putB64(imgPath, await blobToB64(p.blob), `Upload gallery image: ${title}`, await getSha(imgPath));
+        setGBusy(true, "Uploading thumbnail…");
+        await putB64(thumbPath, await blobToB64(p.thumb), `Upload gallery thumbnail: ${title}`, await getSha(thumbPath));
+        Object.assign(entry, { file: imgPath, thumb: thumbPath, width: p.width, height: p.height });
+        if (oldFile && oldFile !== imgPath) { const sha = await getSha(oldFile); if (sha) await deleteFile(oldFile, sha, `Replace gallery image: ${title}`); }
+      }
+
+      const optional = { caption: gFields.caption.value.trim(), alt: gFields.alt.value.trim(), date: gFields.date.value, location: gFields.location.value.trim(), details: gFields.details.value.trim() };
+      for (const k of Object.keys(optional)) { if (optional[k]) entry[k] = optional[k]; else delete entry[k]; }
+      Object.assign(entry, { slug, title, categories: gcur.categories.slice(), tags: gcur.tags.slice() });
+
+      setGBusy(true, "Saving details…");
+      gal = await updateList(GALLERY_PATH, (l) => { const i = l.findIndex((g) => g.slug === slug); if (i >= 0) l[i] = entry; else l.push(entry); return l; },
+        `${editing ? "Update" : "Add"} gallery image: ${title}`, byAdded);
+      gcur = { slug, entry, file: null, categories: entry.categories.slice(), tags: entry.tags.slice() };
+      fillGalleryForm(); renderGalleryList(); renderStatus();
+      toast(`${editing ? "Saved" : "Uploaded"}. GitHub Pages usually shows it on the site within a minute or two.`, "ok");
+    } catch (err) {
+      showGalleryError(listProblem(err));
+    } finally { setGBusy(false); }
+  });
+
+  $("#g-remove").addEventListener("click", async () => {
+    if (gbusy || !gcur || !gcur.slug) return;
+    if (!(await ensureConnected())) return;
+    if (!confirm(`Remove “${gcur.entry.title}” from the gallery? The image files are deleted from the site. This can't be undone (apart from restoring the commit on GitHub).`)) return;
+    setGBusy(true, "Removing…");
+    try {
+      const e = gcur.entry;
+      for (const p of [e.file, e.thumb]) { if (!p) continue; const sha = await getSha(p); if (sha) await deleteFile(p, sha, `Remove gallery image: ${e.title}`); }
+      gal = await updateList(GALLERY_PATH, (l) => l.filter((g) => g.slug !== e.slug), `Remove gallery image index: ${e.title}`, byAdded);
+      toast("Removed from the gallery.", "ok");
+      newImage(); renderStatus();
+    } catch (err) {
+      showGalleryError(listProblem(err));
+    } finally { setGBusy(false); }
+  });
+
+  /* ───────── writing / gallery mode ───────── */
+  function setMode(next) {
+    mode = next;
+    document.body.classList.toggle("mode-gallery", next === "gallery");
+    $$('input[name="mode"]').forEach((r) => { r.checked = r.value === next; });
+    $("#story-items").hidden = next === "gallery";
+    $("#gallery-items").hidden = next !== "gallery";
+    $("#btn-new-image").hidden = next !== "gallery";
+    $("#gallery-editor").hidden = next !== "gallery";
+    if (next === "gallery") { leaveCurrent(); if (!gcur) newImage(); renderGalleryList(); }
+    else { window.scrollTo(0, 0); }
+    renderList(); renderStatus();
+  }
+  $$('input[name="mode"]').forEach((r) => r.addEventListener("change", () => { if (r.checked) setMode(r.value); }));
+
+  /* ───────── lock / enter ───────── */
+  function lock() { document.body.classList.add("locked"); $("#g-password").focus(); }
   let started = false;
-  function unlock() {
+  function enterEditor() {
     document.body.classList.remove("locked");
+    renderConnectState();
     if (started) { refreshRemote(); return; }
     started = true;
     const lastId = store.getJSON(K.cur);
@@ -730,5 +1092,5 @@ body{max-width:720px;margin:40px auto;padding:0 20px;font:18px/1.75 Georgia,seri
   document.addEventListener("visibilitychange", () => { if (document.hidden && cur && !document.body.classList.contains("locked")) saveLocal({ quiet: true }); });
 
   /* ───────── boot ───────── */
-  if (getToken() && cfg.owner && cfg.repo) unlock();
+  if (isUnlocked()) enterEditor(); else $("#g-password").focus();
 })();

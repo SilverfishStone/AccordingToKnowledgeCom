@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
   <meta name="theme-color" content="#000000" />
-  <title>Story editor · According to Knowledge</title>
+  <title>Editor · According to Knowledge</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%23000'/%3E%3Cpath d='M12 3l2.6 6.2 6.4.5-4.9 4.2 1.5 6.3L12 16.9 6.4 20.2l1.5-6.3L3 9.7l6.4-.5z' fill='%238ab4ff'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" />
   <link rel="stylesheet" href="../story-content.css" />
@@ -13,29 +13,35 @@
 </head>
 <body class="locked">
 
-  <!-- ═════════ Sign-in gate ═════════ -->
+  <!-- ═════════ Password gate ═════════ -->
   <section class="gate" id="gate" aria-labelledby="gate-h">
     <form class="gate-card" id="gate-form" autocomplete="off">
-      <h1 id="gate-h">Story editor</h1>
-      <p class="dim">This page is only for the site's author. Connect with a GitHub token that has write access to the site's repository. Without one, nothing can be saved or published.</p>
-
-      <label>Repository owner
-        <input id="g-owner" required spellcheck="false" />
+      <h1 id="gate-h">Editor</h1>
+      <p class="dim">This page is only for the site's author. Enter the password to write, save drafts and manage the gallery.</p>
+      <label>Password
+        <input id="g-password" type="password" required autocomplete="current-password" spellcheck="false" />
       </label>
-      <label>Repository name
-        <input id="g-repo" required spellcheck="false" />
-      </label>
-      <label>Branch
-        <input id="g-branch" required spellcheck="false" />
-      </label>
-      <label>GitHub token
-        <input id="g-token" type="password" required spellcheck="false" autocomplete="off" placeholder="github_pat_…" />
-      </label>
-      <label class="check"><input id="g-remember" type="checkbox" checked /> Remember me on this device</label>
-
+      <label class="check"><input id="g-remember" type="checkbox" checked /> Keep me unlocked on this device</label>
       <p class="form-error" id="g-error" role="alert" hidden></p>
-      <button class="btn primary" id="g-submit" type="submit">Connect</button>
+      <button class="btn primary" id="g-submit" type="submit">Unlock</button>
+    </form>
+  </section>
 
+  <!-- ═════════ GitHub connection (only asked for when publishing) ═════════ -->
+  <dialog class="dialog" id="connect-dialog" aria-labelledby="cd-h">
+    <form id="connect-form" autocomplete="off">
+      <h2 id="cd-h">Connect to GitHub to publish</h2>
+      <p class="dim">Writing and drafts work without this. Publishing saves files to the site's repository, so it needs a GitHub token with write access.</p>
+      <label>Repository owner <input id="c-owner" required spellcheck="false" /></label>
+      <label>Repository name <input id="c-repo" required spellcheck="false" /></label>
+      <label>Branch <input id="c-branch" required spellcheck="false" /></label>
+      <label>GitHub token <input id="c-token" type="password" required spellcheck="false" autocomplete="off" placeholder="github_pat_…" /></label>
+      <label class="check"><input id="c-remember" type="checkbox" checked /> Remember on this device</label>
+      <p class="form-error" id="c-error" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <button class="btn" id="c-cancel" type="button">Cancel</button>
+        <button class="btn primary" id="c-submit" type="submit">Connect</button>
+      </div>
       <details class="help">
         <summary>How do I get a token?</summary>
         <ol>
@@ -44,10 +50,10 @@
           <li>Permissions → Repository permissions → <b>Contents: Read and write</b>. Nothing else is needed.</li>
           <li>Set an expiry, generate, and paste the token above.</li>
         </ol>
-        <p class="dim">The token is kept in this browser only, and is sent to api.github.com and nowhere else. Untick "Remember me" on a shared computer, and use Disconnect in the ⋯ menu when you're done.</p>
+        <p class="dim">The token stays in this browser and is sent only to api.github.com. Untick "Remember" on a shared computer.</p>
       </details>
     </form>
-  </section>
+  </dialog>
 
   <!-- ═════════ Editor ═════════ -->
   <div class="app" id="app">
@@ -56,34 +62,41 @@
       <button class="bar-btn only-narrow" id="btn-side" type="button" aria-label="Show story list" aria-expanded="false">☰</button>
       <span class="status" id="status" role="status" aria-live="polite"></span>
       <span class="spacer"></span>
-      <button class="bar-btn" id="btn-focus" type="button" title="Hide everything but the page (F11-style)" aria-pressed="false">Focus</button>
-      <button class="bar-btn" id="btn-preview" type="button" title="See it the way readers will" aria-pressed="false">Preview</button>
-      <button class="bar-btn" id="btn-save" type="button" title="Save draft (Ctrl+S)">Save draft</button>
-      <button class="bar-btn primary" id="btn-publish" type="button">Publish</button>
+      <button class="bar-btn write-only" id="btn-focus" type="button" title="Hide everything but the page (F11-style)" aria-pressed="false">Focus</button>
+      <button class="bar-btn write-only" id="btn-preview" type="button" title="See it the way readers will" aria-pressed="false">Preview</button>
+      <button class="bar-btn write-only" id="btn-save" type="button" title="Save draft (Ctrl+S)">Save draft</button>
+      <button class="bar-btn primary write-only" id="btn-publish" type="button">Publish</button>
       <details class="menu">
         <summary aria-label="More actions">⋯</summary>
         <div class="menu-list">
-          <button type="button" id="m-export">Download as .html</button>
-          <button type="button" id="m-unpublish">Unpublish from site</button>
-          <button type="button" id="m-delete">Delete local draft</button>
-          <hr />
-          <button type="button" id="m-refresh">Refresh story list</button>
-          <button type="button" id="m-disconnect">Disconnect this device</button>
+          <button type="button" class="write-only" id="m-export">Download as .html</button>
+          <button type="button" class="write-only" id="m-unpublish">Unpublish from site</button>
+          <button type="button" class="write-only" id="m-delete">Delete this draft</button>
+          <hr class="write-only" />
+          <button type="button" id="m-refresh">Refresh lists</button>
+          <button type="button" id="m-connect">Connect to GitHub…</button>
+          <button type="button" id="m-lock">Lock the editor</button>
         </div>
       </details>
     </header>
 
     <div class="wrap">
-      <aside class="side" id="side" aria-label="Your stories">
-        <div class="new-row"><button class="btn primary" id="btn-new-story" type="button">+ Story</button><button class="btn primary" id="btn-new-article" type="button">+ Article</button></div>
+      <aside class="side" id="side" aria-label="Your work">
+        <div class="seg mode-switch" role="radiogroup" aria-label="What to work on">
+          <label><input type="radio" name="mode" value="write" checked /><span>Writing</span></label>
+          <label><input type="radio" name="mode" value="gallery" /><span>Gallery</span></label>
+        </div>
+        <div class="new-row write-only"><button class="btn primary" id="btn-new-story" type="button">+ Story</button><button class="btn primary" id="btn-new-article" type="button">+ Article</button></div>
+        <button class="btn primary block" id="btn-new-image" type="button" hidden>+ Upload image</button>
         <div class="side-note dim" id="side-note"></div>
         <div id="story-items"></div>
+        <div id="gallery-items" hidden></div>
       </aside>
 
       <main class="main">
         <div class="sheet">
           <input class="title-input" id="title" placeholder="Title" maxlength="140" aria-label="Title" autocomplete="off" />
-          <input class="subtitle-input" id="subtitle" placeholder="Subtitle (optional)" maxlength="160" aria-label="Subtitle" autocomplete="off" hidden />
+          <input class="subtitle-input" id="subtitle" placeholder="Subtitle (optional)" maxlength="160" aria-label="Subtitle" autocomplete="off" />
           <textarea class="summary-input" id="summary" rows="2" maxlength="280" placeholder="A line or two shown on the list page (optional)" aria-label="Summary"></textarea>
 
           <section class="meta-panel" id="meta-panel" aria-label="Where this is filed">
@@ -197,6 +210,64 @@
           <div id="preview" class="story-body ql-snow" hidden><div class="ql-editor"></div></div>
         </div>
         <footer class="foot" id="foot"></footer>
+
+        <section class="gallery-editor" id="gallery-editor" aria-labelledby="ge-h" hidden>
+          <div class="sheet">
+            <h2 id="ge-h">Add to the gallery</h2>
+
+            <div class="g-file-row">
+              <label class="file-drop" id="file-drop">
+                <input type="file" id="g-file" accept="image/jpeg,image/png,image/webp,image/gif" />
+                <span id="file-hint">Choose an image (JPEG, PNG, WebP or GIF)</span>
+              </label>
+              <div class="g-preview" id="g-preview" hidden>
+                <img id="g-preview-img" alt="" />
+                <p class="dim" id="g-preview-info"></p>
+              </div>
+            </div>
+
+            <div class="fields">
+              <label>Title <input id="g-title" maxlength="120" autocomplete="off" /></label>
+              <label><span>Caption <span class="opt">(optional)</span></span> <textarea id="g-caption" rows="3" maxlength="600"></textarea></label>
+              <div class="two">
+                <label><span>Date taken / made <span class="opt">(optional)</span></span> <input type="date" id="g-date" /></label>
+                <label><span>Location <span class="opt">(optional)</span></span> <input id="g-location" maxlength="120" autocomplete="off" /></label>
+              </div>
+              <label><span>Details <span class="opt">(medium, camera, lens… optional)</span></span> <input id="g-details" maxlength="200" autocomplete="off" /></label>
+              <label><span>Alt text <span class="opt">(describes the image for people who can't see it)</span></span> <input id="g-alt" maxlength="200" autocomplete="off" /></label>
+
+              <section class="meta-panel" aria-label="Categories and tags">
+                <div class="meta-row">
+                  <span class="meta-label">Categories</span>
+                  <div class="cat-chips" id="g-cat-chips"></div>
+                </div>
+                <div class="meta-row">
+                  <label class="meta-label" for="g-new-cat">Add</label>
+                  <input id="g-new-cat" type="text" maxlength="60" placeholder="New category, then Enter" autocomplete="off" />
+                  <button class="bar-btn" id="g-add-cat" type="button">Add</button>
+                </div>
+                <div class="meta-row">
+                  <span class="meta-label">Tags</span>
+                  <div class="cat-chips" id="g-tag-chips"></div>
+                </div>
+                <div class="meta-row">
+                  <label class="meta-label" for="g-new-tag">Add</label>
+                  <input id="g-new-tag" type="text" maxlength="40" list="g-tag-list" placeholder="A tag, then Enter or comma" autocomplete="off" />
+                  <button class="bar-btn" id="g-add-tag" type="button">Add</button>
+                  <datalist id="g-tag-list"></datalist>
+                </div>
+              </section>
+
+              <label class="check"><input type="checkbox" id="g-keep" /> Keep the original file as it is (no resizing; keeps any camera or location data inside it)</label>
+              <p class="dim g-note" id="g-note">Photos are resized to at most 2400 px on the long side and re-saved without camera or location data, and a small thumbnail is made for the grid.</p>
+              <p class="form-error" id="ge-error" role="alert" hidden></p>
+              <div class="actions">
+                <button class="btn primary" id="g-publish" type="button">Upload &amp; publish</button>
+                <button class="btn danger" id="g-remove" type="button" hidden>Remove from gallery</button>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
   </div>

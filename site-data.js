@@ -1,6 +1,7 @@
 /* ------------------------------------------------------------------
    Edit this file to change the tools shown in the left panel.
-   Articles and stories are published from /write/ and don't live here.
+   Articles, stories and gallery images are published from /write/ and
+   don't live here.
    ------------------------------------------------------------------ */
 
 const SITE = {
@@ -10,7 +11,9 @@ const SITE = {
   /* LEFT PANEL — tools.
      embed: true  -> opens on its own page (tool.html) with a "Back to main site"
                      button. The url must be a page on this site.
-     embed: false -> opens the other website in a new tab                    */
+     embed: false -> opens the other website in a new tab
+     wip:   true  -> marks the tool as a work in progress (amber lamp + tag).
+                     Delete the line when it's finished.                       */
   tools: [
     {
       id: "priorities-chart",
@@ -23,16 +26,18 @@ const SITE = {
     {
       id: "in-good-faith",
       title: "In Good Faith",
-      desc: "My companion site at ingoodfaith.site.",
+      desc: "My companion site at ingoodfaith.site. Still being built.",
       url: "https://ingoodfaith.site",
       icon: "compass",
       embed: false,
+      wip: true,
     },
     // Copy a block above to add another tool.
   ],
 
-  /* Starter category list offered in the editor when you file an article.
-     Any category already used by a published article is offered too, and you
-     can type new ones in the editor, so this is only a convenience.          */
+  /* Starter category lists offered in the editor. Categories already used by a
+     published article / gallery image are offered too, and you can type new
+     ones in the editor, so these are only a convenience.                      */
   categories: ["Mormons", "Comparative Religion", "Apologetics"],
+  galleryCategories: ["Art", "Photography"],
 };

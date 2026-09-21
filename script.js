@@ -18,10 +18,11 @@
   toolList.innerHTML = SITE.tools.map((t) => {
     const href = t.embed ? `tool.html?id=${encodeURIComponent(t.id)}` : t.url;
     const ext  = t.embed ? "" : ' target="_blank" rel="noopener"';
-    return `<a class="tool" data-tool="${esc(t.id)}" href="${esc(href)}"${ext}>
+    return `<a class="tool${t.wip ? " wip-tool" : ""}" data-tool="${esc(t.id)}" href="${esc(href)}"${ext}>
       ${svg(t.icon)}
       <span>
         <span class="tool-name">${esc(t.title)}${t.embed ? "" : svg("ext")}</span>
+        ${t.wip ? '<span class="tool-badge">Work in progress</span>' : ""}
         <span class="tool-desc">${esc(t.desc)}</span>
       </span>
     </a>`;
@@ -134,6 +135,7 @@
     return `<a class="entry" href="#story/${esc(s.slug)}">
       ${kicker ? `<span class="entry-kicker">${esc(kicker)}</span>` : ""}
       <h2>${esc(s.title || "Untitled")}</h2>
+      ${s.subtitle ? `<span class="entry-sub">${esc(s.subtitle)}</span>` : ""}
       <span class="entry-meta">${esc(metaLine(s))}</span>
       ${s.summary ? `<p>${esc(s.summary)}</p>` : ""}
       <span class="more">Read story →</span>
@@ -261,7 +263,7 @@
         <a class="pager-btn start" href="#story/${esc(s.chapters[0].slug)}"><small>Start reading</small>${esc(chapterLabel(s.chapters[0]))}: ${esc(s.chapters[0].title || "Untitled")} →</a>
         <ol class="chapters">${s.chapters.map((c) => `<li><a href="#story/${esc(c.slug)}">
           <span class="ch-num">${esc(c.chapter || "·")}</span>
-          <span class="ch-main"><strong>${esc(c.title || "Untitled")}</strong><span>${esc(metaLine(c))}</span>${c.summary ? `<span>${esc(c.summary)}</span>` : ""}</span>
+          <span class="ch-main"><strong>${esc(c.title || "Untitled")}</strong>${c.subtitle ? `<em>${esc(c.subtitle)}</em>` : ""}<span>${esc(metaLine(c))}</span>${c.summary ? `<span>${esc(c.summary)}</span>` : ""}</span>
         </a></li>`).join("")}</ol>`;
     } catch {
       box.innerHTML = note("Couldn't load this series right now. Try again in a moment.");
@@ -357,20 +359,105 @@
     }
   }
 
+  /* ───────── gallery (gallery/index.json — written by /write/) ───────── */
+  const IMG_RE = /^gallery\/(?:images|thumbs)\/[a-z0-9-]+\.(?:jpe?g|png|webp|gif)$/;
+  const strList = (x) => (Array.isArray(x) ? x.map((v) => String(v).trim()).filter(Boolean) : []);
+  const loadGallery = () => getJSON("gallery/index.json", { optional: true }).then((l) =>
+    (Array.isArray(l) ? l : [])
+      .filter((g) => g && SLUG_RE.test(g.slug) && IMG_RE.test(g.file || "") && IMG_RE.test(g.thumb || ""))
+      .map((g) => ({ ...g, categories: strList(g.categories), tags: strList(g.tags) }))
+      .sort((a, b) => new Date(b.added) - new Date(a.added)));
+
+  function buildFacets(items, field) {
+    const map = new Map();
+    for (const g of items) for (const name of g[field]) {
+      const slug = slugify(name);
+      if (!slug) continue;
+      if (!map.has(slug)) map.set(slug, { slug, name, count: 0 });
+      map.get(slug).count++;
+    }
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }
+  const fmtDay = (d) => {
+    const t = new Date(/^\d{4}-\d{2}-\d{2}$/.test(d || "") ? d + "T00:00:00" : d);
+    return isNaN(t) ? String(d || "") : t.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+  };
+  const dims = (g) => (Number(g.width) > 0 && Number(g.height) > 0 ? ` width="${Number(g.width)}" height="${Number(g.height)}"` : "");
+  const galleryLink = (kind, slug) => `#gallery/${kind}/${encodeURIComponent(slug)}`;
+
+  async function showGallery(kind, slug) {
+    const grid = $("#gallery-grid"), fc = $("#gallery-filters"), ft = $("#gallery-tags");
+    try {
+      const items = await loadGallery();
+      const cats = buildFacets(items, "categories"), tags = buildFacets(items, "tags");
+      const activeCat = kind === "category" ? cats.find((c) => c.slug === slug) : null;
+      const activeTag = kind === "tag" ? tags.find((t) => t.slug === slug) : null;
+      fc.hidden = !cats.length; ft.hidden = !tags.length;
+      fc.innerHTML = cats.length
+        ? `<a class="chip${activeCat || activeTag ? "" : " active"}" href="#gallery">All <small>${items.length}</small></a>` +
+          cats.map((c) => `<a class="chip${activeCat && activeCat.slug === c.slug ? " active" : ""}" href="${galleryLink("category", c.slug)}">${esc(c.name)} <small>${c.count}</small></a>`).join("")
+        : "";
+      ft.innerHTML = tags.map((t) => `<a class="chip${activeTag && activeTag.slug === t.slug ? " active" : ""}" href="${galleryLink("tag", t.slug)}">#${esc(t.name)}</a>`).join("");
+      if (!items.length) { grid.innerHTML = note("No images yet. They'll appear here as I add them."); return; }
+      if (kind && !activeCat && !activeTag) { grid.innerHTML = note("Nothing here."); return; }
+      const shown = activeCat ? items.filter((g) => g.categories.some((n) => slugify(n) === activeCat.slug))
+        : activeTag ? items.filter((g) => g.tags.some((n) => slugify(n) === activeTag.slug)) : items;
+      grid.innerHTML = shown.map((g) => `<a class="tile" href="#image/${esc(g.slug)}">
+        <img src="${esc(g.thumb)}" alt="${esc(g.alt || g.title)}"${dims(g)} loading="lazy" decoding="async">
+        <span class="tile-cap">${esc(g.title)}</span>
+      </a>`).join("");
+    } catch {
+      fc.hidden = true; ft.hidden = true;
+      grid.innerHTML = note("Couldn't load the gallery right now. Try again in a moment.");
+    }
+  }
+
+  async function showImage(slug) {
+    const box = $("#image-box");
+    if (!SLUG_RE.test(slug)) { box.innerHTML = note("That image doesn't exist."); return; }
+    box.innerHTML = note("Loading…");
+    try {
+      const items = await loadGallery();
+      const i = items.findIndex((g) => g.slug === slug);
+      if (i < 0) { box.innerHTML = note("That image doesn't exist (or was removed)."); return; }
+      const g = items[i], newer = items[i - 1], older = items[i + 1];
+      document.title = g.title + " · " + SITE.name;
+      const rows = [["Date", g.date && fmtDay(g.date)], ["Location", g.location], ["Details", g.details]].filter((r) => r[1]);
+      const chips = g.categories.map((c) => `<a class="tag" href="${galleryLink("category", slugify(c))}">${esc(c)}</a>`).join("") +
+                    g.tags.map((t) => `<a class="tag" href="${galleryLink("tag", slugify(t))}">#${esc(t)}</a>`).join("");
+      box.innerHTML = `
+        <a class="photo-frame" href="${esc(g.file)}" target="_blank" rel="noopener" title="Open full size">
+          <img src="${esc(g.file)}" alt="${esc(g.alt || g.title)}"${dims(g)}>
+        </a>
+        <h1>${esc(g.title)}</h1>
+        ${g.caption ? `<p class="photo-caption">${esc(g.caption)}</p>` : ""}
+        ${rows.length ? `<dl class="photo-meta">${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>` : ""}
+        ${chips ? `<div class="tags doc-tags">${chips}</div>` : ""}
+        <div class="pager">
+          ${newer ? `<a class="pager-btn" href="#image/${esc(newer.slug)}"><small>← Newer</small>${esc(newer.title)}</a>` : `<span class="pager-btn off"><small>← Newer</small>Latest image</span>`}
+          ${older ? `<a class="pager-btn next" href="#image/${esc(older.slug)}"><small>Older →</small>${esc(older.title)}</a>` : `<span class="pager-btn off next"><small>Older →</small>First image</span>`}
+        </div>`;
+    } catch {
+      box.innerHTML = note("Couldn't load this image right now. Try again in a moment.");
+    }
+  }
+
   /* ───────── middle: hash router ───────── */
   const views = $$(".view");
   const keys = $$(".key");
   const notFound = $("#not-found");
-  const SECTION = { articles: "Articles", article: "Articles", stories: "Stories", story: "Stories", series: "Stories", contact: "Contact" };
-  const TAB = { articles: "articles", article: "articles", stories: "stories", story: "stories", series: "stories", contact: "contact" };
-  const TITLE = { articles: "Articles", stories: "Stories", contact: "Contact", article: "Article", story: "Story", series: "Series" };
+  const TAB = { articles: "articles", article: "articles", stories: "stories", story: "stories", series: "stories", gallery: "gallery", image: "gallery", contact: "contact" };
+  const TITLE = { articles: "Articles", stories: "Stories", gallery: "Gallery", contact: "Contact", article: "Article", story: "Story", series: "Series", image: "Image" };
 
   function route() {
     const raw = location.hash.replace(/^#\/?/, "");
     const [a = "", b = "", c = ""] = raw.split("/");
-    let view = "", arg = "";
+    let view = "", arg = "", arg2 = "";
 
     if (!raw || (["home", "about", "goals", "articles"].includes(a) && !b)) view = "articles";
+    else if (a === "gallery" && !b) view = "gallery";
+    else if (a === "gallery" && (b === "category" || b === "tag") && c) { view = "gallery"; arg = b; arg2 = decodeURIComponent(c); }
+    else if (a === "image" && b) { view = "image"; arg = b; }
     else if (a === "articles" && b === "category") { view = "articles"; arg = decodeURIComponent(c); }
     else if (a === "article" && b) { view = "article"; arg = b; }
     else if (a === "stories" && !b) view = "stories";
@@ -385,8 +472,9 @@
       k.classList.toggle("active", on);
       on ? k.setAttribute("aria-current", "page") : k.removeAttribute("aria-current");
     });
-    $("#readout").textContent = SECTION[view] || "Unknown";
 
+    if (view === "gallery") showGallery(arg, arg2);
+    if (view === "image") showImage(arg);
     if (view === "articles") showArticles(arg);
     if (view === "stories") showStories();
     if (view === "series") showSeries(arg);

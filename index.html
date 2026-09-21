@@ -17,20 +17,15 @@
   <header class="console">
     <div class="console-inner">
       <a class="plate brand" href="#articles" aria-label="According to Knowledge, home">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.8 6.7 7.2.6-5.5 4.7 1.7 7-6.2-3.8-6.2 3.8 1.7-7L2 9.8l7.2-.6z"/></svg>
         <span>According to Knowledge</span>
       </a>
 
       <nav class="keys" aria-label="Site sections">
         <a class="key" href="#articles" data-tab="articles"><i class="led" aria-hidden="true"></i><span>Articles</span></a>
         <a class="key" href="#stories" data-tab="stories"><i class="led" aria-hidden="true"></i><span>Stories</span></a>
+        <a class="key" href="#gallery" data-tab="gallery"><i class="led" aria-hidden="true"></i><span>Gallery</span></a>
         <a class="key" href="#contact" data-tab="contact"><i class="led" aria-hidden="true"></i><span>Contact</span></a>
       </nav>
-
-      <div class="plate readout" aria-hidden="true">
-        <i class="led on"></i>
-        <span id="readout">Articles</span>
-      </div>
     </div>
   </header>
 
@@ -84,6 +79,21 @@
       <section class="view" data-view="story" aria-label="Story" hidden>
         <div class="reader-bar"><a class="back-link" href="#stories">← All stories</a></div>
         <article class="story" id="story-box" aria-live="polite"></article>
+      </section>
+
+      <!-- GALLERY (grid) -->
+      <section class="view page" data-view="gallery" aria-labelledby="h-gallery" hidden>
+        <h1 class="page-title" id="h-gallery">Gallery</h1>
+        <p class="page-sub">Art and photography.</p>
+        <nav class="filters" id="gallery-filters" aria-label="Filter by category"></nav>
+        <nav class="filters tag-filters" id="gallery-tags" aria-label="Filter by tag"></nav>
+        <div class="gallery-grid" id="gallery-grid" aria-live="polite"></div>
+      </section>
+
+      <!-- IMAGE (detail) -->
+      <section class="view" data-view="image" aria-label="Image" hidden>
+        <div class="reader-bar"><a class="back-link" href="#gallery">← Gallery</a></div>
+        <article class="photo" id="image-box" aria-live="polite"></article>
       </section>
 
       <!-- CONTACT -->
