@@ -1,5 +1,24 @@
 [
   {
+    "added": "2026-09-21T15:19:01.776Z",
+    "file": "gallery/images/barn-owl.jpg",
+    "thumb": "gallery/thumbs/barn-owl.jpg",
+    "width": 3072,
+    "height": 3539,
+    "caption": "sketch of a barn owl",
+    "date": "2026-09-19",
+    "slug": "barn-owl",
+    "title": "Barn Owl",
+    "categories": [
+      "Sketches"
+    ],
+    "tags": [
+      "owl",
+      "traditional art",
+      "bird"
+    ]
+  },
+  {
     "added": "2026-09-21T15:17:09.690Z",
     "file": "gallery/images/silverfox.png",
     "thumb": "gallery/thumbs/silverfox.jpg",
