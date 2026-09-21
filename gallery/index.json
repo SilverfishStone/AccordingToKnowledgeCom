@@ -1,5 +1,71 @@
 [
   {
+    "added": "2026-09-21T22:00:30.275Z",
+    "file": "gallery/images/butterfly.jpg",
+    "thumb": "gallery/thumbs/butterfly.jpg",
+    "width": 6012,
+    "height": 4008,
+    "slug": "butterfly",
+    "title": "Butterfly",
+    "categories": [
+      "Photography"
+    ],
+    "tags": [
+      "photo",
+      "butterfly",
+      "nature"
+    ]
+  },
+  {
+    "added": "2026-09-21T18:53:05.566Z",
+    "file": "gallery/images/reeds.jpg",
+    "thumb": "gallery/thumbs/reeds.jpg",
+    "width": 4000,
+    "height": 3000,
+    "slug": "reeds",
+    "title": "Reeds",
+    "categories": [
+      "Photography"
+    ],
+    "tags": [
+      "photo",
+      "river",
+      "reeds"
+    ]
+  },
+  {
+    "added": "2026-09-21T18:51:29.329Z",
+    "file": "gallery/images/spider.jpg",
+    "thumb": "gallery/thumbs/spider.jpg",
+    "width": 6012,
+    "height": 4008,
+    "slug": "spider",
+    "title": "Spider",
+    "categories": [
+      "Photography"
+    ],
+    "tags": [
+      "spider",
+      "photo"
+    ]
+  },
+  {
+    "added": "2026-09-21T18:49:48.689Z",
+    "file": "gallery/images/tunnel.jpg",
+    "thumb": "gallery/thumbs/tunnel.jpg",
+    "width": 3647,
+    "height": 2724,
+    "slug": "tunnel",
+    "title": "Tunnel",
+    "categories": [
+      "Photography"
+    ],
+    "tags": [
+      "tunnel",
+      "photo"
+    ]
+  },
+  {
     "added": "2026-09-21T15:19:56.193Z",
     "file": "gallery/images/barred-owl.jpg",
     "thumb": "gallery/thumbs/barred-owl.jpg",
