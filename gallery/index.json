@@ -1,5 +1,24 @@
 [
   {
+    "added": "2026-09-21T15:19:56.193Z",
+    "file": "gallery/images/barred-owl.jpg",
+    "thumb": "gallery/thumbs/barred-owl.jpg",
+    "width": 3013,
+    "height": 3558,
+    "caption": "Sketch of a barred owl",
+    "date": "2026-09-16",
+    "slug": "barred-owl",
+    "title": "Barred Owl",
+    "categories": [
+      "Sketches"
+    ],
+    "tags": [
+      "owl",
+      "traditional art",
+      "bird"
+    ]
+  },
+  {
     "added": "2026-09-21T15:19:01.776Z",
     "file": "gallery/images/barn-owl.jpg",
     "thumb": "gallery/thumbs/barn-owl.jpg",
