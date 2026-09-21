@@ -1,5 +1,22 @@
 [
   {
+    "added": "2026-09-21T22:00:30.275Z",
+    "file": "gallery/images/butterfly.jpg",
+    "thumb": "gallery/thumbs/butterfly.jpg",
+    "width": 6012,
+    "height": 4008,
+    "slug": "butterfly",
+    "title": "Butterfly",
+    "categories": [
+      "Photography"
+    ],
+    "tags": [
+      "photo",
+      "butterfly",
+      "nature"
+    ]
+  },
+  {
     "added": "2026-09-21T18:53:05.566Z",
     "file": "gallery/images/reeds.jpg",
     "thumb": "gallery/thumbs/reeds.jpg",
