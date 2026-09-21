@@ -1,5 +1,21 @@
 [
   {
+    "added": "2026-09-21T18:51:29.329Z",
+    "file": "gallery/images/spider.jpg",
+    "thumb": "gallery/thumbs/spider.jpg",
+    "width": 6012,
+    "height": 4008,
+    "slug": "spider",
+    "title": "Spider",
+    "categories": [
+      "Photography"
+    ],
+    "tags": [
+      "spider",
+      "photo"
+    ]
+  },
+  {
     "added": "2026-09-21T18:49:48.689Z",
     "file": "gallery/images/tunnel.jpg",
     "thumb": "gallery/thumbs/tunnel.jpg",
