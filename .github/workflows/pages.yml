@@ -25,6 +25,13 @@ jobs:
       - uses: actions/configure-pages@v5
       - name: Assemble site
         run: rsync -a --exclude='.git' --exclude='.github' --exclude='.claude' ./ _site/
+      # Pages lets browsers cache each file for 10 minutes on its own, which can pair a new
+      # script.js with an old site-data.js. Stamping the commit id onto every asset URL makes
+      # a page always fetch the set of files that was deployed together.
+      - name: Stamp asset versions
+        run: |
+          v="${GITHUB_SHA::8}"
+          grep -rl "__BUILD__" _site --include='*.html' | xargs -r sed -i "s/__BUILD__/$v/g"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

@@ -11,8 +11,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Carlito:ital,wght@0,400;0,700;1,400;1,700&family=Tinos:ital,wght@0,400;0,700;1,400;1,700&family=Caladea:ital,wght@0,400;0,700;1,400;1,700&display=swap" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" />
-  <link rel="stylesheet" href="../story-content.css" />
-  <link rel="stylesheet" href="write.css" />
+  <link rel="stylesheet" href="../story-content.css?v=__BUILD__" />
+  <link rel="stylesheet" href="write.css?v=__BUILD__" />
 </head>
 <body class="locked">
 
@@ -88,12 +88,15 @@
         <div class="seg mode-switch" role="radiogroup" aria-label="What to work on">
           <label><input type="radio" name="mode" value="write" checked /><span>Writing</span></label>
           <label><input type="radio" name="mode" value="gallery" /><span>Gallery</span></label>
+          <label><input type="radio" name="mode" value="whynot" /><span>Why not</span></label>
         </div>
         <div class="new-row write-only"><button class="btn primary" id="btn-new-story" type="button">+ Story</button><button class="btn primary" id="btn-new-article" type="button">+ Article</button></div>
         <button class="btn primary block" id="btn-new-image" type="button" hidden>+ Upload image</button>
+        <button class="btn primary block" id="btn-new-wn" type="button" hidden>+ Add item</button>
         <div class="side-note dim" id="side-note"></div>
         <div id="story-items"></div>
         <div id="gallery-items" hidden></div>
+        <div id="wn-items" hidden></div>
       </aside>
 
       <main class="main">
@@ -136,9 +139,10 @@
                 <input id="new-cat" type="text" maxlength="60" placeholder="New category, then Enter" autocomplete="off" />
                 <button class="bar-btn" id="btn-add-cat" type="button">Add</button>
               </div>
-              <div class="meta-row">
-                <label class="pin"><input type="checkbox" id="pin-article" /> Pin to the home page <span class="meta-hint">(only one article is pinned at a time)</span></label>
-              </div>
+            </div>
+
+            <div class="meta-row" id="pin-row">
+              <label class="pin"><input type="checkbox" id="pin-doc" /> Pin to the home page <span class="meta-hint" id="pin-hint"></span></label>
             </div>
           </section>
 
@@ -248,12 +252,12 @@
 
               <section class="meta-panel" aria-label="Categories and tags">
                 <div class="meta-row">
-                  <span class="meta-label">Categories</span>
+                  <span class="meta-label">Groups</span>
                   <div class="cat-chips" id="g-cat-chips"></div>
                 </div>
                 <div class="meta-row">
                   <label class="meta-label" for="g-new-cat">Add</label>
-                  <input id="g-new-cat" type="text" maxlength="60" placeholder="New category, then Enter" autocomplete="off" />
+                  <input id="g-new-cat" type="text" maxlength="60" placeholder="New group, then Enter" autocomplete="off" />
                   <button class="bar-btn" id="g-add-cat" type="button">Add</button>
                 </div>
                 <div class="meta-row">
@@ -266,7 +270,17 @@
                   <button class="bar-btn" id="g-add-tag" type="button">Add</button>
                   <datalist id="g-tag-list"></datalist>
                 </div>
+                <p class="meta-hint g-groups-hint">An image can be in as many groups as you like. Visitors can browse by any of them.</p>
               </section>
+
+              <details class="meta-panel nest-panel" id="g-nest">
+                <summary>Put groups inside other groups <span class="opt">(so “Art” also shows everything in “Sketches”)</span></summary>
+                <div id="g-nest-body"></div>
+                <div class="meta-row">
+                  <button class="bar-btn" id="g-nest-save" type="button">Save nesting</button>
+                  <span class="meta-hint" id="g-nest-msg">This applies to the whole gallery, not just this image.</span>
+                </div>
+              </details>
 
               <label class="check"><input type="checkbox" id="g-pin" /> Pin as my best work (its thumbnail is shown on the home page; only one is pinned at a time)</label>
               <label class="check"><input type="checkbox" id="g-keep" /> Keep the original file as it is (no resizing; keeps any camera or location data inside it)</label>
@@ -279,6 +293,49 @@
             </div>
           </div>
         </section>
+
+        <section class="whynot-editor" id="whynot-editor" aria-labelledby="wn-h" hidden>
+          <div class="sheet">
+            <h2 id="wn-h">Add an item</h2>
+            <p class="dim wn-intro">Each item is one choice in the “Why am I not…” list. It has no tab on the site yet: <a class="text-link" href="../#why-not" target="_blank" rel="noopener">open the page ↗</a>. To show its tab later, set <code>whyNotTab: true</code> in <code>site-data.js</code>.</p>
+
+            <div class="fields">
+              <div class="two">
+                <label>Name <input id="wn-name" maxlength="80" autocomplete="off" placeholder="e.g. Deism" /></label>
+                <label>Group <input id="wn-group" maxlength="60" list="wn-group-list" autocomplete="off" placeholder="e.g. Christian denominations" /></label>
+              </div>
+              <datalist id="wn-group-list"></datalist>
+              <label>Explanation
+                <select id="wn-inherits"></select>
+              </label>
+              <label><span id="wn-reason-label">Why I'm not this</span>
+                <textarea id="wn-reason" rows="10" maxlength="8000"></textarea>
+                <span class="opt">A blank line starts a new paragraph. <b>**bold**</b>, <i>*italic*</i>, and [link text](https://address) also work.</span>
+              </label>
+
+              <div>
+                <span class="meta-label wn-preview-label">How it will read</span>
+                <div class="wn-preview" id="wn-preview"></div>
+              </div>
+
+              <p class="form-error" id="wn-error" role="alert" hidden></p>
+              <div class="actions">
+                <button class="btn primary" id="wn-save" type="button">Save &amp; publish</button>
+                <button class="btn danger" id="wn-remove" type="button" hidden>Remove item</button>
+              </div>
+
+              <details class="meta-panel" id="wn-bulk">
+                <summary>Add several at once</summary>
+                <p class="meta-hint">One name per line. A line starting with # sets the group for the names below it (before any, the Group box above is used). Names already on the list are skipped.</p>
+                <textarea id="wn-bulk-text" rows="8" placeholder="# Christian denominations&#10;Lutheranism&#10;Methodism&#10;# Ideologies&#10;Marxism"></textarea>
+                <div class="meta-row">
+                  <button class="bar-btn" id="wn-bulk-add" type="button">Add these</button>
+                  <button class="bar-btn" id="wn-bulk-starter" type="button">Fill in a starter list to edit</button>
+                </div>
+              </details>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
   </div>
@@ -287,7 +344,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
-  <script src="../site-data.js"></script>
-  <script src="write.js"></script>
+  <script src="../site-data.js?v=__BUILD__"></script>
+  <script src="write.js?v=__BUILD__"></script>
 </body>
 </html>

@@ -60,7 +60,11 @@ const SITE = {
   ],
 
   /* While reading a story or article the page switches to two panels so the
-     text gets more room. Which side panel steps aside: "left" (tools) or "right"
-     (latest articles).                                                          */
-  readingHides: "left",
+     text gets more room. Which side panel steps aside: "right" (latest
+     articles) or "left" (tools and the latest-story card).                      */
+  readingHides: "right",
+
+  /* The "Why am I not…" page (#why-not) works already but has no tab yet, so you
+     can build the list in /write/ first. Set this to true to show its tab.       */
+  whyNotTab: false,
 };

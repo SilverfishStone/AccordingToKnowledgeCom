@@ -423,6 +423,7 @@
     const el = $("#status");
     el.className = "status " + cls;
     if (mode === "gallery") { el.textContent = override || `${gal.length} image${gal.length === 1 ? "" : "s"} in the gallery`; return; }
+    if (mode === "whynot") { el.textContent = override || `${wn.length} item${wn.length === 1 ? "" : "s"} on the “Why am I not…” list`; return; }
     if (override) { el.textContent = override; return; }
     if (!cur) { el.textContent = ""; return; }
     const saved = savedAt ? "Saved on this device " + fmtTime(savedAt) : "Not saved yet";
@@ -473,9 +474,10 @@
     // categories
     $("#cat-chips").innerHTML = knownCategories().map((c) =>
       `<button type="button" class="cat" data-cat="${esc(c)}" aria-pressed="${has(cur.categories, c)}">${esc(c)}</button>`).join("");
-    $("#pin-article").checked = !!cur.pinned;
+    $("#pin-doc").checked = !!cur.pinned;
+    $("#pin-hint").textContent = `(only one ${isArticle ? "article" : "story"} is pinned at a time; unpinned, the home page shows the latest)`;
   }
-  $("#pin-article").addEventListener("change", (e) => { if (cur) { cur.pinned = e.target.checked; onEdit(); } });
+  $("#pin-doc").addEventListener("change", (e) => { if (cur) { cur.pinned = e.target.checked; onEdit(); } });
 
   $$('input[name="kind"]').forEach((r) => r.addEventListener("change", () => {
     if (!cur || cur.slug || !r.checked) return;
@@ -530,6 +532,12 @@
     renderFoot();
   }
 
+  const PIN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6z"/><path d="M12 14v7"/></svg>';
+  const isPinned = (kind, slug) => !!((kind === "image" ? gal : remote[kind]).find((s) => s.slug === slug) || {}).pinned;
+  const pinBtn = (kind, slug, name) => {
+    const on = isPinned(kind, slug);
+    return `<button type="button" class="item-pin${on ? " on" : ""}" data-pin-kind="${kind}" data-pin-slug="${esc(slug)}" aria-pressed="${on}" title="${on ? "Unpin (the home page will show the latest one instead)" : "Pin to the home page"}" aria-label="${on ? "Unpin" : "Pin"}: ${esc(name)}">${PIN}</button>`;
+  };
   const TRASH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12"/><path d="M9 7V4h6v3"/></svg>';
 
   function renderList() {
@@ -545,17 +553,19 @@
     const item = (d) => `<div class="item-row">
       <button type="button" class="item${cur && d.id === cur.id ? " active" : ""}" data-id="${esc(d.id)}">
         <span class="item-title">${esc(d.title.trim() || "Untitled")}</span>
-        <span class="item-meta">${kindBadge(d.kind)}${status(d)}${d.slug && d.pinned ? '<span class="badge pin">Pinned</span>' : ""}<span>${esc(fmtDate(d.updated))}</span></span></button>
+        <span class="item-meta">${kindBadge(d.kind)}${status(d)}${d.slug && isPinned(d.kind, d.slug) ? '<span class="badge pin">Pinned</span>' : ""}<span>${esc(fmtDate(d.updated))}</span></span></button>
+      ${d.slug ? pinBtn(d.kind, d.slug, d.title.trim() || "Untitled") : ""}
       <button type="button" class="item-del" data-del="${esc(d.id)}" title="Delete this draft" aria-label="Delete draft: ${esc(d.title.trim() || "Untitled")}">${TRASH}</button></div>`;
     const rItem = (s) => `<div class="item-row"><button type="button" class="item" data-kind="${s.kind}" data-slug="${esc(s.slug)}">
       <span class="item-title">${esc(s.title || "Untitled")}</span>
-      <span class="item-meta">${kindBadge(s.kind)}<span class="badge live">Live</span>${s.pinned ? '<span class="badge pin">Pinned</span>' : ""}<span>${esc(fmtDate(s.published))}</span></span></button></div>`;
+      <span class="item-meta">${kindBadge(s.kind)}<span class="badge live">Live</span>${s.pinned ? '<span class="badge pin">Pinned</span>' : ""}<span>${esc(fmtDate(s.published))}</span></span></button>${pinBtn(s.kind, s.slug, s.title || "Untitled")}</div>`;
 
     $("#story-items").innerHTML =
       (local.length ? `<div class="group-label">Drafts &amp; edits</div>${local.map(item).join("")}` : "") +
       (remoteOnly.length ? `<div class="group-label">Published</div>${remoteOnly.map(rItem).join("")}` : "");
     $("#side-note").textContent = mode === "gallery"
       ? "Gallery images are published straight away (there are no drafts)."
+      : mode === "whynot" ? "Items are published straight away (there are no drafts)."
       : `Drafts stay in this browser. Publishing commits to ${cfg.owner}/${cfg.repo}.`;
   }
 
@@ -623,7 +633,7 @@
         slug: s.slug || slug, published: s.published || null,
         series: s.series || "", chapter: s.chapter || null,
         categories: Array.isArray(s.categories) ? s.categories : [],
-        pinned: kind === "article" && !!(remote.article.find((a) => a.slug === slug) || {}).pinned,
+        pinned: !!(remote[kind].find((a) => a.slug === slug) || {}).pinned,
         extra: s.source ? { source: s.source } : {},
       });
       drafts[d.id] = d; persist();
@@ -635,6 +645,8 @@
   }
 
   $("#story-items").addEventListener("click", (e) => {
+    const pin = e.target.closest(".item-pin");
+    if (pin) { togglePin(pin.dataset.pinKind, pin.dataset.pinSlug); return; }
     const del = e.target.closest(".item-del");
     if (del) { deleteDraft(del.dataset.del); return; }
     const b = e.target.closest(".item");
@@ -642,6 +654,37 @@
     document.body.classList.remove("side-open");
     if (b.dataset.id) openDraft(b.dataset.id); else openRemote(b.dataset.kind, b.dataset.slug);
   });
+  /* Pin or unpin straight from the list. Only the index file changes (one commit). The home page
+     shows the pinned item, or the latest one when nothing is pinned. Only one is pinned per kind. */
+  let pinBusy = false;
+  async function togglePin(kind, slug) {
+    if (pinBusy || busy || gbusy) return;
+    const list = kind === "image" ? gal : remote[kind];
+    const entry = list.find((s) => s.slug === slug);
+    if (!entry) return;
+    if (!(await ensureConnected())) return;
+    const willPin = !entry.pinned;
+    pinBusy = true;
+    try {
+      const path = kind === "image" ? GALLERY_PATH : indexPath(kind);
+      const label = kind === "image" ? "gallery image" : KINDS[kind].label.toLowerCase();
+      const next = await updateList(path, (l) => {
+        l.forEach((s) => { if (s.slug === slug) { if (willPin) s.pinned = true; else delete s.pinned; } else if (willPin) delete s.pinned; });
+        return l;
+      }, `${willPin ? "Pin" : "Unpin"} ${label}: ${entry.title}`, kind === "image" ? byAdded : byNewest);
+      if (kind === "image") gal = next; else remote[kind] = next;
+      // keep local copies (and an open form) in step with the index
+      for (const d of Object.values(drafts)) if (d.kind === kind && d.slug) d.pinned = d.slug === slug ? willPin : (willPin ? false : d.pinned);
+      persist();
+      if (cur && cur.kind === kind && cur.slug) cur.pinned = isPinned(kind, cur.slug);
+      if (gcur && kind === "image" && gcur.slug) $("#g-pin").checked = isPinned("image", gcur.slug);
+      renderList(); renderGalleryList(); renderMeta();
+      toast(willPin ? `Pinned “${entry.title}” to the home page. It appears once the site redeploys (a minute or two).` : `Unpinned “${entry.title}”. The home page will show the latest one instead.`, "ok");
+    } catch (err) {
+      toast(listProblem(err), "err");
+    } finally { pinBusy = false; }
+  }
+
   $("#btn-new-story").addEventListener("click", () => { document.body.classList.remove("side-open"); newOne("story"); });
   $("#btn-new-article").addEventListener("click", () => { document.body.classList.remove("side-open"); newOne("article"); });
   $("#btn-side").addEventListener("click", () => {
@@ -744,7 +787,8 @@
       const sub = subtitleEl.value.trim();
       if (sub) meta.subtitle = sub;
       if (kind === "story") { if (cur.series) { meta.series = cur.series; meta.chapter = cur.chapter; } }
-      else { meta.categories = cur.categories.slice(); if (cur.pinned) meta.pinned = true; }
+      else meta.categories = cur.categories.slice();
+      if (cur.pinned) meta.pinned = true;
       const { pinned: _pinned, ...docMeta } = meta;   // "pinned" lives only in the index, so un-pinning never has to touch other files
       const doc = { ...docMeta, ...(kind === "article" && cur.extra && cur.extra.source ? { source: cur.extra.source } : {}), html, delta };
 
@@ -753,7 +797,7 @@
       await putFile(path, JSON.stringify(doc), `${verb} ${label.toLowerCase()}: ${title}`, existing && existing.sha);
 
       remote[kind] = await updateList(indexPath(kind), (l) => {
-        if (meta.pinned) l.forEach((s) => { if (s.slug !== slug) delete s.pinned; });   // only one pinned article
+        if (meta.pinned) l.forEach((s) => { if (s.slug !== slug) delete s.pinned; });   // only one pinned per list
         const i = l.findIndex((s) => s.slug === slug);
         if (i >= 0) l[i] = meta; else l.push(meta);
         return l;
@@ -835,11 +879,13 @@ body{max-width:720px;margin:40px auto;padding:0 20px;font:18px/1.75 Georgia,seri
 
   async function refreshRemote(announce) {
     try {
-      const [stories, articles, series, gallery] = await Promise.all([
-        readList(indexPath("story")), readList(indexPath("article")), readList(SERIES_PATH), readList(GALLERY_PATH)]);
+      const [stories, articles, series, gallery, groups, whynot] = await Promise.all([
+        readList(indexPath("story")), readList(indexPath("article")), readList(SERIES_PATH), readList(GALLERY_PATH), readList(GROUPS_PATH), readList(WN_PATH)]);
       remote = { story: stories.sort(byNewest), article: articles.sort(byNewest) };
       seriesList = series;
       gal = gallery.sort(byAdded);
+      galGroups = groups; nestFromPublished();
+      wn = whynot.sort(wnSort);
       if (announce) toast("Lists refreshed.", "ok");
     } catch (err) {
       toast("Couldn't load what's published: " + listProblem(err), "err");
@@ -847,6 +893,8 @@ body{max-width:720px;margin:40px auto;padding:0 20px;font:18px/1.75 Georgia,seri
     renderList();
     renderMeta();
     renderGalleryList();
+    renderGalleryChips();
+    renderWnList(); renderWnChoices();
     renderStatus();
   }
 
@@ -860,7 +908,7 @@ body{max-width:720px;margin:40px auto;padding:0 20px;font:18px/1.75 Georgia,seri
   let previewUrl = null;
 
   const normTag = (s) => String(s).trim().replace(/^#+/, "").replace(/\s+/g, " ").slice(0, 40);
-  const knownGalleryCategories = () => uniqueNames([SITE_CFG.galleryCategories || [], ...gal.map((g) => g.categories || []), gcur ? gcur.categories : []]);
+  const knownGalleryCategories = () => uniqueNames([SITE_CFG.galleryCategories || [], ...gal.map((g) => g.categories || []), gcur ? gcur.categories : [], ...galGroups.map((g) => [g.name, ...(g.parents || [])])]);
 
   function renderGalleryChips() {
     if (!gcur) return;
@@ -870,6 +918,7 @@ body{max-width:720px;margin:40px auto;padding:0 20px;font:18px/1.75 Georgia,seri
       ? gcur.tags.map((t) => `<button type="button" class="cat tag" data-tag="${esc(t)}" aria-pressed="true" title="Click to remove">#${esc(t)}<span class="x" aria-hidden="true">×</span></button>`).join("")
       : '<span class="meta-hint">No tags yet</span>';
     $("#g-tag-list").innerHTML = uniqueNames(gal.map((g) => g.tags || [])).map((t) => `<option value="${esc(t)}">`).join("");
+    renderNesting();
   }
   $("#g-cat-chips").addEventListener("click", (e) => {
     const b = e.target.closest(".cat"); if (!b || !gcur) return;
@@ -902,6 +951,59 @@ body{max-width:720px;margin:40px auto;padding:0 20px;font:18px/1.75 Georgia,seri
   $("#g-new-cat").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addGalleryCategory(); } });
   $("#g-add-tag").addEventListener("click", addGalleryTags);
   $("#g-new-tag").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addGalleryTags(); } });
+
+  /* Groups inside groups: gallery/groups.json = [{ name, parents: [name] }]. Filing an image under
+     "Sketches" then also shows it under "Art" once Sketches is put inside Art. Only groups that sit
+     inside another are stored. */
+  const GROUPS_PATH = "gallery/groups.json";
+  let galGroups = [];                       // as published
+  let nest = new Map();                     // lower-case group name -> parent names (working copy)
+  let nestBusy = false;
+  const nestParents = (name) => nest.get(name.toLowerCase()) || [];
+  function nestFromPublished() { nest = new Map(galGroups.map((g) => [String(g.name).toLowerCase(), (g.parents || []).slice()])); }
+  function nestedInside(name) {             // every group inside `name`, however deep
+    const out = new Set(), todo = [name.toLowerCase()];
+    while (todo.length) {
+      const t = todo.pop();
+      for (const [k, ps] of nest) if (!out.has(k) && ps.some((p) => p.toLowerCase() === t)) { out.add(k); todo.push(k); }
+    }
+    return out;
+  }
+  function renderNesting() {
+    const names = knownGalleryCategories();
+    $("#g-nest-body").innerHTML = names.length ? names.map((n) => {
+      const banned = nestedInside(n); banned.add(n.toLowerCase());   // no loops
+      const chips = names.filter((p) => !banned.has(p.toLowerCase())).map((p) =>
+        `<button type="button" class="cat" data-child="${esc(n)}" data-parent="${esc(p)}" aria-pressed="${has(nestParents(n), p)}">${esc(p)}</button>`).join("");
+      return `<div class="nest-row"><strong>${esc(n)}</strong><span class="meta-hint">is also part of</span><div class="cat-chips">${chips || '<span class="meta-hint">nothing else to choose</span>'}</div></div>`;
+    }).join("") : '<p class="meta-hint">Give an image a group first.</p>';
+  }
+  $("#g-nest-body").addEventListener("click", (e) => {
+    const b = e.target.closest(".cat"); if (!b) return;
+    const key = b.dataset.child.toLowerCase(), list = nestParents(b.dataset.child).slice();
+    const i = list.findIndex((p) => p.toLowerCase() === b.dataset.parent.toLowerCase());
+    if (i >= 0) list.splice(i, 1); else list.push(b.dataset.parent);
+    if (list.length) nest.set(key, list); else nest.delete(key);
+    $("#g-nest-msg").textContent = "Not saved yet.";
+    renderNesting();
+  });
+  $("#g-nest-save").addEventListener("click", async () => {
+    if (nestBusy) return;
+    if (!(await ensureConnected())) return;
+    nestBusy = true; $("#g-nest-save").disabled = true;
+    try {
+      const names = knownGalleryCategories();
+      const out = [...nest].filter(([, ps]) => ps.length)
+        .map(([k, ps]) => ({ name: names.find((n) => n.toLowerCase() === k) || k, parents: ps }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      galGroups = await updateList(GROUPS_PATH, () => out, "Update gallery group nesting");
+      nestFromPublished(); renderNesting();
+      $("#g-nest-msg").textContent = "Saved. The site shows it after the next deploy (a minute or two).";
+      toast("Group nesting saved.", "ok");
+    } catch (err) {
+      $("#g-nest-msg").textContent = listProblem(err);
+    } finally { nestBusy = false; $("#g-nest-save").disabled = false; }
+  });
 
   function showGalleryError(msg) { gErrEl.textContent = msg; gErrEl.hidden = !msg; }
   function setPreviewImage(src, info) {
@@ -937,10 +1039,12 @@ body{max-width:720px;margin:40px auto;padding:0 20px;font:18px/1.75 Georgia,seri
     $("#gallery-items").innerHTML = gal.length
       ? `<div class="group-label">In the gallery</div>` + gal.map((g) => `<div class="item-row"><button type="button" class="item gitem${gcur && gcur.slug === g.slug ? " active" : ""}" data-gslug="${esc(g.slug)}">
           <img class="gthumb" src="${esc(ROOT + g.thumb)}" alt="" loading="lazy">
-          <span><span class="item-title">${esc(g.title)}</span><span class="item-meta">${g.pinned ? '<span class="badge pin">Pinned</span>' : ""}<span>${esc(fmtDate(g.added))}</span></span></span></button></div>`).join("")
+          <span><span class="item-title">${esc(g.title)}</span><span class="item-meta">${g.pinned ? '<span class="badge pin">Pinned</span>' : ""}<span>${esc(fmtDate(g.added))}</span></span></span></button>${pinBtn("image", g.slug, g.title)}</div>`).join("")
       : '<p class="side-note dim">Nothing in the gallery yet.</p>';
   }
   $("#gallery-items").addEventListener("click", (e) => {
+    const pin = e.target.closest(".item-pin");
+    if (pin) { togglePin(pin.dataset.pinKind, pin.dataset.pinSlug); return; }
     const b = e.target.closest(".gitem"); if (!b) return;
     document.body.classList.remove("side-open"); openImage(b.dataset.gslug);
   });
@@ -1078,16 +1182,272 @@ body{max-width:720px;margin:40px auto;padding:0 20px;font:18px/1.75 Georgia,seri
     } finally { setGBusy(false); }
   });
 
-  /* ───────── writing / gallery mode ───────── */
+  /* ═════════ "Why am I not…" (whynot/index.json) ═════════
+     [{ slug, name, group, reason?, inherits? }]. `inherits` is another item's slug: that item's
+     explanation is shown too, after this item's own text (if it has any). */
+  const WN_PATH = "whynot/index.json";
+  const wnSort = (a, b) => String(a.group || "").localeCompare(String(b.group || "")) || String(a.name).localeCompare(String(b.name));
+  const wnBy = (list) => new Map(list.map((e) => [e.slug, e]));
+  let wn = [];
+  let wcur = null;            // { slug: string|null, group }
+  let wbusy = false;
+  let wDirty = false;
+  let wLastGroup = "";
+  const wnEl = { name: $("#wn-name"), group: $("#wn-group"), inherits: $("#wn-inherits"), reason: $("#wn-reason") };
+  const wnErr = $("#wn-error");
+
+  // same rules as the public page
+  const wnFormat = (text) => String(text).split(/\n\s*\n/).filter((p) => p.trim()).map((p) => "<p>" + esc(p.trim()).replace(/\n/g, "<br>")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/\[([^\]]+)\]\(((?:https?:\/\/|#)[^\s)]+)\)/g, (_, t, u) => `<a href="${u}">${t}</a>`) + "</p>").join("");
+  function wnBlocks(list, entry) {
+    const by = wnBy(list), seen = new Set(), out = [];
+    for (let e = entry; e && !seen.has(e.slug); e = by.get(e.inherits)) {
+      seen.add(e.slug);
+      if (e.reason) out.push({ from: e === entry ? null : e, text: e.reason });
+    }
+    return out;
+  }
+  // does `entry` (or anything it inherits from) lead to `slug`? Then it can't be chosen as slug's source.
+  function wnLeadsTo(entry, slug) {
+    const by = wnBy(wn), seen = new Set();
+    for (let e = entry; e && !seen.has(e.slug); e = by.get(e.inherits)) { if (e.slug === slug) return true; seen.add(e.slug); }
+    return false;
+  }
+
+  function renderWnChoices() {
+    const groups = new Map();
+    for (const e of wn.slice().sort(wnSort)) {
+      if (wcur && wcur.slug && wnLeadsTo(e, wcur.slug)) continue;
+      const g = e.group || "Other";
+      (groups.get(g) || groups.set(g, []).get(g)).push(e);
+    }
+    const keep = wnEl.inherits.value;
+    wnEl.inherits.innerHTML = '<option value="">I’ll write my own explanation</option>' + [...groups].map(([g, l]) =>
+      `<optgroup label="${esc(g)}">${l.map((e) => `<option value="${esc(e.slug)}">Same as: ${esc(e.name)}</option>`).join("")}</optgroup>`).join("");
+    wnEl.inherits.value = [...wnEl.inherits.options].some((o) => o.value === keep) ? keep : "";
+    $("#wn-group-list").innerHTML = uniqueNames([wn.map((e) => e.group || "")]).map((g) => `<option value="${esc(g)}">`).join("");
+  }
+
+  function renderWnPreview() {
+    const slug = (wcur && wcur.slug) || "__new__";
+    const draft = { slug, name: wnEl.name.value.trim() || "This item", group: wnEl.group.value.trim(), reason: wnEl.reason.value.trim(), inherits: wnEl.inherits.value };
+    const blocks = wnBlocks(wn.filter((e) => e.slug !== slug).concat(draft), draft);
+    $("#wn-reason-label").textContent = draft.inherits ? "Anything specific to this one (optional; shown before the shared explanation)" : "Why I'm not this";
+    $("#wn-preview").innerHTML = blocks.length
+      ? blocks.map((b) => (b.from ? `<p class="wn-from">Same reasoning as ${esc(b.from.name)}</p>` : "") + wnFormat(b.text)).join("")
+      : '<p class="dim">Nothing written yet. The page will say you haven’t written this one yet.</p>';
+  }
+
+  function showWnError(msg) { wnErr.textContent = msg; wnErr.hidden = !msg; }
+
+  function fillWnForm() {
+    const e = (wcur && wcur.slug && wn.find((x) => x.slug === wcur.slug)) || {};
+    wnEl.name.value = e.name || ""; wnEl.reason.value = e.reason || "";
+    wnEl.group.value = e.group || (wcur && wcur.group) || "";
+    wnEl.inherits.value = "";
+    renderWnChoices();
+    wnEl.inherits.value = e.inherits || "";
+    if (wnEl.inherits.value !== (e.inherits || "")) wnEl.inherits.value = "";
+    $("#wn-h").textContent = wcur && wcur.slug ? "Edit item" : "Add an item";
+    $("#wn-save").textContent = wcur && wcur.slug ? "Save changes" : "Save & publish";
+    $("#wn-remove").hidden = !(wcur && wcur.slug);
+    showWnError(""); wDirty = false;
+    renderWnPreview();
+  }
+
+  function renderWnList() {
+    const el = $("#wn-items");
+    if (!wn.length) { el.innerHTML = '<p class="side-note dim">Nothing on the list yet. Add one, or use “Add several at once” under the form.</p>'; return; }
+    const by = wnBy(wn), groups = new Map();
+    for (const e of wn.slice().sort(wnSort)) { const g = e.group || "Other"; (groups.get(g) || groups.set(g, []).get(g)).push(e); }
+    el.innerHTML = [...groups].map(([g, l]) => `<div class="group-label">${esc(g)}</div>` + l.map((e) => {
+      const badge = e.inherits ? `<span class="badge kind">Same as ${esc((by.get(e.inherits) || {}).name || "…")}</span>`
+        : e.reason ? '<span class="badge live">Written</span>' : '<span class="badge">Empty</span>';
+      return `<div class="item-row"><button type="button" class="item${wcur && wcur.slug === e.slug ? " active" : ""}" data-wslug="${esc(e.slug)}">
+        <span class="item-title">${esc(e.name)}</span><span class="item-meta">${badge}</span></button></div>`;
+    }).join("")).join("");
+  }
+
+  const wnLeave = () => !wDirty || confirm("Discard your unsaved changes to this item?");
+  function newWn() { if (!wnLeave()) return; wcur = { slug: null, group: wLastGroup }; fillWnForm(); renderWnList(); wnEl.name.focus(); }
+  function openWn(slug) {
+    if (!wn.some((e) => e.slug === slug) || (wcur && wcur.slug === slug) || !wnLeave()) return;
+    wcur = { slug, group: "" }; fillWnForm(); renderWnList(); window.scrollTo(0, 0);
+  }
+  $("#wn-items").addEventListener("click", (e) => {
+    const b = e.target.closest(".item"); if (!b) return;
+    document.body.classList.remove("side-open"); openWn(b.dataset.wslug);
+  });
+  $("#btn-new-wn").addEventListener("click", () => { document.body.classList.remove("side-open"); newWn(); });
+  for (const el of Object.values(wnEl)) el.addEventListener("input", () => { wDirty = true; renderWnPreview(); });
+  wnEl.inherits.addEventListener("change", () => { wDirty = true; renderWnPreview(); });
+
+  function setWBusy(on, label) {
+    wbusy = on;
+    for (const id of ["#wn-save", "#wn-remove", "#btn-new-wn", "#wn-bulk-add"]) $(id).disabled = on;
+    if (on) $("#wn-save").textContent = label;
+    else $("#wn-save").textContent = wcur && wcur.slug ? "Save changes" : "Save & publish";
+  }
+
+  $("#wn-save").addEventListener("click", async () => {
+    if (wbusy || !wcur) return;
+    const name = wnEl.name.value.replace(/\s+/g, " ").trim(), group = wnEl.group.value.replace(/\s+/g, " ").trim() || "Other";
+    const reason = wnEl.reason.value.trim(), inherits = wnEl.inherits.value;
+    if (!name) { showWnError("Give the item a name."); wnEl.name.focus(); return; }
+    if (!slugify(name)) { showWnError("Use letters or numbers in the name."); return; }
+    if (wn.some((e) => e.slug !== wcur.slug && e.name.toLowerCase() === name.toLowerCase())) { showWnError("There is already an item with that name."); return; }
+    showWnError("");
+    if (!(await ensureConnected())) { showWnError("Publishing needs a GitHub connection."); return; }
+    setWBusy(true, "Saving…");
+    let savedSlug = wcur.slug;
+    const editing = !!wcur.slug;
+    try {
+      wn = await updateList(WN_PATH, (l) => {
+        let slug = wcur.slug;
+        if (!slug) { const used = new Set(l.map((e) => e.slug)), base = slugify(name); slug = base; for (let n = 2; used.has(slug); n++) slug = `${base}-${n}`; }
+        if (inherits) {                       // never let two items point at each other
+          const by = wnBy(l), seen = new Set();
+          for (let e = by.get(inherits); e && !seen.has(e.slug); e = by.get(e.inherits)) {
+            if (e.slug === slug) throw new Error("That would make two items point at each other.");
+            seen.add(e.slug);
+          }
+        }
+        savedSlug = slug;
+        const entry = { slug, name, group, ...(reason ? { reason } : {}), ...(inherits ? { inherits } : {}) };
+        const i = l.findIndex((e) => e.slug === slug);
+        if (i >= 0) l[i] = entry; else l.push(entry);
+        return l;
+      }, `${editing ? "Update" : "Add"} “why not” item: ${name}`, wnSort);
+      wLastGroup = group;
+      wcur = { slug: savedSlug, group };
+      fillWnForm(); renderWnList(); renderStatus();
+      toast(`${editing ? "Saved" : "Added"}. GitHub Pages usually shows it on the site within a minute or two.`, "ok");
+    } catch (err) {
+      showWnError(listProblem(err));
+    } finally { setWBusy(false); }
+  });
+
+  $("#wn-remove").addEventListener("click", async () => {
+    if (wbusy || !wcur || !wcur.slug) return;
+    const slug = wcur.slug, item = wn.find((e) => e.slug === slug); if (!item) return;
+    const users = wn.filter((e) => e.inherits === slug).length;
+    if (!confirm(`Remove “${item.name}” from the list?` + (users ? `\n\n${users} other item${users === 1 ? " uses" : "s use"} its explanation. They keep the text (it is copied into them).` : ""))) return;
+    if (!(await ensureConnected())) return;
+    setWBusy(true, "Removing…");
+    try {
+      wn = await updateList(WN_PATH, (l) => {
+        const gone = l.find((e) => e.slug === slug);
+        return l.filter((e) => e.slug !== slug).map((e) => {
+          if (e.inherits !== slug || !gone) return e;
+          const next = { ...e };                                   // splice the removed item out of the chain
+          if (gone.reason) next.reason = [e.reason, gone.reason].filter(Boolean).join("\n\n");
+          if (gone.inherits && gone.inherits !== e.slug) next.inherits = gone.inherits; else delete next.inherits;
+          return next;
+        });
+      }, `Remove “why not” item: ${item.name}`, wnSort);
+      toast("Removed from the list.", "ok");
+      wDirty = false; wcur = { slug: null, group: wLastGroup }; fillWnForm(); renderWnList(); renderStatus();
+    } catch (err) {
+      showWnError(listProblem(err));
+    } finally { setWBusy(false); }
+  });
+
+  const WN_STARTER = `# World religions
+Christianity
+Islam
+Judaism
+Hinduism
+Buddhism
+Sikhism
+Bahá'í Faith
+Jainism
+# Christian denominations
+Roman Catholicism
+Eastern Orthodoxy
+Lutheranism
+Reformed / Calvinism
+Anglicanism
+Baptist
+Methodism
+Pentecostalism
+Seventh-day Adventism
+Jehovah's Witnesses
+Mormonism (Latter-day Saints)
+# Worldviews
+Atheism
+Agnosticism
+Deism
+Pantheism
+Secular humanism
+# Ideologies
+Marxism
+Socialism
+Libertarianism
+Anarchism
+Fascism
+Nationalism
+Utilitarianism
+Nihilism`;
+  $("#wn-bulk-starter").addEventListener("click", () => {
+    const t = $("#wn-bulk-text");
+    if (t.value.trim() && !confirm("Replace what's in the box with the starter list?")) return;
+    t.value = WN_STARTER; t.focus();
+  });
+  $("#wn-bulk-add").addEventListener("click", async () => {
+    if (wbusy) return;
+    let group = wnEl.group.value.replace(/\s+/g, " ").trim() || "Other";
+    const found = [], seen = new Set(wn.map((e) => e.name.toLowerCase()));
+    for (const raw of $("#wn-bulk-text").value.split("\n")) {
+      const line = raw.trim(); if (!line) continue;
+      const h = line.match(/^#+\s*(.+)$/);
+      if (h) { group = h[1].replace(/\s+/g, " ").trim().slice(0, 60) || group; continue; }
+      const name = line.replace(/\s+/g, " ").slice(0, 80);
+      if (!slugify(name) || seen.has(name.toLowerCase())) continue;
+      seen.add(name.toLowerCase()); found.push({ name, group });
+    }
+    if (!found.length) { showWnError("Nothing new to add. Names already on the list are skipped."); return; }
+    showWnError("");
+    if (!(await ensureConnected())) { showWnError("Publishing needs a GitHub connection."); return; }
+    setWBusy(true, "Saving…");
+    try {
+      let added = 0;
+      wn = await updateList(WN_PATH, (l) => {
+        added = 0;
+        const used = new Set(l.map((e) => e.slug)), names = new Set(l.map((e) => e.name.toLowerCase()));
+        for (const f of found) {
+          if (names.has(f.name.toLowerCase())) continue;
+          const base = slugify(f.name); let slug = base;
+          for (let n = 2; used.has(slug); n++) slug = `${base}-${n}`;
+          used.add(slug); names.add(f.name.toLowerCase()); l.push({ slug, name: f.name, group: f.group }); added++;
+        }
+        return l;
+      }, `Add “why not” items (${found.length})`, wnSort);
+      $("#wn-bulk-text").value = "";
+      renderWnList(); renderWnChoices(); renderStatus();
+      toast(`Added ${added} item${added === 1 ? "" : "s"}. Open each one to write its explanation.`, "ok");
+    } catch (err) {
+      showWnError(listProblem(err));
+    } finally { setWBusy(false); }
+  });
+
+  /* ───────── writing / gallery / why-not mode ───────── */
   function setMode(next) {
+    if (next !== "whynot" && mode === "whynot" && !wnLeave()) { $$('input[name="mode"]').forEach((r) => { r.checked = r.value === mode; }); return; }
     mode = next;
     document.body.classList.toggle("mode-gallery", next === "gallery");
+    document.body.classList.toggle("mode-whynot", next === "whynot");
     $$('input[name="mode"]').forEach((r) => { r.checked = r.value === next; });
-    $("#story-items").hidden = next === "gallery";
+    $("#story-items").hidden = next !== "write";
     $("#gallery-items").hidden = next !== "gallery";
+    $("#wn-items").hidden = next !== "whynot";
     $("#btn-new-image").hidden = next !== "gallery";
+    $("#btn-new-wn").hidden = next !== "whynot";
     $("#gallery-editor").hidden = next !== "gallery";
-    if (next === "gallery") { leaveCurrent(); if (!gcur) newImage(); renderGalleryList(); }
+    $("#whynot-editor").hidden = next !== "whynot";
+    if (next !== "write") leaveCurrent();
+    if (next === "gallery") { if (!gcur) newImage(); renderGalleryList(); }
+    else if (next === "whynot") { if (!wcur) { wcur = { slug: null, group: wLastGroup }; fillWnForm(); } renderWnList(); }
     else { window.scrollTo(0, 0); }
     renderList(); renderStatus();
   }

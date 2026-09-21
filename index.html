@@ -10,8 +10,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Carlito:ital,wght@0,400;0,700;1,400;1,700&family=Tinos:ital,wght@0,400;0,700;1,400;1,700&family=Caladea:ital,wght@0,400;0,700;1,400;1,700&display=swap" />
-  <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="story-content.css" />
+  <link rel="stylesheet" href="styles.css?v=__BUILD__" />
+  <link rel="stylesheet" href="story-content.css?v=__BUILD__" />
 </head>
 <body data-panel="mid">
   <canvas id="stars" aria-hidden="true"></canvas>
@@ -29,6 +29,7 @@
         <a class="key" href="#stories" data-tab="stories"><i class="led" aria-hidden="true"></i><span>Stories</span></a>
         <a class="key" href="#gallery" data-tab="gallery"><i class="led" aria-hidden="true"></i><span>Gallery</span></a>
         <a class="key" href="#contact" data-tab="contact"><i class="led" aria-hidden="true"></i><span>Contact</span></a>
+        <a class="key" id="key-whynot" href="#why-not" data-tab="why-not" hidden><i class="led" aria-hidden="true"></i><span>Why not</span></a>
       </nav>
     </div>
   </header>
@@ -67,6 +68,17 @@
             <span class="tags" id="pinned-tags"></span>
             <span class="featured-summary" id="pinned-summary"></span>
             <span class="more">Read the article →</span>
+          </a>
+        </div>
+
+        <div class="home-block" id="home-story" hidden>
+          <p class="eyebrow">Pinned story</p>
+          <a class="featured" id="story-link" href="#stories">
+            <span class="entry-kicker" id="story-kicker"></span>
+            <span class="featured-title" id="story-title"></span>
+            <span class="entry-sub" id="story-sub"></span>
+            <span class="featured-summary" id="story-summary"></span>
+            <span class="more">Read the story →</span>
           </a>
         </div>
 
@@ -121,7 +133,8 @@
       <section class="view page" data-view="gallery" aria-labelledby="h-gallery" hidden>
         <h1 class="page-title" id="h-gallery">Gallery</h1>
         <p class="page-sub">Art and photography.</p>
-        <nav class="filters" id="gallery-filters" aria-label="Filter by category"></nav>
+        <nav class="filters" id="gallery-filters" aria-label="Filter by group"></nav>
+        <nav class="filters sub-filters" id="gallery-subgroups" aria-label="Groups inside this group" hidden></nav>
         <nav class="filters tag-filters" id="gallery-tags" aria-label="Filter by tag"></nav>
         <div class="gallery-grid" id="gallery-grid" aria-live="polite"></div>
       </section>
@@ -130,6 +143,17 @@
       <section class="view" data-view="image" aria-label="Image" hidden>
         <div class="reader-bar"><a class="back-link" href="#gallery">← Gallery</a></div>
         <article class="photo" id="image-box" aria-live="polite"></article>
+      </section>
+
+      <!-- WHY AM I NOT (no tab until SITE.whyNotTab is true) -->
+      <section class="view page" data-view="why-not" aria-labelledby="h-whynot" hidden>
+        <h1 class="page-title" id="h-whynot">Why am I not…</h1>
+        <p class="page-sub">Choose a belief, ideology or denomination to see my reasons.</p>
+        <label class="wn-pick" id="wn-pick" hidden>
+          <span class="visually-hidden">Choose one</span>
+          <select id="wn-select"></select>
+        </label>
+        <article class="wn-detail" id="wn-detail" aria-live="polite"></article>
       </section>
 
       <!-- CONTACT -->
@@ -194,7 +218,7 @@
     <button type="button" data-show="right"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5"/></svg><span>Latest</span></button>
   </nav>
 
-  <script src="site-data.js"></script>
-  <script src="script.js"></script>
+  <script src="site-data.js?v=__BUILD__"></script>
+  <script src="script.js?v=__BUILD__"></script>
 </body>
 </html>

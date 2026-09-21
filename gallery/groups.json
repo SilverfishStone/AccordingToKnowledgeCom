@@ -1,0 +1,14 @@
+[
+  {
+    "name": "My Digital Art",
+    "parents": [
+      "Art"
+    ]
+  },
+  {
+    "name": "Sketches",
+    "parents": [
+      "Art"
+    ]
+  }
+]

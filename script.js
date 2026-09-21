@@ -131,7 +131,7 @@
   const note = (msg) => `<p class="empty-note">${esc(msg)}</p>`;
 
   function storyEntry(s, series) {
-    const kicker = storyKicker(s, series);
+    const kicker = [s.pinned ? "Pinned" : "", storyKicker(s, series)].filter(Boolean).join(" · ");
     return `<a class="entry" href="#story/${esc(s.slug)}">
       ${kicker ? `<span class="entry-kicker">${esc(kicker)}</span>` : ""}
       <h2>${esc(s.title || "Untitled")}</h2>
@@ -386,29 +386,73 @@
   const dims = (g) => (Number(g.width) > 0 && Number(g.height) > 0 ? ` width="${Number(g.width)}" height="${Number(g.height)}"` : "");
   const galleryLink = (kind, slug) => `#gallery/${kind}/${encodeURIComponent(slug)}`;
 
+  /* Groups can sit inside other groups (gallery/groups.json: Sketches inside Art), so an image is
+     in every group it is filed under and in every group those sit inside. */
+  const loadGroups = () => getJSON("gallery/groups.json", { optional: true }).then((l) =>
+    (Array.isArray(l) ? l : []).filter((g) => g && typeof g.name === "string" && slugify(g.name))
+      .map((g) => ({ name: g.name.trim(), parents: strList(g.parents) })));
+
+  function buildGroups(items, nesting) {
+    const names = new Map(), parentsOf = new Map();
+    const learn = (n) => { const s = slugify(n); if (s && !names.has(s)) names.set(s, String(n).trim()); return s; };
+    for (const g of nesting) { const s = learn(g.name); parentsOf.set(s, g.parents.map(learn).filter((p) => p && p !== s)); }
+    for (const g of items) g.categories.forEach(learn);
+    const above = (slug) => {                                // every group this one sits inside
+      const seen = new Set(), todo = [...(parentsOf.get(slug) || [])];
+      while (todo.length) { const s = todo.pop(); if (seen.has(s) || s === slug) continue; seen.add(s); todo.push(...(parentsOf.get(s) || [])); }
+      return seen;
+    };
+    const facets = new Map();
+    for (const g of items) {
+      g.groupSlugs = new Set();
+      for (const name of g.categories) {
+        const s = slugify(name); if (!s) continue;
+        g.groupSlugs.add(s); above(s).forEach((p) => g.groupSlugs.add(p));
+      }
+      for (const s of g.groupSlugs) {
+        if (!facets.has(s)) facets.set(s, { slug: s, name: names.get(s) || s, count: 0, parents: [], children: [] });
+        facets.get(s).count++;
+      }
+    }
+    for (const f of facets.values()) f.parents = (parentsOf.get(f.slug) || []).filter((p) => facets.has(p) && p !== f.slug);
+    for (const f of facets.values()) for (const p of f.parents) facets.get(p).children.push(f);
+    const byName = (x, y) => x.name.localeCompare(y.name);
+    for (const f of facets.values()) f.children.sort(byName);
+    return { facets, top: [...facets.values()].filter((f) => !f.parents.length).sort(byName), above };
+  }
+
   async function showGallery(kind, slug) {
-    const grid = $("#gallery-grid"), fc = $("#gallery-filters"), ft = $("#gallery-tags");
+    const grid = $("#gallery-grid"), fc = $("#gallery-filters"), fs = $("#gallery-subgroups"), ft = $("#gallery-tags");
     try {
-      const items = await loadGallery();
-      const cats = buildFacets(items, "categories"), tags = buildFacets(items, "tags");
-      const activeCat = kind === "category" ? cats.find((c) => c.slug === slug) : null;
+      const [items, nesting] = await Promise.all([loadGallery(), loadGroups().catch(() => [])]);
+      const { facets, top, above } = buildGroups(items, nesting);
+      const tags = buildFacets(items, "tags");
+      const activeCat = kind === "category" ? facets.get(slug) : null;
       const activeTag = kind === "tag" ? tags.find((t) => t.slug === slug) : null;
-      fc.hidden = !cats.length; ft.hidden = !tags.length;
-      fc.innerHTML = cats.length
-        ? `<a class="chip${activeCat || activeTag ? "" : " active"}" href="#gallery">All <small>${items.length}</small></a>` +
-          cats.map((c) => `<a class="chip${activeCat && activeCat.slug === c.slug ? " active" : ""}" href="${galleryLink("category", c.slug)}">${esc(c.name)} <small>${c.count}</small></a>`).join("")
+      const path = activeCat ? above(activeCat.slug) : new Set();
+      const chip = (f) => `<a class="chip${activeCat && activeCat.slug === f.slug ? " active" : path.has(f.slug) ? " path" : ""}" href="${galleryLink("category", f.slug)}">${esc(f.name)} <small>${f.count}</small></a>`;
+
+      fc.hidden = !facets.size; ft.hidden = !tags.length;
+      fc.innerHTML = facets.size
+        ? `<a class="chip${activeCat || activeTag ? "" : " active"}" href="#gallery">All <small>${items.length}</small></a>` + top.map(chip).join("")
+        : "";
+      // second row: what is inside the group you're in (or the group your group sits inside)
+      const focus = activeCat && (activeCat.children.length ? activeCat : facets.get(activeCat.parents[0]));
+      fs.hidden = !(focus && focus.children.length);
+      fs.innerHTML = focus && focus.children.length
+        ? `<span class="sub-label">In ${esc(focus.name)}</span>` + chip({ ...focus, name: "All " + focus.name }) + focus.children.map(chip).join("")
         : "";
       ft.innerHTML = tags.map((t) => `<a class="chip${activeTag && activeTag.slug === t.slug ? " active" : ""}" href="${galleryLink("tag", t.slug)}">#${esc(t.name)}</a>`).join("");
       if (!items.length) { grid.innerHTML = note("No images yet. They'll appear here as I add them."); return; }
       if (kind && !activeCat && !activeTag) { grid.innerHTML = note("Nothing here."); return; }
-      const shown = activeCat ? items.filter((g) => g.categories.some((n) => slugify(n) === activeCat.slug))
+      const shown = activeCat ? items.filter((g) => g.groupSlugs.has(activeCat.slug))
         : activeTag ? items.filter((g) => g.tags.some((n) => slugify(n) === activeTag.slug)) : items;
       grid.innerHTML = shown.map((g) => `<a class="tile" href="#image/${esc(g.slug)}">
         <img src="${esc(g.thumb)}" alt="${esc(g.alt || g.title)}"${dims(g)} loading="lazy" decoding="async">
         <span class="tile-cap">${esc(g.title)}</span>
       </a>`).join("");
     } catch {
-      fc.hidden = true; ft.hidden = true;
+      fc.hidden = true; fs.hidden = true; ft.hidden = true;
       grid.innerHTML = note("Couldn't load the gallery right now. Try again in a moment.");
     }
   }
@@ -443,6 +487,54 @@
     }
   }
 
+  /* ───────── "Why am I not…" (whynot/index.json, written by /write/; no tab until SITE.whyNotTab) ───────── */
+  const loadWhyNot = () => getJSON("whynot/index.json", { optional: true }).then((l) =>
+    (Array.isArray(l) ? l : []).filter((e) => e && SLUG_RE.test(e.slug || "") && typeof e.name === "string" && e.name.trim())
+      .map((e) => ({ slug: e.slug, name: e.name.trim(), group: String(e.group || "").trim() || "Other",
+        reason: String(e.reason || "").trim(), inherits: SLUG_RE.test(e.inherits || "") ? e.inherits : "" })));
+
+  // blank line = new paragraph; **bold**, *italic*, [text](https://link)
+  const wnFormat = (text) => String(text).split(/\n\s*\n/).filter((p) => p.trim()).map((p) => "<p>" + esc(p.trim()).replace(/\n/g, "<br>")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/\[([^\]]+)\]\(((?:https?:\/\/|#)[^\s)]+)\)/g, (_, t, u) => `<a href="${u}"${u[0] === "#" ? "" : ' target="_blank" rel="noopener"'}>${t}</a>`) + "</p>").join("");
+
+  // an item's own text first, then the text of the item it inherits from, and so on
+  function wnBlocks(list, entry) {
+    const by = new Map(list.map((e) => [e.slug, e])), seen = new Set(), out = [];
+    for (let e = entry; e && !seen.has(e.slug); e = by.get(e.inherits)) {
+      seen.add(e.slug);
+      if (e.reason) out.push({ from: e === entry ? null : e, text: e.reason });
+    }
+    return out;
+  }
+
+  $("#wn-select").addEventListener("change", (e) => { location.hash = e.target.value ? "#why-not/" + e.target.value : "#why-not"; });
+
+  async function showWhyNot(slug) {
+    const sel = $("#wn-select"), box = $("#wn-detail"), pick = $("#wn-pick");
+    try {
+      const list = await loadWhyNot();
+      pick.hidden = !list.length;
+      if (!list.length) { box.innerHTML = note("Nothing here yet."); return; }
+      const groups = new Map();
+      for (const e of list.slice().sort((x, y) => x.name.localeCompare(y.name))) (groups.get(e.group) || groups.set(e.group, []).get(e.group)).push(e);
+      sel.innerHTML = '<option value="">Choose one…</option>' + [...groups].sort((x, y) => x[0].localeCompare(y[0]))
+        .map(([g, l]) => `<optgroup label="${esc(g)}">${l.map((e) => `<option value="${esc(e.slug)}">${esc(e.name)}</option>`).join("")}</optgroup>`).join("");
+      const e = slug ? list.find((x) => x.slug === slug) : null;
+      sel.value = e ? e.slug : "";
+      if (!slug) { box.innerHTML = ""; return; }
+      if (!e) { box.innerHTML = note("That one isn't on the list."); return; }
+      document.title = e.name + " · Why am I not… · " + SITE.name;
+      const blocks = wnBlocks(list, e);
+      box.innerHTML = `<h2 class="wn-name">${esc(e.name)}</h2><div class="tags"><span class="tag">${esc(e.group)}</span></div>` +
+        (blocks.length
+          ? blocks.map((b) => (b.from ? `<p class="wn-from">Same reasoning as <a class="text-link" href="#why-not/${esc(b.from.slug)}">${esc(b.from.name)}</a></p>` : "") + `<div class="wn-text">${wnFormat(b.text)}</div>`).join("")
+          : note("I haven't written this one yet."));
+    } catch {
+      box.innerHTML = note("Couldn't load this right now. Try again in a moment.");
+    }
+  }
+
   /* ───────── home: about, pinned article, gallery button, the rules ───────── */
   const boldify = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   $("#h-home").textContent = SITE.about || "";
@@ -450,7 +542,7 @@
   $("#rules-list").innerHTML = (SITE.rules || []).map((r) => `<li><span>${boldify(r)}</span></li>`).join("");
 
   async function showHome() {
-    const [articles, gallery] = await Promise.allSettled([loadArticles(), loadGallery()]);
+    const [articles, gallery, stories, seriesMeta] = await Promise.allSettled([loadArticles(), loadGallery(), loadStories(), loadSeriesMeta()]);
 
     // the pinned article (or, until one is pinned, the newest)
     const list = articles.status === "fulfilled" ? articles.value : [];
@@ -463,6 +555,20 @@
       $("#pinned-sub").textContent = a.subtitle || "";
       $("#pinned-tags").innerHTML = a.categories.map((c) => `<span class="tag">${esc(c)}</span>`).join("");
       $("#pinned-summary").textContent = a.summary || "";
+    }
+
+    // the pinned story (or the latest one)
+    const sl = stories.status === "fulfilled" ? stories.value : [];
+    const st = sl.find((x) => x.pinned) || sl[0];
+    $("#home-story").hidden = !st;
+    if (st) {
+      const sm = seriesMeta.status === "fulfilled" ? seriesMeta.value : [];
+      $("#home-story .eyebrow").textContent = st.pinned ? "Pinned story" : "Latest story";
+      $("#story-link").href = "#story/" + st.slug;
+      $("#story-kicker").textContent = storyKicker(st, buildSeries(sl, sm));
+      $("#story-title").textContent = st.title || "Untitled";
+      $("#story-sub").textContent = st.subtitle || "";
+      $("#story-summary").textContent = st.summary || "";
     }
 
     // the gallery button shows the pinned image (or, until one is pinned, the newest)
@@ -480,9 +586,10 @@
   /* ───────── middle: hash router ───────── */
   const views = $$(".view");
   const keys = $$(".key");
+  if (SITE.whyNotTab) $("#key-whynot").hidden = false;
   const notFound = $("#not-found");
-  const TAB = { home: "home", articles: "articles", article: "articles", stories: "stories", story: "stories", series: "stories", gallery: "gallery", image: "gallery", contact: "contact" };
-  const TITLE = { home: "Home", articles: "Articles", stories: "Stories", gallery: "Gallery", contact: "Contact", article: "Article", story: "Story", series: "Series", image: "Image" };
+  const TAB = { home: "home", articles: "articles", article: "articles", stories: "stories", story: "stories", series: "stories", gallery: "gallery", image: "gallery", contact: "contact", "why-not": "why-not" };
+  const TITLE = { home: "Home", articles: "Articles", stories: "Stories", gallery: "Gallery", contact: "Contact", article: "Article", story: "Story", series: "Series", image: "Image", "why-not": "Why am I not…" };
 
   function route() {
     const raw = location.hash.replace(/^#\/?/, "");
@@ -500,6 +607,7 @@
     else if (a === "story" && b) { view = "story"; arg = b; }
     else if (a === "series" && b) { view = "series"; arg = b; }
     else if (a === "contact" && !b) view = "contact";
+    else if (a === "why-not") { view = "why-not"; arg = b; }
 
     views.forEach((v) => { v.hidden = v.dataset.view !== view; });
     notFound.hidden = view !== "";
@@ -517,6 +625,7 @@
 
     if (view === "home") showHome();
     if (view === "gallery") showGallery(arg, arg2);
+    if (view === "why-not") showWhyNot(arg);
     if (view === "image") showImage(arg);
     if (view === "articles") showArticles(arg);
     if (view === "stories") showStories();
