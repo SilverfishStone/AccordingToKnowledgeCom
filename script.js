@@ -129,6 +129,8 @@
 
   /* ───────── shared bits of markup ───────── */
   const note = (msg) => `<p class="empty-note">${esc(msg)}</p>`;
+  // for the handful of messages that mean "this doesn't exist," not "try again in a moment"
+  const errNote = (msg) => `<p class="empty-note with-ghost"><img class="err-ghost" src="assets/ghost-guitar.gif" alt="" width="90" height="81">${esc(msg)}</p>`;
 
   function storyEntry(s, series) {
     const kicker = [s.pinned ? "Pinned" : "", storyKicker(s, series)].filter(Boolean).join(" · ");
@@ -251,11 +253,11 @@
 
   async function showSeries(slug) {
     const box = $("#series-box");
-    if (!SLUG_RE.test(slug)) { box.innerHTML = note("That series doesn't exist."); return; }
+    if (!SLUG_RE.test(slug)) { box.innerHTML = errNote("That series doesn't exist."); return; }
     try {
       const [stories, meta] = await Promise.all([loadStories(), loadSeriesMeta()]);
       const s = buildSeries(stories, meta).get(slug);
-      if (!s) { box.innerHTML = note("That series doesn't exist."); return; }
+      if (!s) { box.innerHTML = errNote("That series doesn't exist."); return; }
       document.title = s.title + " · " + SITE.name;
       box.innerHTML = `
         <p class="eyebrow series-eyebrow">Series</p>
@@ -300,7 +302,7 @@
   async function renderDoc(kind, slug) {
     const box = $(kind === "story" ? "#story-box" : "#article-box");
     const mine = ++docToken;
-    if (!SLUG_RE.test(slug) || RESERVED.has(slug)) { box.innerHTML = note("That page doesn't exist."); return; }
+    if (!SLUG_RE.test(slug) || RESERVED.has(slug)) { box.innerHTML = errNote("That page doesn't exist."); return; }
     box.innerHTML = note("Loading…");
     try {
       const [, res, extra] = await Promise.all([
@@ -355,7 +357,7 @@
     } catch (err) {
       if (mine !== docToken) return;
       box.innerHTML = String(err.message) === "404"
-        ? note("That page doesn't exist (or was unpublished).")
+        ? errNote("That page doesn't exist (or was unpublished).")
         : note("Couldn't load this right now. Try again in a moment.");
     }
   }
@@ -459,12 +461,12 @@
 
   async function showImage(slug) {
     const box = $("#image-box");
-    if (!SLUG_RE.test(slug)) { box.innerHTML = note("That image doesn't exist."); return; }
+    if (!SLUG_RE.test(slug)) { box.innerHTML = errNote("That image doesn't exist."); return; }
     box.innerHTML = note("Loading…");
     try {
       const items = await loadGallery();
       const i = items.findIndex((g) => g.slug === slug);
-      if (i < 0) { box.innerHTML = note("That image doesn't exist (or was removed)."); return; }
+      if (i < 0) { box.innerHTML = errNote("That image doesn't exist (or was removed)."); return; }
       const g = items[i], newer = items[i - 1], older = items[i + 1];
       document.title = g.title + " · " + SITE.name;
       const rows = [["Date", g.date && fmtDay(g.date)], ["Location", g.location], ["Details", g.details]].filter((r) => r[1]);
@@ -523,7 +525,7 @@
       const e = slug ? list.find((x) => x.slug === slug) : null;
       sel.value = e ? e.slug : "";
       if (!slug) { box.innerHTML = ""; return; }
-      if (!e) { box.innerHTML = note("That one isn't on the list."); return; }
+      if (!e) { box.innerHTML = errNote("That one isn't on the list."); return; }
       document.title = e.name + " · Why am I not… · " + SITE.name;
       const blocks = wnBlocks(list, e);
       box.innerHTML = `<h2 class="wn-name">${esc(e.name)}</h2><div class="tags"><span class="tag">${esc(e.group)}</span></div>` +
@@ -589,14 +591,18 @@
   if (SITE.whyNotTab) $("#key-whynot").hidden = false;
   const notFound = $("#not-found");
   const TAB = { home: "home", articles: "articles", article: "articles", stories: "stories", story: "stories", series: "stories", gallery: "gallery", image: "gallery", contact: "contact", "why-not": "why-not" };
-  const TITLE = { home: "Home", articles: "Articles", stories: "Stories", gallery: "Gallery", contact: "Contact", article: "Article", story: "Story", series: "Series", image: "Image", "why-not": "Why am I not…" };
+  const TITLE = { home: "Home", articles: "Articles", stories: "Stories", gallery: "Gallery", contact: "Contact", article: "Article", story: "Story", series: "Series", image: "Image", "why-not": "Why am I not…", secret: "Shh…" };
 
   function route() {
     const raw = location.hash.replace(/^#\/?/, "");
     const [a = "", b = "", c = ""] = raw.split("/");
     let view = "", arg = "", arg2 = "";
 
-    if (!raw || (["home", "about", "goals"].includes(a) && !b)) view = "home";
+    // 404.html (a real bad URL, no #) sets this before script.js loads, so a bare page load
+    // there shows the same "doesn't exist" screen instead of quietly looking like home.
+    if (!raw && window.__ATK_404__) view = "";
+    else if (!raw || (["home", "about", "goals"].includes(a) && !b)) view = "home";
+    else if (a === "secret" && !b) view = "secret";
     else if (a === "articles" && !b) view = "articles";
     else if (a === "gallery" && !b) view = "gallery";
     else if (a === "gallery" && (b === "category" || b === "tag") && c) { view = "gallery"; arg = b; arg2 = decodeURIComponent(c); }

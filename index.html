@@ -58,6 +58,7 @@
         <div class="home-about">
           <p class="eyebrow">About me</p>
           <h1 id="h-home" class="about-text"></h1>
+          <div class="goat-lane" aria-hidden="true"><div class="goat-walk"><span class="goat"></span></div></div>
         </div>
 
         <div class="home-block" id="home-pinned" hidden>
@@ -173,7 +174,18 @@
         </ul>
       </section>
 
-      <p class="not-found" id="not-found" hidden>That page doesn't exist. <a class="text-link" href="#articles">Back to articles</a></p>
+      <!-- SECRET (no link anywhere; reached by clicking the 404 ghost) -->
+      <section class="view page secret" data-view="secret" aria-labelledby="h-secret" hidden>
+        <h1 class="page-title" id="h-secret">You found the ghost's hideout</h1>
+        <p class="page-sub">Nothing here yet — activities are coming.</p>
+      </section>
+
+      <div class="not-found" id="not-found" hidden>
+        <a class="err-ghost-link" href="#secret" title="…follow the ghost?">
+          <img class="err-ghost" src="assets/ghost-guitar.gif" alt="A ghost playing guitar. It looks like it wants you to follow it." width="150" height="135">
+        </a>
+        <p>That page doesn't exist. <a class="text-link" href="#articles">Back to articles</a></p>
+      </div>
     </main>
 
     <!-- ═════════ RIGHT: article highlights ═════════ -->

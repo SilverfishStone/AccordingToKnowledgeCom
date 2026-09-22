@@ -32,6 +32,16 @@ jobs:
         run: |
           v="${GITHUB_SHA::8}"
           grep -rl "__BUILD__" _site --include='*.html' | xargs -r sed -i "s/__BUILD__/$v/g"
+      # GitHub Pages serves this file (with a real 404 status) for any URL that isn't a real
+      # file, e.g. a mistyped path with no #hash. It's index.html plus a flag so the router
+      # shows the same "doesn't exist" screen, and a <base> tag so its assets still load
+      # correctly no matter how deep the mistyped path was.
+      - name: Build 404 page
+        run: |
+          sed \
+            -e 's#<head>#<head>\n  <base href="/">#' \
+            -e 's#\(<script src="site-data\.js[^"]*"></script>\)#<script>window.__ATK_404__=true;</script>\n  \1#' \
+            _site/index.html > _site/404.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

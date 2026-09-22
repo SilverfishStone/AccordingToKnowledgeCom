@@ -537,3 +537,79 @@ body.reading .reader-bar { padding-left: 56px; }
 .wn-text { max-width: 36em; font-family: var(--reading-font); font-size: 19px; line-height: 1.7; }
 .wn-text p + p { margin-top: 1em; }
 .wn-text a { color: var(--accent); text-decoration: underline; }
+
+/* home: a real 73-frame walk cycle (assets/goat.png, 480×165 per frame) prances across
+   "About me" when you hover, then goes again. He's drawn facing left, so he enters from
+   offscreen right, crosses, and exits offscreen left (.goat-lane clips him once he's past
+   the edge) before resetting. Two layers: .goat-walk glides right→left (a couple of smooth,
+   eased stops, both `left` and `opacity` transitioned so leaving the panel mid-walk eases
+   away instead of popping back into view); the inner .goat steps through the frame strip
+   with `steps()` so the legs actually cycle, plus a small continuous hop for a skipping
+   feel — both only matter while he's on-screen walking; frames hold on 0 while offscreen,
+   rather than fighting the glide for one jerky keyframe list. */
+.home-about { position: relative; }
+.goat-lane {
+  --goat-w: 130px; --goat-h: 44px; --goat-frames: 73; --goat-hop: 8px; --goat-fade: 22px;
+  position: relative; height: calc(var(--goat-h) + var(--goat-hop)); margin-top: -15px; opacity: 0;
+  overflow: hidden; pointer-events: none; transition: opacity .2s ease;
+  /* fade at the edges instead of a hard clip, so he doesn't look chopped off as he enters/exits */
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--goat-fade), #000 calc(100% - var(--goat-fade)), transparent 100%);
+          mask-image: linear-gradient(to right, transparent 0, #000 var(--goat-fade), #000 calc(100% - var(--goat-fade)), transparent 100%);
+}
+.home-about:hover .goat-lane, .home-about:focus-within .goat-lane { opacity: 1; }
+.goat-walk {
+  position: absolute; left: 0; bottom: 0; width: var(--goat-w); height: var(--goat-h);
+  transition: left .2s ease, opacity .2s ease;   /* eases back to rest if you stop hovering mid-walk */
+}
+.home-about:hover .goat-walk, .home-about:focus-within .goat-walk { animation: goat-walk 11s ease-in-out infinite; }
+@keyframes goat-walk {
+  0%    { left: 100%;                     opacity: 1; }   /* enters from offscreen right */
+  45%   { left: calc(-1 * var(--goat-w)); opacity: 1; }   /* exits fully offscreen left */
+  45.3% { left: calc(-1 * var(--goat-w)); opacity: 0; }   /* stay hidden while he's "gone" */
+  92%   { left: calc(-1 * var(--goat-w)); opacity: 0; }
+  92.3% { left: 100%;                     opacity: 0; }   /* reset instantly while invisible */
+  93%   { left: 100%;                     opacity: 1; }   /* ready to enter again */
+  100%  { left: 100%;                     opacity: 1; }
+}
+.goat {
+  position: absolute; left: 0; bottom: 0; width: var(--goat-w); height: var(--goat-h);
+  background: url("assets/goat.png") repeat-x left bottom;
+  background-size: calc(var(--goat-w) * var(--goat-frames)) var(--goat-h);
+}
+.home-about:hover .goat, .home-about:focus-within .goat { animation: goat-step 11s infinite, goat-hop .35s ease-in-out infinite; }
+/* the legs cycle through the 73-frame walk 3 times per crossing (not once) — one pass looked
+   like smooth sliding with moving legs; repeating the stride several times over the same
+   distance/time reads as actual little jumps instead. background-repeat lets the strip
+   wrap seamlessly frame 72 -> 0 each lap. */
+@keyframes goat-step {
+  0%    { background-position-x: 0;                                        animation-timing-function: steps(216); }   /* 72 steps/lap × 3 laps */
+  45%   { background-position-x: calc(var(--goat-w) * (1 - var(--goat-frames)) * 3); }
+  45.01%{ background-position-x: 0; }                                       /* rest on frame 0 while offscreen */
+  100%  { background-position-x: 0; }
+}
+@keyframes goat-hop { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(calc(-1 * var(--goat-hop))); } }
+@media (max-width: 560px) {
+  .goat-lane { --goat-w: 88px; --goat-h: 30px; --goat-hop: 5px; --goat-fade: 14px; margin-top: -10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .goat-lane { opacity: 1; }
+  .goat-walk, .goat { left: 0; background-position-x: 0; transform: none; }
+  .home-about:hover .goat-walk, .home-about:focus-within .goat-walk,
+  .home-about:hover .goat, .home-about:focus-within .goat { animation: none; }
+}
+
+/* a ghost with a guitar shows up wherever a page or item genuinely doesn't exist.
+   On the full "page doesn't exist" screen it's big, and clicking it leads to #secret. */
+.not-found { display: flex; align-items: center; gap: 28px; }
+.err-ghost-link { flex: none; display: block; border-radius: 12px; transition: transform .15s ease, filter .15s ease; }
+.err-ghost-link:hover, .err-ghost-link:focus-visible { transform: scale(1.04); filter: brightness(1.12); }
+.err-ghost-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.err-ghost { display: block; width: 260px; max-width: 46vw; height: auto; image-rendering: auto; }
+.empty-note.with-ghost { display: flex; align-items: center; gap: 16px; padding: 26px 0; }
+.empty-note.with-ghost .err-ghost { width: 64px; max-width: none; }
+.secret .page-sub { margin-bottom: 0; }
+@media (max-width: 560px) {
+  .not-found { flex-direction: column; text-align: center; gap: 10px; }
+  .err-ghost { width: 200px; max-width: 70vw; }
+  .empty-note.with-ghost { flex-direction: column; text-align: center; }
+}
