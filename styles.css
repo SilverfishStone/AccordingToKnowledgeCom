@@ -608,6 +608,8 @@ body.reading .reader-bar { padding-left: 56px; }
 }
 .activity-note { margin-top: 8px; font-size: 13px; color: var(--dim); }
 @media (max-width: 700px) { .game-frame { aspect-ratio: 3 / 4; max-height: 72vh; } }
+/* the page puts the game in full screen (so it can lock the Esc key for it) */
+.game-frame:fullscreen { width: 100%; height: 100%; max-height: none; aspect-ratio: auto; border: 0; border-radius: 0; }
 @media (max-width: 560px) {
   .not-found { flex-direction: column; text-align: center; gap: 10px; }
   .err-ghost { width: 200px; max-width: 70vw; }

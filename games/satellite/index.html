@@ -128,6 +128,14 @@
     .mode ul { margin: 0; padding-left: 16px; color: #c5cde0; }
     .warn { color: var(--amber) !important; }
     @media (max-width: 700px) { .slots, .modes { grid-template-columns: 1fr; } }
+
+    /* purchase prompt */
+    .check { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--dim); cursor: pointer; }
+    .check input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+    .shop-foot { align-items: center; justify-content: space-between; }
+    .confirm { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 16px; background: rgba(2, 4, 10, .6); }
+    .confirm .card { width: min(400px, 100%); }
+    .confirm .actions { margin-bottom: 0; }
   </style>
 </head>
 <body>
@@ -245,8 +253,21 @@
         </div>
       </section>
       <p class="shop-note" id="shop-note" role="status"></p>
-      <div class="actions">
+      <div class="actions shop-foot">
         <button type="button" class="primary" id="btn-shop-close">Back to flying</button>
+        <label class="check"><input type="checkbox" id="shop-ask" /> Ask before buying</label>
+      </div>
+    </div>
+    <div class="confirm" id="buy-confirm" hidden>
+      <div class="card" role="alertdialog" aria-labelledby="buy-q" aria-describedby="buy-what">
+        <p class="eyebrow">Confirm purchase</p>
+        <p id="buy-q"><b>Are you sure you want to purchase?</b></p>
+        <p id="buy-what"></p>
+        <label class="check"><input type="checkbox" id="buy-skip" /> Don't ask me again on this save</label>
+        <div class="actions">
+          <button type="button" class="primary" id="buy-yes">Buy</button>
+          <button type="button" id="buy-no">Cancel</button>
+        </div>
       </div>
     </div>
   </div>
@@ -254,7 +275,8 @@
   <details class="dev" id="dev" hidden>
     <summary>Playtest tools</summary>
     <div class="body">
-      <span class="note">Playtest mode: the shop is open anywhere, everything in it is free, and this has its own save.</span>
+      <span class="note">Playtest mode: the shop is open anywhere, everything in it is free, and this has its own saves.</span>
+      <label class="check"><input type="checkbox" id="dev-free" checked /> Free shop (untick to pay real prices and see the purchase prompt)</label>
       <div class="row">
         <button type="button" id="dev-shop">Open shop</button>
         <button type="button" id="dev-cash">+1000 credits</button>
@@ -535,22 +557,22 @@
     const MODES = {
       free: {
         name: "Free play", about: ["Fly anywhere and run as many bounties at once as you like", "Arrows point to your delivery sectors", "Tows are free and you keep your cargo"],
-        maxJobs: Infinity, sectorArrow: true, stationArrowInSector: false, towFee: 0, towKeepsCargo: true,
+        maxJobs: Infinity, sectorArrow: true, stationArrowInSector: false, rememberFound: true, towFee: 0, towKeepsCargo: true,
         tankMul: 1, brakeMul: 1, brakeBurnMul: 1, steerBurn: 0, fuelPrice: 0, fuelOutEnds: false, sparse: false, startCredits: 0,
       },
       easy: {
         name: "Easy", about: ["Arrows point to your delivery sector, then to the station once you're in it", "A 50% bigger tank, and brakes that barely use fuel", "Tows are free, but your cargo is lost"],
-        maxJobs: 1, sectorArrow: true, stationArrowInSector: true, towFee: 0, towKeepsCargo: false,
+        maxJobs: 1, sectorArrow: true, stationArrowInSector: true, rememberFound: true, towFee: 0, towKeepsCargo: false,
         tankMul: 1.5, brakeMul: 1.3, brakeBurnMul: 0.35, steerBurn: 0, fuelPrice: 0, fuelOutEnds: false, sparse: false, startCredits: 0,
       },
       standard: {
         name: "Standard", about: ["You're told the sector, not the way there", "A tow costs 5 credits and your cargo"],
-        maxJobs: 1, sectorArrow: false, stationArrowInSector: false, towFee: 5, towKeepsCargo: false,
+        maxJobs: 1, sectorArrow: false, stationArrowInSector: false, rememberFound: false, towFee: 5, towKeepsCargo: false,
         tankMul: 1, brakeMul: 1, brakeBurnMul: 1, steerBurn: 0, fuelPrice: 0, fuelOutEnds: false, sparse: false, startCredits: 0,
       },
       challenge: {
         name: "Challenge", about: ["Far fewer fuel depots and data stations", "Fuel costs 5 credits a quarter tank, and steering uses fuel", "No tows: run dry and the game is over"],
-        maxJobs: 1, sectorArrow: false, stationArrowInSector: false, towFee: null, towKeepsCargo: false,
+        maxJobs: 1, sectorArrow: false, stationArrowInSector: false, rememberFound: false, towFee: null, towKeepsCargo: false,
         tankMul: 1, brakeMul: 1, brakeBurnMul: 1, steerBurn: 0.8, fuelPrice: 5, fuelOutEnds: true, sparse: true, startCredits: 20,
       },
     };
@@ -599,13 +621,15 @@
         values: [1, 1.2, 1.4, 1.65], prices: [250, 550, 950], show: (v) => `${Math.round(v * 100)}% power` },
       { id: "dcfuel", name: "Refuel at data centers", about: "Data stations keep a small fuel reserve you can top up from while you're landed. It refills slowly once you've used it.",
         values: [0, 15, 25, 40], prices: [300, 600, 1000], show: (v) => (v ? `${v} fuel in each data station` : "no fuel at data stations") },
+      { id: "pump", name: "Fuel pump", about: "Refuel faster, at depots and from data station reserves.",
+        values: [1, 1.5, 2, 3], prices: [80, 160, 300], show: (v) => `${v}× refuel speed` },
     ];
     const upgradeValue = (id) => { const u = UPGRADES.find((x) => x.id === id); return u.values[clamp(game.upgrades[id] || 0, 0, u.values.length - 1)]; };
     // what the ship can do right now, after upgrades
     function stats() {
       const power = upgradeValue("power"), m = mode();
       return {
-        tank: upgradeValue("tank") * m.tankMul, burn: upgradeValue("eff"), dcFuel: upgradeValue("dcfuel"),
+        tank: upgradeValue("tank") * m.tankMul, burn: upgradeValue("eff"), dcFuel: upgradeValue("dcfuel"), pump: upgradeValue("pump"),
         thrust: T.THRUST * power, brake: T.BRAKE * power * m.brakeMul, brakeBurn: m.brakeBurnMul,
         maxSpeed: T.MAX_SPEED * (1 + (power - 1) * 0.5),
       };
@@ -660,7 +684,7 @@
       // fuel depots: a jittered grid with some gaps, so a depot is sometimes in finder range and sometimes not
       const cell = 50;
       for (let gy = 0; gy < WORLD / cell; gy++) for (let gx = 0; gx < WORLD / cell; gx++) {
-        if (rnd() < (sparse ? 0.7 : 0.2)) continue;
+        if (rnd() < (sparse ? 0.5 : 0.2)) continue;
         for (let t = 0; t < 20; t++) {
           const x = gx * cell + 5 + rnd() * (cell - 10), y = gy * cell + 5 + rnd() * (cell - 10);
           if (clear(x, y, 14)) { stations.push({ kind: "fuel", x, y }); break; }
@@ -716,9 +740,10 @@
       Object.assign(game, {
         t: 0,
         ship: { x: st.x, y: st.y, vx: 0, vy: 0, a: 0, fuel: 0, thrusting: false, braking: false, refueling: false },
-        dockedAt: st, dockable: null, jobs: [], transfer: null, stranded: false, over: false,
+        dockedAt: st, dockable: null, jobs: [], transfer: null, stranded: false, over: false, mapMoved: false,
         stats: { deliveries: 0, kb: 0, tows: 0 },
-        credits: mode().startCredits, upgrades: { eff: 0, tank: 0, power: 0, dcfuel: 0 }, look: defaultLook(), owned: noneOwned(),
+        credits: mode().startCredits, upgrades: { eff: 0, tank: 0, power: 0, dcfuel: 0, pump: 0 }, look: defaultLook(), owned: noneOwned(),
+        settings: { askBeforeBuying: true },
         discovered: new Set(), visited: new Set(), lastSector: -1,
         toasts: [], particles: [],
       });
@@ -731,18 +756,25 @@
       if (!world || game.slot === null || game.state === "intro") return;
       const s = game.ship, r = (v) => Math.round(v * 1000) / 1000;
       store.set(SLOT_KEYS[game.slot], {
-        v: WORLD_VERSION, mode: game.mode, savedAt: Date.now(), over: game.over, t: r(game.t),
+        v: WORLD_VERSION, wf: worldPrint(), mode: game.mode, savedAt: Date.now(), over: game.over, t: r(game.t),
         ship: [r(s.x), r(s.y), r(s.vx), r(s.vy), r(s.a), r(s.fuel)],
         dock: game.dockedAt ? game.dockedAt.id : -1,
         jobs: game.jobs,
         stats: game.stats,
-        credits: Math.round(game.credits * 100) / 100, up: game.upgrades, look: game.look,
+        credits: Math.round(game.credits * 100) / 100, up: game.upgrades, look: game.look, settings: game.settings,
         owned: { paints: [...game.owned.paints], patterns: [...game.owned.patterns], stickers: [...game.owned.stickers] },
         disc: [...game.discovered],
         vis: [...game.visited],
         data: world.datas.map((d) => (d.hasData ? -1 : Math.round(d.regenAt))),
         res: world.datas.filter((d) => d.drawn > 0).map((d) => [d.id, Math.round(d.drawn * 10) / 10]),
       });
+    }
+
+    // a fingerprint of where every station is, so a save can tell when the map has been retuned
+    function worldPrint() {
+      let h = world.stations.length;
+      for (const st of world.stations) h = hash3(h, Math.round(st.x * 10), Math.round(st.y * 10));
+      return h;
     }
 
     // what a slot holds, for the save screen (null when it's empty or unreadable)
@@ -771,11 +803,12 @@
       const d = slotInfo(slot);
       if (!d) return false;
       newGame(d.mode, slot);
-      if (!Array.isArray(d.data) || d.data.length !== world.datas.length) return false;
       const byId = (id) => world.stations[id] || null;
       game.over = !!d.over;
       // saves from before the shop existed just get the defaults for these
       game.credits = Math.max(0, +d.credits || 0);
+      game.stats = Object.assign({ deliveries: 0, kb: 0, tows: 0 }, d.stats);
+      game.settings = Object.assign({ askBeforeBuying: true }, d.settings);
       for (const u of UPGRADES) game.upgrades[u.id] = clamp(Math.floor(+(d.up && d.up[u.id]) || 0), 0, u.values.length - 1);
       game.look = Object.assign(defaultLook(), d.look);
       const owned = d.owned || {};
@@ -784,14 +817,21 @@
         patterns: new Set(owned.patterns || []),
         stickers: new Set(owned.stickers || []),
       };
+      game.t = +d.t || 0;
+      // if the map has been retuned since this save (stations moved), keep the player's progress
+      // and put them back at the start, full of fuel
+      const sameMap = d.wf ? d.wf === worldPrint() : d.mode !== "challenge" && Array.isArray(d.data) && d.data.length === world.datas.length;
+      if (!sameMap) {
+        game.ship.fuel = stats().tank;
+        game.mapMoved = true;
+        return true;
+      }
       const [x, y, vx, vy, a, fuel] = d.ship.map(Number);
       Object.assign(game.ship, { x, y, vx, vy, a, fuel: clamp(fuel, 0, stats().tank) });
-      game.t = +d.t || 0;
       game.dockedAt = d.dock >= 0 ? byId(d.dock) : null;
       game.jobs = (d.jobs || (d.job ? [d.job] : []))
         .filter((j) => j && byId(j.to) && byId(j.from))
         .map((j) => ({ from: j.from, to: j.to, kb: +j.kb || 0, pay: +j.pay || bountyPay(byId(j.from), byId(j.to), +j.kb || 0) }));
-      game.stats = Object.assign({ deliveries: 0, kb: 0, tows: 0 }, d.stats);
       game.discovered = new Set((d.disc || []).filter((id) => byId(id)));
       game.visited = new Set((d.vis || []).filter((i) => i >= 0 && i < T.SECTORS * T.SECTORS));
       world.datas.forEach((st, i) => { st.hasData = d.data[i] === -1; st.regenAt = st.hasData ? 0 : +d.data[i]; });
@@ -1005,9 +1045,19 @@
 
     addEventListener("keydown", (e) => {
       if (e.target.closest && e.target.closest(".dev")) return;
-      if (game.state === "intro" || game.state === "over") return;   // the menus are plain buttons
+      // Esc closes whatever is on top: the purchase prompt, the shop, the map, a menu. Full screen
+      // is last: Esc leaves it only from the save screen (or hold Esc anywhere)
+      if (game.state === "intro" || game.state === "over") {   // the menus are plain buttons
+        if (e.code !== "Escape" || e.repeat) return;
+        if (game.state === "over") showSaves();
+        else if (!$("#modes").hidden) { showOverlay("#intro"); renderSlots(); }
+        else if (isFull()) setFullscreen(false);
+        e.preventDefault();
+        return;
+      }
       if (game.state === "shop") {
-        if (e.code === "Escape" || (e.code === "KeyU" && !e.repeat)) { closeShop(); e.preventDefault(); }
+        if (e.code === "Escape" && !$("#buy-confirm").hidden) { cancelPurchase(); e.preventDefault(); return; }
+        if (e.code === "Escape" || (e.code === "KeyU" && !e.repeat && $("#buy-confirm").hidden)) { closeShop(); e.preventDefault(); }
         return;
       }
       if (HOLD[e.code]) { keys[HOLD[e.code]] = true; e.preventDefault(); return; }
@@ -1022,6 +1072,7 @@
           if (game.mapOpen) toggleMap(false);
           else if (game.state === "play") pause();
           else if (game.state === "paused") resume();
+          e.preventDefault();
           break;
         case "KeyT": if (game.state === "play") tow(); break;
         case "KeyF": toggleFullscreen(); break;
@@ -1071,13 +1122,37 @@
       game.mapOpen = typeof force === "boolean" ? force : !game.mapOpen;
       releaseAll();
     }
-    function toggleFullscreen() {
+    /* full screen. Chrome and Edge can lock the Esc key while full screen, so Esc reaches the game
+       and closes the map and menus first; holding Esc (or F, or ⛶) leaves full screen. Keyboard lock
+       only works in a top-level page, so inside the site the page around the game does the full
+       screen (see setGameFrame in script.js). Other browsers still use Esc to leave full screen. */
+    let parentFull = false, parentAnswered = false, askedFor = null;
+    const isFull = () => !!document.fullscreenElement || parentFull;
+    async function localFullscreen(on) {
       const d = document;
       try {
-        if (d.fullscreenElement) d.exitFullscreen();
-        else (d.documentElement.requestFullscreen || d.documentElement.webkitRequestFullscreen)?.call(d.documentElement);
+        if (!on) { if (d.fullscreenElement) await d.exitFullscreen(); return; }
+        await (d.documentElement.requestFullscreen || d.documentElement.webkitRequestFullscreen).call(d.documentElement);
+        try { await navigator.keyboard?.lock?.(["Escape"]); } catch { /* no keyboard lock here */ }
       } catch { /* not allowed here */ }
     }
+    function setFullscreen(on) {
+      if (PLAYTEST || document.fullscreenElement) { localFullscreen(on); return; }
+      // ask the site; if it doesn't answer (the game embedded somewhere else), do it here instead
+      parentAnswered = false; askedFor = on;
+      try { parent.postMessage({ type: "satellite:fullscreen", on }, "/"); } catch { }
+      setTimeout(() => { if (!parentAnswered) localFullscreen(on); }, 250);
+    }
+    const toggleFullscreen = () => setFullscreen(!isFull());
+    addEventListener("message", (e) => {
+      if (e.source !== parent || !e.data || e.data.type !== "satellite:fullscreen-state") return;
+      parentAnswered = true;
+      parentFull = !!e.data.on;
+      // the site couldn't do it (some browsers only allow full screen in the frame that was clicked)
+      if (askedFor && !parentFull) localFullscreen(true);
+      askedFor = null;
+    });
+    document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement) try { navigator.keyboard?.unlock?.(); } catch { } });
     $("#btn-resume").addEventListener("click", resume);
 
     /* the save screen: three slots, each continue / new game (overwrite) / delete */
@@ -1144,6 +1219,7 @@
       if (!loadSlot(slot)) { toast("That save couldn't be read.", "#ff6b6b"); showSaves(); return; }
       sanitizeLook();
       play();
+      if (game.mapMoved) { toast("The map has changed since this save. Your credits, upgrades and looks are kept;", "#ffc46b"); toast("you're back at the starting station with a full tank.", "#ffc46b"); saveGame(); }
     }
     // a look can point at art that's gone (a .spr loaded for one playtest session, or a file
     // removed from the site); fall back to what's actually here
@@ -1206,15 +1282,49 @@
       $("#shop").hidden = false;
       $("#btn-shop-close").focus({ preventScroll: true });
     }
-    function closeShop() { $("#shop").hidden = true; saveGame(); play(); }
+    function closeShop() { cancelPurchase(); $("#shop").hidden = true; saveGame(); play(); }
 
+    // in playtest the shop is free, unless "Free shop" is unticked in the playtest tools
+    let devFreeShop = true;
+    const freeShop = () => PLAYTEST && devFreeShop;
     const priceTag = (price, owned) => (owned ? '<span class="pr own">Owned</span>'
-      : PLAYTEST ? '<span class="pr own">Free (playtest)</span>' : `<span class="pr">${price} cr</span>`);
-    const hullUnlocked = (def) => PLAYTEST || !def.needs || Object.entries(def.needs).every(([id, lv]) => (game.upgrades[id] || 0) >= lv);
+      : freeShop() ? '<span class="pr own">Free (playtest)</span>' : `<span class="pr">${price} cr</span>`);
+    const hullUnlocked = (def) => freeShop() || !def.needs || Object.entries(def.needs).every(([id, lv]) => (game.upgrades[id] || 0) >= lv);
+
+    /* "Are you sure you want to purchase?" (each save can turn it off) */
+    let pendingPurchase = null;
+    function purchase(what, price, apply) {
+      if (freeShop()) { apply(); return; }
+      if (game.credits < price) { $("#shop-note").textContent = `${what} costs ${price} cr. You need ${Math.ceil(price - game.credits)} more.`; return; }
+      const buy = () => { game.credits -= price; apply(); };
+      if (!game.settings.askBeforeBuying) { buy(); return; }
+      pendingPurchase = buy;
+      $("#buy-what").textContent = `${what} for ${price} cr. You'll have ${Math.floor(game.credits - price)} cr left.`;
+      $("#buy-skip").checked = false;
+      $("#buy-confirm").hidden = false;
+      $("#buy-yes").focus({ preventScroll: true });
+    }
+    function cancelPurchase() {
+      if ($("#buy-confirm").hidden) return;
+      pendingPurchase = null;
+      $("#buy-confirm").hidden = true;
+      $("#btn-shop-close").focus({ preventScroll: true });
+    }
+    $("#buy-yes").addEventListener("click", () => {
+      const buy = pendingPurchase;
+      if ($("#buy-skip").checked) game.settings.askBeforeBuying = false;
+      cancelPurchase();
+      if (buy) buy();
+    });
+    $("#buy-no").addEventListener("click", cancelPurchase);
+    $("#buy-confirm").addEventListener("click", (e) => { if (e.target === e.currentTarget) cancelPurchase(); });
+    $("#shop-ask").addEventListener("change", (e) => { game.settings.askBeforeBuying = e.target.checked; saveGame(); });
 
     function renderShop() {
       $("#shop-credits").textContent = `${Math.floor(game.credits)} cr`;
-      $("#shop-where").textContent = PLAYTEST ? "Playtest: everything is free" : `Outfitter · ${game.dockedAt ? game.dockedAt.name : ""}`;
+      $("#shop-where").textContent = freeShop() ? "Playtest: everything is free" : `Outfitter · ${game.dockedAt ? game.dockedAt.name : "playtest"}`;
+      $("#shop-ask").checked = game.settings.askBeforeBuying;
+      $("#shop-ask").closest("label").hidden = freeShop();
       document.querySelectorAll("#shop .playtest-only").forEach((el) => { el.hidden = !PLAYTEST; });
       $("#shop-custom").value = game.look.paint;
       $("#shop-custom-panels").value = game.look.panels;
@@ -1222,8 +1332,8 @@
       $("#shop-upgrades").innerHTML = UPGRADES.map((u) => {
         const lv = game.upgrades[u.id] || 0, max = u.values.length - 1, done = lv >= max;
         const price = done ? 0 : u.prices[lv];
-        const can = done ? false : PLAYTEST || game.credits >= price;
-        const label = done ? "Maxed out" : PLAYTEST ? `Buy (free)` : `Buy · ${price} cr`;
+        const can = done ? false : freeShop() || game.credits >= price;
+        const label = done ? "Maxed out" : freeShop() ? `Buy (free)` : `Buy · ${price} cr`;
         return `<div class="upgrade">
           <div>
             <h3>${u.name} ${lv ? "· level " + ["I", "II", "III", "IV"][lv - 1] : ""}</h3>
@@ -1298,20 +1408,18 @@
     function buyUpgrade(id) {
       const u = UPGRADES.find((x) => x.id === id), lv = game.upgrades[id] || 0;
       if (!u || lv >= u.values.length - 1) return;
-      const price = u.prices[lv];
-      if (!PLAYTEST) {
-        if (game.credits < price) { $("#shop-note").textContent = `You need ${Math.ceil(price - game.credits)} more credits for that.`; return; }
-        game.credits -= price;
-      }
-      game.upgrades[id] = lv + 1;
-      let note = `${u.name} upgraded: ${u.show(u.values[lv + 1])}.`;
-      if (id === "eff" && lv === 0 && art.hulls.has("efficient")) { game.look.hull = "efficient"; note += " Your ship was refitted with the Efficient hull."; }
-      $("#shop-note").textContent = note;
-      renderShop(); saveGame();
+      purchase(`${u.name} level ${["I", "II", "III", "IV"][lv]}`, u.prices[lv], () => {
+        game.upgrades[id] = lv + 1;
+        let note = `${u.name} upgraded: ${u.show(u.values[lv + 1])}.`;
+        if (id === "eff" && lv === 0 && art.hulls.has("efficient")) { game.look.hull = "efficient"; note += " Your ship was refitted with the Efficient hull."; }
+        $("#shop-note").textContent = note;
+        renderShop(); saveGame();
+      });
     }
 
     function chooseLook(kind, id, slot = "paint") {
       const note = (t) => { $("#shop-note").textContent = t; };
+      const done = () => { renderShop(); saveGame(); };
       if (kind === "hull") {
         const d = CATALOG.hulls.find((x) => x.id === id);
         if (!d || !hullUnlocked(d)) { note("That model comes with the first Fuel efficiency upgrade."); return; }
@@ -1319,22 +1427,27 @@
       } else if (kind === "paint") {
         const p = CATALOG.paints.find((x) => x.id === id);
         if (!p) return;
-        if (!(p.price === 0 || game.owned.paints.has(id) || PLAYTEST)) {
-          if (game.credits < p.price) { note(`${p.name} paint costs ${p.price} cr. You need ${Math.ceil(p.price - game.credits)} more.`); return; }
-          game.credits -= p.price; game.owned.paints.add(id); note(`Bought ${p.name} paint. You can use it on the body or the panels.`);
+        const wear = () => { game.look[slot === "panels" ? "panels" : "paint"] = p.hex; };
+        if (!(p.price === 0 || game.owned.paints.has(id) || freeShop())) {
+          purchase(`${p.name} paint`, p.price, () => {
+            game.owned.paints.add(id); wear();
+            note(`Bought ${p.name} paint. You can use it on the body or the panels.`);
+            done();
+          });
+          return;
         }
-        game.look[slot === "panels" ? "panels" : "paint"] = p.hex;
+        wear();
       } else {
         const list = kind === "pattern" ? CATALOG.patterns : CATALOG.stickers, owned = game.owned[kind + "s"];
         const d = id ? list.find((x) => x.id === id) : null;
         if (id && !d) return;
-        if (d && d.price && !owned.has(id) && !PLAYTEST) {
-          if (game.credits < d.price) { note(`${d.name} costs ${d.price} cr. You need ${Math.ceil(d.price - game.credits)} more.`); return; }
-          game.credits -= d.price; owned.add(id); note(`Bought ${d.name}.`);
+        if (d && d.price && !owned.has(id) && !freeShop()) {
+          purchase(`The ${d.name} ${kind}`, d.price, () => { owned.add(id); game.look[kind] = id; note(`Bought ${d.name}.`); done(); });
+          return;
         }
         game.look[kind] = d ? id : null;
       }
-      renderShop(); saveGame();
+      done();
     }
 
     $("#shop").addEventListener("click", (e) => {
@@ -1380,10 +1493,12 @@
       toast(`Landed at ${st.name}.` + (canTakeJob() && st.hasData ? " It has a bounty: press E." : "") + topUp);
     }
 
-    /* bounties: pay grows with the distance and the size of the packet */
+    /* bounties: pay is mostly the distance (about 1.1 cr a bit), plus a little for the size of the packet */
     function bountyPay(from, to, kb) {
       return Math.round((35 + dist(from, to) * 1.1 + kb / 40) / 5) * 5;
     }
+    // the distance as offers show it: rounded to 10, so it hints without giving the spot away
+    const roughBits = (a, b) => Math.max(10, Math.round(dist(a, b) / 10) * 10);
     // what a data station is offering, made up the first time you look and kept until it's taken
     function offerAt(st) {
       if (!st.hasData) return null;
@@ -1402,8 +1517,11 @@
 
     function pickDestination(from) {
       const others = world.datas.filter((d) => d !== from);
-      const band = others.filter((d) => { const r = dist(d, from); return r >= 45 && r <= 170; });
-      const pool = band.length ? band : others;
+      // challenge runs are shorter and end near a depot, so a delivery never strands you by itself
+      const sparse = mode().sparse, [lo, hi] = sparse ? [40, 120] : [45, 170];
+      const band = others.filter((d) => { const r = dist(d, from); return r >= lo && r <= hi; });
+      const nearFuel = sparse ? band.filter((d) => world.fuels.some((f) => dist(f, d) <= 25)) : band;
+      const pool = nearFuel.length ? nearFuel : band.length ? band : others;
       return pool[Math.floor(Math.random() * pool.length)];
     }
 
@@ -1417,7 +1535,7 @@
         game.jobs.push({ ...offer });
         st.hasData = false; st.offer = null;
         st.regenAt = game.t + T.REGEN[0] + Math.random() * (T.REGEN[1] - T.REGEN[0]);
-        toast(`Bounty accepted: deliver ${fmtKb(offer.kb)} to ${dest.name} in sector ${sectorName(sectorOf(dest))} for ${offer.pay} cr.`, "#7ee787");
+        toast(`Bounty accepted: deliver ${fmtKb(offer.kb)} to ${dest.name} in sector ${sectorName(sectorOf(dest))} (about ${roughBits(st, dest)} bits) for ${offer.pay} cr.`, "#7ee787");
       } else {
         const done = jobsFor(st);
         if (!done.length) return;
@@ -1506,7 +1624,7 @@
           s.x = st.x; s.y = st.y; s.vx = 0; s.vy = 0;
           // refuel only while R is held: a depot, or (with the upgrade) a data station's small reserve
           if (keys.fuel && s.fuel < ship.tank) {
-            let take = Math.min(ship.tank - s.fuel, st.kind === "fuel" ? T.REFUEL * dt : Math.min(T.DC_REFUEL * dt, reserveLeft(st)));
+            let take = Math.min(ship.tank - s.fuel, st.kind === "fuel" ? T.REFUEL * ship.pump * dt : Math.min(T.DC_REFUEL * ship.pump * dt, reserveLeft(st)));
             if (m.fuelPrice && take > 0) {
               const perFuel = m.fuelPrice / (ship.tank * 0.25);
               take = Math.min(take, game.credits / perFuel);
@@ -1908,7 +2026,9 @@
         const job = jobs[0], dest = world.stations[job.to];
         const ds = sectorOf(dest), more = jobs.length > 1 ? ` (+${jobs.length - 1} more)` : "";
         l1 = `BOUNTY ${job.pay} cr · ${fmtKb(job.kb)} → ${dest.name} · SECTOR ${sectorName(ds)}${more}`;
-        if (game.discovered.has(dest.id)) { l2 = `Located, ${dist(dest, s).toFixed(1)} bits away. Land there to deliver.`; c2 = "#7ee787"; }
+        if (game.discovered.has(dest.id) && (mode().rememberFound || sec === ds || dist(dest, s) <= T.RADAR)) {
+          l2 = `Located, ${dist(dest, s).toFixed(1)} bits away. Land there to deliver.`; c2 = "#7ee787";
+        } else if (game.discovered.has(dest.id)) l2 = `You've found it before: head back to sector ${sectorName(ds)} (M for the map).`;
         else if (sec === ds) { l2 = `You're in ${sectorName(ds)}. Search it: the station shows on radar within ${T.RADAR} bits.`; c2 = "#8ab4ff"; }
         else l2 = `Head for sector ${sectorName(ds)} (M for the map).`;
       } else {
@@ -1929,7 +2049,10 @@
         const dest = world.stations[job.to], ds = sectorOf(dest);
         if (game.dockedAt === dest) continue;
         const label = `${dest.name} · ${dist(dest, s).toFixed(1)} bits`;
-        if (game.discovered.has(dest.id)) marker(dest.x, dest.y, "#7ee787", label, now, L);
+        // a station you've found stays marked on free play and easy; on standard and challenge
+        // only while you're in its sector or it's on your radar
+        const found = game.discovered.has(dest.id) && (m.rememberFound || sec === ds || dist(dest, s) <= T.RADAR);
+        if (found) marker(dest.x, dest.y, "#7ee787", label, now, L);
         else if (sec === ds) { if (m.stationArrowInSector) marker(dest.x, dest.y, "#7ee787", label, now, L); }
         else if (m.sectorArrow && !sectorsShown.has(ds)) {
           sectorsShown.add(ds);
@@ -2017,7 +2140,7 @@
         const carrying = jobsByDistance();
         if (offer) {
           const dest = world.stations[offer.to];
-          text = `BOUNTY: ${fmtKb(offer.kb)} to ${dest.name} (sector ${sectorName(sectorOf(dest))}) pays ${offer.pay} cr. Press E to accept.`;
+          text = `BOUNTY: ${fmtKb(offer.kb)} to ${dest.name} (sector ${sectorName(sectorOf(dest))}, about ${roughBits(st, dest)} bits) pays ${offer.pay} cr. Press E to accept.`;
           color = "#7ee787";
         } else if (!carrying.length) text = "No bounty here right now. Thrust (W) to launch, or U for the shop.";
         else if (st.hasData) text = `This station has a bounty, but deliver your data for ${world.stations[carrying[0].to].name} first.`;
@@ -2219,6 +2342,7 @@
       addEventListener("dragleave", (e) => { if (!e.relatedTarget) document.body.classList.remove("drag"); });
       addEventListener("drop", (e) => { e.preventDefault(); document.body.classList.remove("drag"); tryFile(e.dataTransfer.files[0]); });
 
+      $("#dev-free").addEventListener("change", (e) => { devFreeShop = e.target.checked; if (game.state === "shop") renderShop(); });
       $("#dev-shop").addEventListener("click", () => { if (game.state !== "play") play(); openShop(); });
       $("#dev-cash").addEventListener("click", () => { game.credits += 1000; if (game.state === "shop") renderShop(); saveGame(); });
       const setAll = (maxed) => {

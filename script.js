@@ -591,6 +591,29 @@
     if (f.getAttribute("src") !== want) f.setAttribute("src", want);
   }
 
+  /* The game asks this page for full screen instead of doing it itself: only a top-level page can
+     lock the Esc key while full screen (Chrome and Edge), which lets Esc close the game's map and
+     menus instead of leaving full screen. Holding Esc still leaves it. */
+  window.addEventListener("message", async (e) => {
+    const f = $("#game-satellite");
+    if (!f || e.source !== f.contentWindow || !e.data || e.data.type !== "satellite:fullscreen") return;
+    try {
+      if (e.data.on) {
+        await f.requestFullscreen();
+        try { await navigator.keyboard?.lock?.(["Escape"]); } catch { /* no keyboard lock in this browser */ }
+      } else if (document.fullscreenElement) await document.exitFullscreen();
+    } catch { /* full screen not allowed */ }
+    tellGameFullscreen();
+  });
+  function tellGameFullscreen() {
+    const f = $("#game-satellite");
+    try { f?.contentWindow?.postMessage({ type: "satellite:fullscreen-state", on: document.fullscreenElement === f }, "/"); } catch { }
+  }
+  document.addEventListener("fullscreenchange", () => {
+    if (!document.fullscreenElement) try { navigator.keyboard?.unlock?.(); } catch { }
+    tellGameFullscreen();
+  });
+
   /* ───────── middle: hash router ───────── */
   const views = $$(".view");
   const keys = $$(".key");
