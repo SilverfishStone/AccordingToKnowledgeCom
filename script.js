@@ -166,8 +166,8 @@
     markLatest();
   }, () => { latestEl.hidden = true; });
 
-  /* ───────── right panel: latest articles + categories ───────── */
-  const postList = $("#post-list"), postEmpty = $("#post-empty"), search = $("#search"), topicRow = $("#topic-row");
+  /* ───────── right panel: latest articles ───────── */
+  const postList = $("#post-list"), postEmpty = $("#post-empty"), search = $("#search");
   let allArticles = [];
   function renderHighlights() {
     const q = search.value.trim().toLowerCase();
@@ -186,9 +186,6 @@
     $("#wip-card").hidden = has;
     $("#search-wrap").hidden = !has;
     $("#articles-card").hidden = !has;
-    const cats = buildCategories(articles);
-    $("#topics-card").hidden = !cats.length;
-    topicRow.innerHTML = cats.map((c) => `<a class="topic" href="${catLink(c)}">${esc(c.name)} <small>${c.count}</small></a>`).join("");
     renderHighlights();
   }, () => { $("#wip-card").hidden = false; });
   search.addEventListener("input", renderHighlights);
@@ -585,6 +582,15 @@
     } else $("#home-gallery-cap").textContent = "Art and photography";
   }
 
+  /* ───────── secret page: the game only loads while that page is open ─────────
+     Leaving the page blanks the frame, which unloads the game (it saves as it goes). */
+  function setGameFrame(on) {
+    const f = $("#game-satellite");
+    if (!f || (!on && !f.hasAttribute("src"))) return;
+    const want = on ? f.dataset.src : "about:blank";
+    if (f.getAttribute("src") !== want) f.setAttribute("src", want);
+  }
+
   /* ───────── middle: hash router ───────── */
   const views = $$(".view");
   const keys = $$(".key");
@@ -623,8 +629,8 @@
       on ? k.setAttribute("aria-current", "page") : k.removeAttribute("aria-current");
     });
 
-    // reading a story or article: two panels, so the text gets the room
-    const reading = view === "article" || view === "story";
+    // reading a story or article (or playing on the secret page): two panels, so it gets the room
+    const reading = view === "article" || view === "story" || view === "secret";
     document.body.classList.toggle("reading", reading);
     document.body.classList.toggle("hide-left", reading && SITE.readingHides !== "right");
     document.body.classList.toggle("hide-right", reading && SITE.readingHides === "right");
@@ -638,6 +644,7 @@
     if (view === "series") showSeries(arg);
     if (view === "article") renderDoc("article", arg);
     if (view === "story") renderDoc("story", arg);
+    setGameFrame(view === "secret");
     markLatest();
 
     document.title = (TITLE[view] || "Not found") + " · " + SITE.name;

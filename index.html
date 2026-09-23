@@ -177,7 +177,18 @@
       <!-- SECRET (no link anywhere; reached by clicking the 404 ghost) -->
       <section class="view page secret" data-view="secret" aria-labelledby="h-secret" hidden>
         <h1 class="page-title" id="h-secret">You found the ghost's hideout</h1>
-        <p class="page-sub">Nothing here yet — activities are coming.</p>
+        <p class="page-sub">A few things to do while you're here. More are coming.</p>
+
+        <article class="activity" aria-labelledby="h-satellite">
+          <div class="activity-head">
+            <h2 id="h-satellite">Satellite Courier</h2>
+            <span class="tag">Game</span>
+          </div>
+          <p class="activity-sub">Run data bounties across 100 sectors, spend your credits on upgrades and paint jobs, and don't run out of fuel.</p>
+          <!-- src is set when this page is opened and cleared when you leave, so the game only runs while it's on screen -->
+          <iframe class="game-frame" id="game-satellite" title="Satellite Courier" data-src="games/satellite/index.html?v=__BUILD__" allow="fullscreen" allowfullscreen></iframe>
+          <p class="activity-note">Click the game first so it can hear your keyboard. Progress is saved in this browser.</p>
+        </article>
       </section>
 
       <div class="not-found" id="not-found" hidden>
@@ -209,11 +220,6 @@
           <h2>Latest articles</h2>
           <div id="post-list"></div>
           <p class="empty" id="post-empty" hidden>No articles match your search.</p>
-        </section>
-
-        <section class="card" id="topics-card" hidden>
-          <h2>Categories</h2>
-          <div class="topic-row" id="topic-row"></div>
         </section>
 
         <footer class="side-foot">

@@ -1,0 +1,2266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="robots" content="noindex" />
+  <title>Satellite Courier</title>
+  <style>
+    :root {
+      --bg: #03050b; --panel: rgba(9, 13, 24, .92); --line: #26314d; --text: #dfe8ff; --dim: #8d9ab8;
+      --accent: #8ab4ff; --amber: #ffc46b; --green: #7ee787; --red: #ff6b6b;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font: 14px/1.5 var(--mono); }
+    [hidden] { display: none !important; }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; outline: none; }
+
+    /* keycap buttons, same family as the site's control panel */
+    button {
+      font: 700 12px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #aeb9d4; cursor: pointer;
+      padding: 10px 16px; border: 1px solid #06080e; border-radius: 7px;
+      background: linear-gradient(180deg, #465069 0%, #2c3449 46%, #1f2637 100%);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.28), inset 0 -2px 0 rgba(0,0,0,.35), 0 3px 0 #080b12, 0 5px 8px rgba(0,0,0,.5);
+      transition: transform .06s ease-out, box-shadow .06s ease-out, filter .15s;
+      -webkit-tap-highlight-color: transparent; user-select: none;
+    }
+    button:hover { color: #fff; filter: brightness(1.12); }
+    button:active, button.down { transform: translateY(2px); box-shadow: inset 0 2px 6px rgba(0,0,0,.6), 0 1px 0 #080b12; }
+    button.primary { color: #0b1020; background: linear-gradient(180deg, #b9d2ff 0%, #8ab4ff 50%, #5f8fdf 100%); }
+    button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+    .overlay { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 16px; background: rgba(2, 4, 10, .72); overflow-y: auto; }
+    .card {
+      width: min(560px, 100%); padding: 24px 26px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel);
+      box-shadow: 0 20px 60px rgba(0,0,0,.6);
+    }
+    .eyebrow { margin: 0 0 4px; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--accent); }
+    .card h1 { margin: 0 0 10px; font: 700 28px/1.15 Georgia, "Times New Roman", serif; }
+    .card p { margin: 0 0 12px; color: #c5cde0; }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 18px 0 14px; }
+    .keys { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 0; font-size: 12.5px; }
+    .keys dt { color: var(--amber); }
+    .keys dd { margin: 0; color: #c5cde0; }
+    .note { font-size: 12px; color: var(--dim); }
+
+    .corner { position: fixed; top: 10px; right: 10px; display: flex; gap: 8px; }
+    .corner button { padding: 8px 10px; font-size: 11px; }
+
+    /* touch controls (phones and tablets) */
+    .touch { position: fixed; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; align-items: flex-end;
+             padding: 0 12px max(12px, env(safe-area-inset-bottom)); pointer-events: none; }
+    .touch .pad { display: flex; gap: 10px; align-items: flex-end; pointer-events: auto; }
+    .touch button { width: 64px; height: 56px; padding: 0; font-size: 18px; opacity: .88; touch-action: none; }
+    .touch button.word { font-size: 11px; }
+    .touch button.big { width: 88px; height: 72px; }
+
+    /* playtest tools: only when this page is opened on its own, not inside the site */
+    .dev { position: fixed; right: 10px; top: 56px; max-width: min(360px, calc(100% - 20px)); border: 1px solid var(--line); border-radius: 10px; background: var(--panel); font-size: 12px; }
+    .dev summary { cursor: pointer; padding: 8px 12px; color: var(--amber); letter-spacing: .1em; text-transform: uppercase; }
+    .dev .body { display: grid; gap: 8px; padding: 0 12px 12px; }
+    .dev .row { display: flex; flex-wrap: wrap; gap: 6px; }
+    .dev button { padding: 7px 10px; font-size: 10.5px; }
+    .dev input[type=file] { font: inherit; color: var(--dim); max-width: 100%; }
+    .dev pre { margin: 0; white-space: pre-wrap; color: #c5cde0; }
+    body.drag::after { content: "Drop a .spr sprite to use it"; position: fixed; inset: 12px; display: grid; place-items: center;
+                       border: 2px dashed var(--accent); border-radius: 14px; background: rgba(3,5,11,.8); color: var(--accent); font-size: 16px; }
+    .dev select { font: inherit; color: var(--text); background: #0b1020; border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
+    @media (max-width: 480px) { .corner { gap: 6px; } .corner button { padding: 7px 8px; font-size: 10px; letter-spacing: .06em; } }
+
+    /* the shop */
+    .card.wide { width: min(780px, 100%); }
+    .shop-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .wallet { padding-top: 4px; font: 700 18px/1 var(--mono); color: var(--amber); white-space: nowrap; }
+    .tabs { display: flex; gap: 8px; margin: 4px 0 16px; }
+    .tabs button[aria-selected="true"] { color: #0b1020; background: linear-gradient(180deg, #b9d2ff 0%, #8ab4ff 50%, #5f8fdf 100%); }
+    .upgrade { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; align-items: center; padding: 14px 0; border-top: 1px solid var(--line); }
+    .upgrade h3 { margin: 0; font-size: 14px; }
+    .upgrade p { margin: 2px 0 0; font-size: 12px; color: var(--dim); }
+    .upgrade .now { color: #c5cde0; }
+    .pips { display: flex; gap: 4px; margin-top: 7px; }
+    .pips i { width: 16px; height: 6px; border-radius: 2px; background: #1e263b; }
+    .pips i.on { background: var(--green); }
+    .buy { min-width: 132px; }
+    .buy[disabled] { opacity: .5; cursor: default; filter: none; transform: none; }
+    .looks { display: grid; grid-template-columns: 180px 1fr; gap: 20px; align-items: start; }
+    .preview { position: sticky; top: 0; }
+    #shop-preview { display: block; width: 180px; height: 180px; image-rendering: pixelated; border: 1px solid var(--line); border-radius: 10px;
+                    background: radial-gradient(circle at 50% 40%, #121a33, #03050b 70%); }
+    .preview p { margin: 8px 0 0; font-size: 12px; color: var(--dim); text-align: center; }
+    .group h3 { margin: 0 0 8px; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--dim); }
+    .items { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+    .item { display: flex; flex-direction: column; align-items: center; gap: 5px; width: 88px; padding: 9px 6px 8px;
+            font-size: 11px; font-weight: 400; letter-spacing: 0; text-transform: none; line-height: 1.2; }
+    .item[aria-pressed="true"] { outline: 2px solid var(--green); outline-offset: 2px; color: #fff; }
+    .item .sw { width: 40px; height: 40px; border-radius: 6px; border: 1px solid #06080e; image-rendering: pixelated; background: #03050b; }
+    .item .sw.wide { width: 64px; }
+    .item .pr { color: var(--amber); }
+    .item .pr.own { color: var(--dim); }
+    .item.locked { opacity: .6; }
+    .custom { display: flex; align-items: center; gap: 10px; margin: -8px 0 18px; font-size: 12px; color: var(--dim); }
+    .custom input { width: 44px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; }
+    .shop-note { min-height: 1.5em; margin: 0; color: var(--amber); font-size: 12px; }
+    @media (max-width: 600px) { .looks { grid-template-columns: 1fr; } .preview { position: static; } #shop-preview { margin: 0 auto; } }
+
+    /* save slots and difficulties */
+    .card h2.sub { margin: 18px 0 10px; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--dim); }
+    .slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .slot { display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: rgba(3,5,11,.55); }
+    .slot.empty { border-style: dashed; }
+    .slot-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .slot-head b { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+    .tag { padding: 2px 7px; border-radius: 999px; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; border: 1px solid currentColor; }
+    .tag.free { color: var(--accent); } .tag.easy { color: var(--green); } .tag.standard { color: var(--amber); } .tag.challenge { color: var(--red); }
+    .tag.done { color: var(--red); background: rgba(255,107,107,.12); }
+    .slot-info { margin: 0 !important; font-size: 12px; line-height: 1.6; color: #c5cde0; flex: 1; }
+    .slot-info .dim { color: var(--dim); }
+    .slot-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .slot-actions button { padding: 8px 10px; font-size: 10.5px; letter-spacing: .08em; }
+    .slot-actions .danger { color: #ffb4b4; }
+    .slot .ask { margin: 0 !important; font-size: 12px; color: var(--amber); }
+    .how { margin-top: 16px; }
+    .how summary { cursor: pointer; margin-bottom: 10px; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--dim); }
+    .modes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .mode { display: block; text-align: left; padding: 14px 16px; font-size: 12px; font-weight: 400; letter-spacing: 0; text-transform: none; line-height: 1.5; }
+    .mode strong { display: block; margin-bottom: 6px; font-size: 14px; letter-spacing: .1em; text-transform: uppercase; }
+    .mode.free strong { color: var(--accent); } .mode.easy strong { color: var(--green); } .mode.standard strong { color: var(--amber); } .mode.challenge strong { color: var(--red); }
+    .mode ul { margin: 0; padding-left: 16px; color: #c5cde0; }
+    .warn { color: var(--amber) !important; }
+    @media (max-width: 700px) { .slots, .modes { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <canvas id="view" tabindex="0" aria-label="Satellite Courier. Fly a satellite between space stations."></canvas>
+
+  <div class="corner">
+    <button type="button" id="btn-map" title="Map (M)">Map</button>
+    <button type="button" id="btn-shop" title="Shop (U, while landed)">Shop</button>
+    <button type="button" id="btn-pause" title="Pause (P)" aria-label="Pause">❚❚</button>
+    <button type="button" id="btn-full" title="Full screen (F)" aria-label="Full screen">⛶</button>
+  </div>
+
+  <div class="touch" id="touch" hidden>
+    <div class="pad">
+      <button type="button" data-hold="left" aria-label="Turn left">◀</button>
+      <button type="button" data-hold="right" aria-label="Turn right">▶</button>
+    </div>
+    <div class="pad">
+      <button type="button" class="word" data-tap="use">Use</button>
+      <button type="button" class="word" data-hold="fuel">Fuel</button>
+      <button type="button" class="word" data-hold="brake">Brake</button>
+      <button type="button" class="word big" data-hold="thrust">Thrust</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="intro">
+    <div class="card wide" role="dialog" aria-labelledby="intro-h">
+      <p class="eyebrow">Choose a save</p>
+      <h1 id="intro-h">Satellite Courier</h1>
+      <div class="slots" id="slots"></div>
+      <h2 class="sub">How to play</h2>
+      <p>You're a courier satellite running data bounties. Land at a data station with a <b style="color:var(--green)">green light</b> to see its bounty, download the packet, then carry it to the station named in your orders. You're told its <b>sector</b>, then you search for the station.</p>
+      <p>Bounties pay <b style="color:var(--amber)">credits</b> for upgrades and new looks. Mind your fuel, and your speed: nothing coasts forever out here. When fuel runs low, your screen points to the nearest depot within <b>20 bits</b>.</p>
+      <details class="how">
+        <summary>Controls</summary>
+        <dl class="keys">
+          <dt>W / ↑</dt><dd>Thrust</dd>
+          <dt>A D / ← →</dt><dd>Turn</dd>
+          <dt>S / ↓</dt><dd>Brake (stabilizers, uses fuel)</dd>
+          <dt>E / Space</dt><dd>Land when you're slow and close to a station; accept or deliver a bounty once landed</dd>
+          <dt>R (hold)</dt><dd>Refuel while landed</dd>
+          <dt>U</dt><dd>Shop, while landed</dd>
+          <dt>M</dt><dd>Map</dd>
+          <dt>P / Esc</dt><dd>Pause</dd>
+          <dt>T</dt><dd>Call a tow when you're out of fuel</dd>
+        </dl>
+      </details>
+      <p class="note" id="intro-note" hidden></p>
+    </div>
+  </div>
+
+  <div class="overlay" id="modes" hidden>
+    <div class="card wide" role="dialog" aria-labelledby="modes-h">
+      <p class="eyebrow" id="modes-slot"></p>
+      <h1 id="modes-h">Choose a difficulty</h1>
+      <p class="warn" id="modes-warn" hidden></p>
+      <div class="modes" id="mode-list"></div>
+      <div class="actions"><button type="button" id="btn-modes-back">Back</button></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="paused" hidden>
+    <div class="card" role="dialog" aria-labelledby="paused-h">
+      <p class="eyebrow">Paused · <span id="paused-slot"></span></p>
+      <h1 id="paused-h">Holding position</h1>
+      <p id="paused-stats"></p>
+      <div class="actions">
+        <button type="button" class="primary" id="btn-resume">Resume</button>
+        <button type="button" id="btn-quit">Save &amp; quit to saves</button>
+      </div>
+      <p class="note">Your progress is saved in this browser.</p>
+    </div>
+  </div>
+
+  <div class="overlay" id="over" hidden>
+    <div class="card" role="dialog" aria-labelledby="over-h">
+      <p class="eyebrow" id="over-slot"></p>
+      <h1 id="over-h">Out of fuel</h1>
+      <p id="over-stats"></p>
+      <div class="actions"><button type="button" class="primary" id="btn-over-menu">Back to saves</button></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="shop" hidden>
+    <div class="card wide" role="dialog" aria-labelledby="shop-h">
+      <div class="shop-top">
+        <div>
+          <p class="eyebrow" id="shop-where">Outfitter</p>
+          <h1 id="shop-h">Shop</h1>
+        </div>
+        <div class="wallet" id="shop-credits">0 cr</div>
+      </div>
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" data-tab="upgrades" aria-selected="true">Upgrades</button>
+        <button type="button" role="tab" data-tab="looks" aria-selected="false">Looks</button>
+      </div>
+      <section data-panel="upgrades" id="shop-upgrades"></section>
+      <section data-panel="looks" hidden>
+        <div class="looks">
+          <div class="preview">
+            <canvas id="shop-preview" width="180" height="180" aria-label="Your ship"></canvas>
+            <p>Your ship</p>
+          </div>
+          <div>
+            <div class="group"><h3>Model</h3><div class="items" id="shop-hulls"></div></div>
+            <div class="group"><h3>Body paint</h3><div class="items" id="shop-paints" data-slot="paint"></div>
+              <label class="custom playtest-only" hidden>Any colour (playtest) <input type="color" id="shop-custom" data-slot="paint" value="#808080" /></label>
+            </div>
+            <div class="group"><h3>Panel paint</h3><div class="items" id="shop-panels" data-slot="panels"></div>
+              <label class="custom playtest-only" hidden>Any colour (playtest) <input type="color" id="shop-custom-panels" data-slot="panels" value="#0000ff" /></label>
+            </div>
+            <div class="group"><h3>Pattern</h3><div class="items" id="shop-patterns"></div></div>
+            <div class="group"><h3>Sticker</h3><div class="items" id="shop-stickers"></div></div>
+          </div>
+        </div>
+      </section>
+      <p class="shop-note" id="shop-note" role="status"></p>
+      <div class="actions">
+        <button type="button" class="primary" id="btn-shop-close">Back to flying</button>
+      </div>
+    </div>
+  </div>
+
+  <details class="dev" id="dev" hidden>
+    <summary>Playtest tools</summary>
+    <div class="body">
+      <span class="note">Playtest mode: the shop is open anywhere, everything in it is free, and this has its own save.</span>
+      <div class="row">
+        <button type="button" id="dev-shop">Open shop</button>
+        <button type="button" id="dev-cash">+1000 credits</button>
+        <button type="button" id="dev-max">Max upgrades</button>
+        <button type="button" id="dev-min">Reset upgrades</button>
+      </div>
+      <label>Load a .spr as
+        <select id="dev-kind">
+          <option value="hulls">a ship model</option>
+          <option value="patterns">a pattern</option>
+          <option value="stickers">a sticker</option>
+        </select>
+      </label>
+      <input type="file" id="dev-file" accept=".spr" />
+      <pre id="dev-info">Loading art…</pre>
+      <div class="row">
+        <button type="button" id="dev-fuel">Fill fuel</button>
+        <button type="button" id="dev-reveal">Reveal map</button>
+        <button type="button" id="dev-data">Data everywhere</button>
+        <button type="button" id="dev-erase">Save menu</button>
+      </div>
+      <span class="note">Or drop a .spr anywhere on this page (it's added as whatever is picked above, and shows up in the shop). Ship models use animations named "float" and "thruster"; the grey (#808080) parts take paint and patterns. Patterns tile across the grey; stickers sit on the middle of the body.</span>
+      <span class="note">Tuning values (thrust, drag, fuel burn, radar range…) live in <code>satellite.T</code> in the browser console and can be changed while you play.</span>
+    </div>
+  </details>
+
+  <!-- The .spr reader (window.SPR). Self-contained: copy this whole <script> block into any page
+       that needs to read sprites from the SilverDev sprite editor. -->
+  <script id="spr-reader">
+/* ------------------------------------------------------------------
+   SPR — reads the ".spr" sprite files made by the SilverDev sprite editor
+   (net.silverfishstone.spriteeditor.SpriteFileFormat) in the browser.
+
+   Layout (big-endian, as written by Java's DataOutputStream):
+     0  4  magic "SSPR"
+     4  1  version   (1/2 = one legacy sheet, 3+ = one sheet per animation)
+     5  1  orientation (0 = vertical strip, 1 = horizontal strip)
+     6  2  frameSize (square frames, shared by every animation)
+     version 3+:
+     8  2  animationCount, then per animation:
+           nameLength u16, name (UTF-8), frameCount u16,
+           frameDelayTicks u16 (60 ticks = 1 s), pngLength u32, PNG bytes
+     version 1/2:
+           frameCount u16, frameDelayTicks u16, pngLength u32, PNG bytes,
+           then (v2 only) tagCount u16 and per tag:
+           name, startFrame u16, frameCount u16, frameDelayTicks u16
+
+   Usage:
+     const sprite = await SPR.load("satellite.spr");       // fetch + parse
+     const sprite = await SPR.fromFile(fileInput.files[0]); // <input type=file>
+     const sprite = await SPR.fromBase64(b64);
+     const anim = sprite.get("thruster");                   // or sprite.default
+     anim.draw(ctx, anim.frameAt(timeMs), x, y, width, height);
+
+   Defines window.SPR. Needs no server: it works from file:// too.
+   ------------------------------------------------------------------ */
+(function (global) {
+  "use strict";
+
+  const MAGIC = "SSPR";
+  const TICKS_PER_SECOND = 60;
+
+  /* Same rule as the editor: a stored tick count becomes at least 16 ms. */
+  const ticksToMs = (ticks) => Math.max(16, Math.round((ticks / TICKS_PER_SECOND) * 1000));
+
+  class Reader {
+    constructor(buffer) {
+      this.view = new DataView(buffer);
+      this.bytes = new Uint8Array(buffer);
+      this.pos = 0;
+    }
+    need(n) {
+      if (this.pos + n > this.bytes.length) {
+        throw new Error(`This .spr file is cut short (wanted ${n} more bytes at byte ${this.pos}).`);
+      }
+    }
+    u8()  { this.need(1); return this.view.getUint8(this.pos++); }
+    u16() { this.need(2); const v = this.view.getUint16(this.pos); this.pos += 2; return v; }
+    u32() { this.need(4); const v = this.view.getUint32(this.pos); this.pos += 4; return v; }
+    take(n) { this.need(n); const b = this.bytes.subarray(this.pos, this.pos + n); this.pos += n; return b; }
+    string() { return new TextDecoder("utf-8").decode(this.take(this.u16())); }
+  }
+
+  /* PNG bytes -> something drawImage accepts. ImageBitmap where available, <img> otherwise. */
+  async function decodePng(bytes, label) {
+    const blob = new Blob([bytes], { type: "image/png" });
+    try {
+      if (global.createImageBitmap) return await global.createImageBitmap(blob);
+    } catch { /* fall through to <img> */ }
+    const url = URL.createObjectURL(blob);
+    try {
+      return await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error(`The picture inside this .spr couldn't be read${label ? ` (animation "${label}")` : ""}.`));
+        img.src = url;
+      });
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  /* One named animation: a sheet plus the rectangle of each of its frames. */
+  class Animation {
+    constructor(name, sheet, frameSize, horizontal, frameCount, frameDelayTicks, startFrame = 0) {
+      this.name = name;
+      this.sheet = sheet;
+      this.frameSize = frameSize;
+      this.horizontal = horizontal;
+      this.frameDelayTicks = frameDelayTicks;
+      this.frameDelayMs = ticksToMs(frameDelayTicks);
+      // never promise more frames than the sheet actually holds
+      const along = horizontal ? sheet.width : sheet.height;
+      const available = Math.max(0, Math.floor(along / frameSize) - startFrame);
+      this.frameCount = Math.max(0, Math.min(frameCount, available));
+      this.frames = [];
+      for (let i = 0; i < this.frameCount; i++) {
+        const k = startFrame + i;
+        this.frames.push({ sx: horizontal ? k * frameSize : 0, sy: horizontal ? 0 : k * frameSize, sw: frameSize, sh: frameSize });
+      }
+    }
+    /* Which frame is showing `timeMs` after the animation started (loops). */
+    frameAt(timeMs) {
+      if (this.frameCount <= 1) return 0;
+      return Math.floor(timeMs / this.frameDelayMs) % this.frameCount;
+    }
+    /* Draws one frame; width/height default to the frame's own size. */
+    draw(ctx, index, dx, dy, dw = this.frameSize, dh = this.frameSize) {
+      const f = this.frames[index % Math.max(1, this.frameCount)];
+      if (f) ctx.drawImage(this.sheet, f.sx, f.sy, f.sw, f.sh, dx, dy, dw, dh);
+    }
+    /* Pixel bounds of the non-transparent art in one frame: {x, y, w, h}, or null if empty. */
+    bounds(index = 0) {
+      const f = this.frames[index];
+      if (!f) return null;
+      const c = document.createElement("canvas");
+      c.width = f.sw; c.height = f.sh;
+      const g = c.getContext("2d", { willReadFrequently: true });
+      g.drawImage(this.sheet, f.sx, f.sy, f.sw, f.sh, 0, 0, f.sw, f.sh);
+      const px = g.getImageData(0, 0, f.sw, f.sh).data;
+      let x0 = f.sw, y0 = f.sh, x1 = -1, y1 = -1;
+      for (let y = 0; y < f.sh; y++) for (let x = 0; x < f.sw; x++) {
+        if (px[(y * f.sw + x) * 4 + 3] > 10) { if (x < x0) x0 = x; if (y < y0) y0 = y; if (x > x1) x1 = x; if (y > y1) y1 = y; }
+      }
+      return x1 < 0 ? null : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+    }
+  }
+
+  class Sprite {
+    constructor(version, horizontal, frameSize, animations) {
+      this.version = version;
+      this.horizontal = horizontal;
+      this.frameSize = frameSize;
+      this.animations = animations;                 // in file order
+      this.default = animations[0] || null;         // like the engine: the first one is the default
+    }
+    get(name) { return this.animations.find((a) => a.name === name) || null; }
+    get names() { return this.animations.map((a) => a.name); }
+  }
+
+  async function parse(buffer) {
+    const r = new Reader(buffer);
+    const magic = String.fromCharCode(...r.take(4));
+    if (magic !== MAGIC) throw new Error("That isn't a .spr sprite file (it doesn't start with SSPR).");
+    const version = r.u8();
+    const horizontal = r.u8() !== 0;
+    const frameSize = r.u16();
+    if (!frameSize) throw new Error("This .spr file says its frames are 0 pixels wide.");
+
+    const animations = [];
+    if (version >= 3) {
+      const count = r.u16();
+      for (let i = 0; i < count; i++) {
+        const name = r.string();
+        const frameCount = r.u16();
+        const ticks = r.u16();
+        const sheet = await decodePng(r.take(r.u32()), name);
+        animations.push(new Animation(name, sheet, frameSize, horizontal, frameCount, ticks));
+      }
+    } else {
+      // Legacy: one shared sheet. It stays the default animation (named ""), and a v2 file's
+      // named ranges become their own animations over that same sheet — the engine does the same.
+      const frameCount = r.u16();
+      const ticks = r.u16();
+      const sheet = await decodePng(r.take(r.u32()), null);
+      animations.push(new Animation("", sheet, frameSize, horizontal, frameCount, ticks));
+      if (version >= 2) {
+        const tags = r.u16();
+        for (let i = 0; i < tags; i++) {
+          const name = r.string();
+          const start = r.u16();
+          const count = r.u16();
+          const tagTicks = r.u16();
+          const anim = new Animation(name, sheet, frameSize, horizontal, count, tagTicks, start);
+          if (anim.frameCount) animations.push(anim);
+        }
+      }
+    }
+    return new Sprite(version, horizontal, frameSize, animations);
+  }
+
+  async function load(url) {
+    const res = await fetch(url, { cache: "no-cache" });
+    if (!res.ok) throw new Error(`Couldn't load ${url} (HTTP ${res.status}).`);
+    return parse(await res.arrayBuffer());
+  }
+
+  async function fromFile(file) {
+    return parse(await file.arrayBuffer());
+  }
+
+  function fromBase64(b64) {
+    const bin = atob(b64.replace(/\s+/g, ""));
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return parse(bytes.buffer);
+  }
+
+  global.SPR = { parse, load, fromFile, fromBase64, ticksToMs, Sprite, Animation };
+})(typeof window !== "undefined" ? window : globalThis);
+  </script>
+  <script>
+    /* Built-in copies of the .spr files next to this page, used when those files can't be fetched
+       (for example when this page is opened straight from disk). On the site, the files next to
+       this page win: replace one to change that art, or add one and list it in CATALOG below. */
+    const BUILTIN = {
+      "satellite.spr": "U1NQUgMAACAAAgAFZmxvYXQAAQAGAAAAtolQTkcNChoKAAAADUlIRFIAAAAgAAAAIAgGAAAAc3p69AAAAH1JREFUeF7tj0EOwCAIBH26P7f1YsggUmPb004yJxdYSxFCCLFHe+hntFrr0p7h0C78jV3oDlLmJ6bcoWY8LRDuCmHjwwLOFNN4tB7yIGV+sitlNvR3Aed440HK/MQU09i1dgcp84tdIWx8WMB5hDtIe4ZDb8LfRAohhHjMBWC2XyjinJYQAAAAAElFTkSuQmCCAAh0aHJ1c3RlcgAEAAYAAAKFiVBORw0KGgoAAAANSUhEUgAAACAAAACACAYAAABqZmsaAAACTElEQVR4Xu2ZQXbDIAwFc/Qcr7eiJglEHgkrfgQ5C817s2gs+J92UdPebkmSJMk5yocuo9zv90PrDBedhaeRG6pAynlDl22oCGcLDPcawsaTBZQuonFv3WUg5byxl4u1KLqAsj9jIOW8oYtorFqrQMr5g72GsPFkAeUUKpDWGS76JjzNyHVsP8lS/nY/2Kf1s7I4vPIo0Eq0Iq/wkAIVVSLq9JJdiejwSi9wRXhDFri0SDg/ddqfKpMkSZJE0F46PZehXsNpneGis/A0ckMVSDlv6LINFeFsgeFeQ9h4soDSRTTurbsMpJw39nKxFkUXUPZnDKScN3QRjVVrFUg5f7DXEDaeLKCcQgXSOsNF34SnGbmGIm/Ejy+FUZdUs8Qv/H2gfc7ZZexKRAY3Wugl4RahRWRYaHCSJEmS/AL1N98nLkO9htM6w0Vn4WnkhiqQct7QZRt6v/A+v34/YyDl/MFeQ9h4soDSRTTurbsMpJw39nKxFkUXUPZnDKScN3QRjVVrFUg5f7DXEDaeLKCcQgXSOsNF34SnGbmO3X/Mb/B1S15KwbVchtdnnF/Co4QsIgosL9ECVInI70BlVyTq9CMuDa9cGp4kSZIk0dTfep+4DPUaTusMF52Fp5EbqkDKeUOXbej5nvl0tsBwryFsPFlA6SIa99ZdBlLOG3u5WIuiCyj7MwZSzhu6iMaqtQqknD/YawgbTxZQTqECaZ3hom/C04xcQ+GNWBp1OTVLRF9OW5i8mrfPObuMXYnI4EYLvSTcIrSIDAsNTlbwD+aC9MSTmCF5AAAAAElFTkSuQmCC",
+      "satellite_efficient.spr": "U1NQUgMAACAAAgAFZmxvYXQAAQAGAAAAzolQTkcNChoKAAAADUlIRFIAAAAgAAAAIAgGAAAAc3p69AAAAJVJREFUeF7tkAsKgCAQBT26N7cWaqt5KtKXYAeGQJ/7KaUgCH5KafgaJed80M4YepLPBuAvb/kYsjm1DB+Nwi1qG0lDynxHYT4sy6V9V68OwFpS09lfUs+wIWVeHRqAU2+yIWVea/1jANEzbEiZV4cG4NRbhg0p81pLajrrRU3PsCFlvuMppCG1DB/dCbdoGQRBEAwzAQJvqOpKP9wZAAAAAElFTkSuQmCCAAh0aHJ1c3RlcgAEAAYAAALLiVBORw0KGgoAAAANSUhEUgAAACAAAACACAYAAABqZmsaAAACkklEQVR4Xu2ZAW7rMAxDe/Qeb7fKoq5SnEc7MNpaaTATeCh+zIhUBwzJ/u02NTV1US0N0rTc7/cddo2mkTqtAL/yFsMkmxPz8KZecYvaRhJI6D9AtF5cnof26bxbgLNkZqg8JOFhIKFf6SrA1hsMJPTrrGsUEMLDQEK/0lWArTcPAwn9OktmhvygRngYSOg/4CVJIDEPb/qkuEWLcVp/gsvys/vB/mHXlsHhpkcBL+FFnuEpBUxSImv7UrsS2eGmKHBGuKsscGqRdH3Vtl9VZmpq6l/Jn3xImtKfBanTCvArbzFMsjkxD2/qFbeobSSBhP4DROvF5Xlon867BThLZobKQxIeBhL6la4CbL3BQEK/zrpGASE8DCT0K10F2HrzMJDQr7NkZsgPaoSHgYT+A16SBBLz8KZPilu0GKOlfCN+/LMg6yW1WuIb/j7g1+kdpl2JzGCXh54SXlNqkTIsNXhqampqqpD9+q2RpvRnQeq0AvzKWwyTbE7Mw5t6xS1qG0kgof8A0XrRHnL903m3AGfJzFB5SMLDQEK/0lWArTcYSOjXWdcoIISHgYR+pasAW28eBhL6dZbMDPlBjfAwkNB/wEuSQGIe3vRJcYsW47T7H/MbeL4lD9WC1/Iy3M7oH6JHibJIUWB4CQ+QEpnfgGlXJGv7lk4NN50aPjU1NfVvZb96a6Qp/VmQOq0Av/IWwySbE/Pwpl5xi9pGEkjoP0C0XrTnS/903i3AWTIzVB6S8DCQ0K90FWDrDQYS+nXWNQoI4WEgoV/pKsDWm4eBhH6dJTNDflAjPAwk9B/wkiSQmIc3fVLcosUYLXwjLsl6Oa2WyH459bDy1dyv0ztMuxKZwS4PPSW8ptQiZVhq8NQI/QIhFRvqfNRCMwAAAABJRU5ErkJggg==",
+      "checker_board.spr": "U1NQUgMAAAoAAQAAAAEABgAAAGyJUE5HDQoaCgAAAA1JSERSAAAACgAAAAoIBgAAAI0yz70AAAAzSURBVHhejYqxCQAwAML8zNf8vKUdhYCDQ2KU5LzZ/iMWHc1qQbyHLYj3sAXxHrYgnsMLSXrVDWdLK6MAAAAASUVORK5CYII=",
+      "yellow_lights.spr": "U1NQUgMAAAoAAQAFYmxpbmsAAgBIAAAAcIlQTkcNChoKAAAADUlIRFIAAAAKAAAAFAgGAAAAtO6sVgAAADdJREFUeF7FzrENACAMBLFMl/03CgNgiTTor3R1Vd+aqdkYUZZMPzKiLFl3Xz8yoiyZfmRE2bMD/5smcSc9jzQAAAAASUVORK5CYII=",
+      "data_station.spr": "U1NQUgMAACAAAgAQYmFzZXN0YXRpb25ibGluawACAHgAAAHwiVBORw0KGgoAAAANSUhEUgAAACAAAABACAYAAAB7jnWuAAABt0lEQVR4Xu2XQW6DQAxFfRBWVRe9HHfIQdh02TNxgp6CMgmg8QOnnlGcSSS+9Dbm4/+FQIDIKUOXy2VKfHedgr4wnQXWApw/TWeBdy6QziF+DcMw1TKfPh0pzZljiku9SBY+juNGcQku9iBGeFUJLvcgSwEGs0TyMW8nLvcgBwXSrGkB4irAxV7kUfcAF5cgRok8fPHZ4tK+74uQrESuNM+K2mKBGuR2mRU4bovLImCmEs28xCVwV1WBCJipRHMEzFRaX8GRMFOJZiIHd/gKvRZZ3F40k9kyff587Uhzei2YqUQzkegCfJSI3ClArwUzN9EYDfPbFzj1clofm+Z/x2cBzp+ms8A7F7i+nIBf/IQqYT6dvwRXpTlzTHGpF8nCrT8jZh2Kiz2IEV5Vgss9yFKAwSyRfMzbics9yEGBNGtagLgKcLEXedQ9wMUliFEiD198triU33H/IVmJXGmeFbXFAjXI7TIrcNwWl0XATCWaeYlL4K6qAhEwU4nmCJiptL6CI2GmEs1EDu7wFXotsri9aCazZep+P3akOb0WzFSimUh0AT5KRO4UoNeCmZtojIb57Qu00h+ftkkK1SX4lQAAAABJRU5ErkJgggAQZnVlbHN0YXRpb25ibGluawACAHgAAAIuiVBORw0KGgoAAAANSUhEUgAAACAAAABACAYAAAB7jnWuAAAB9UlEQVR4Xu2YTW7CMBCFZ98roC5KFz1WL8AdWPUUbLrsqgfiAFVPkWYgRuMvHvBPQoqUJ32iGjvzHpat4IqscrTf7zvlc7OJ4LzZtAYIAVi/m9YAjxxAnyH5OhwOXS39411KWqePKzbNRYz58Xi8UByCjXMQx7wqBJvnIEMAGjOEzqPfSGyegyQCaG3RACQrABvnIlPtATYuQZwQ1nyY54tNd7tdEWJCWGndBPXFADXIeZkjMO6LzeaAnpE4mUtcAntVBWjl+/1pBD0jsUErPx/PI+gZKbyCW9Fvqmb6ud1uL9g6vU9iIyKJHR5IBQjG/UG8/N0c4PXrbYTWvQBqHlgkQNEK8CgRuRLAzqvaAzSbAp4AJYzRf5YA4exbwhj9V/0/hSO1+O14DcD63bQGeOQAp5cTyBd/VpXQPx7dB4K0Th9XbJqLGHPvZkSvpNg4B3HMq0KweQ4yBKAxQ+g8+o3E5jlIIoDWFg1AsgKwcS4y1R5g4xLECWHNh3m+2JS/8W4hJoSV1k1QXwxQg5yXOQLjvthsDugZiZO5xCWwV1WAVngnSN6IrNigFd6KFHpGCq/gVqruhio2IpLY4YFUgOLbMQ1JP6Xb/L6M0LoXYPL/D9D8VoCiFeBRInIlgJ1XtQdoNgU8AUoYo/8sAcLZt4Qx+i+mP6jlTJysP+mEAAAAAElFTkSuQmCC",
+      "fuel_station.spr": "U1NQUgMAABkAAQAFYmxpbmsAAgAGAAABw4lQTkcNChoKAAAADUlIRFIAAAAZAAAAMggGAAAAqYJwlgAAAYpJREFUeF611tFtwzAMBFCj42SnzlKvklnyU3SRjqGChpkeTiRFyvIBBIJY4gNtRPG2FdO+t8bfrYo09upyjkY/Xx9u6Rral8qwOZfuoT5uOuD3+XBrBioBs5ALtNdnVx4mfbixpgTMQiEg17ksKELCKc4Nbd/3d+l3FSgNtPb/GaHLCE6AiEJD5DyLzNuFiDTnyiB41g2RS5NkEISWPBNEPCgDWIjERBjCYiCaQuNOoxAXrxlNoQmhqLKA5FhQgXAtACEi6SAL4+sVQGNCUeke6pPKENM1tG8q2Ixrfe5873qnycFyU/gWLb1dRyN+2Kse/LA5l+6hPm46gH+I3o9S91K/LiVgFnIBPoGjU1j6cGNNCZiFQkCuc1lQhIRTnBvcv98slAaWvEhYCE4w9Up0nkXm7UKEX+zSL3dw1g2RS5NkEISWPBNEPCgDWIjERBjCYiCaQuNOoxAXrxlNoQmhqLKA5FhQgXAtACEi6SAL4+sVQGNCUeke6pPKENM1tG8q2IxrfWbeu/4AbOhIwPTs7NgAAAAASUVORK5CYII=",
+    };
+  </script>
+  <script>
+  (() => {
+    "use strict";
+    const $ = (s) => document.querySelector(s);
+    const TAU = Math.PI * 2;
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+    /* ───────── tuning (distances in bits, times in seconds) ───────── */
+    const T = {
+      BIT: 40,            // screen px per bit at zoom 1
+      SECTOR: 40,         // bits per side of a sector
+      SECTORS: 10,        // the map is SECTORS × SECTORS (A–J across, 1–10 down)
+      FUEL_LOW: 0.35,     // below this share of the tank the fuel finder switches on…
+      FUEL_FINDER: 20,    // …and points at the nearest depot, if it's within this many bits
+      THRUST: 6,          // bits/s² (before upgrades)
+      BRAKE: 8,           // bits/s² (stabilizers, before upgrades)
+      MAX_SPEED: 12,      // bits/s (before upgrades)
+      DRAG: 0.15,         // speed entropy: each second you lose this share of your speed…
+      FRICTION: 0.2,      // …plus this many bits/s, so you really do come to a stop
+      TURN: 3.4,          // radians/s
+      BURN_THRUST: 7,     // fuel/s (before upgrades)
+      BURN_BRAKE: 5,      // fuel/s (before upgrades)
+      REFUEL: 30,         // fuel/s while you hold R, landed at a depot
+      DC_REFUEL: 12,      // fuel/s from a data station's reserve (with the refuel upgrade)…
+      DC_REGEN: 0.2,      // …which refills at this many fuel/s once you've left it
+      DOCK_RANGE: 1.6,    // bits from a station's centre
+      DOCK_SPEED: 2.5,    // bits/s: the fastest you can be moving and still land
+      RADAR: 22,          // bits: anything this close shows on radar and gets discovered
+      TRANSFER: 1.8,      // seconds to download or deliver a packet
+      REGEN: [70, 160],   // seconds before an emptied data station has new data
+      SAT_SCALE: 2,       // screen px per sprite px at zoom 1
+    };
+    const WORLD = T.SECTOR * T.SECTORS;
+    const WORLD_SEED = 2718;
+    const WORLD_VERSION = 1;              // bump when map generation changes, so old saves are dropped
+    // Opened on its own (not inside the site) this is the playtest build: everything in the shop is
+    // free, and it keeps a separate save so experimenting never touches real progress.
+    const PLAYTEST = (() => { try { return window.top === window.self; } catch { return false; } })();
+    // three save slots (playtest has its own three)
+    const SLOT_KEYS = [1, 2, 3].map((n) => `atk.satellite${PLAYTEST ? ".playtest" : ""}.slot${n}`);
+    const OLD_KEYS = { save: `atk.satellite${PLAYTEST ? ".playtest" : ""}.v1`, best: `atk.satellite${PLAYTEST ? ".playtest" : ""}.best` };
+
+    /* ───────── difficulties ───────── */
+    const MODES = {
+      free: {
+        name: "Free play", about: ["Fly anywhere and run as many bounties at once as you like", "Arrows point to your delivery sectors", "Tows are free and you keep your cargo"],
+        maxJobs: Infinity, sectorArrow: true, stationArrowInSector: false, towFee: 0, towKeepsCargo: true,
+        tankMul: 1, brakeMul: 1, brakeBurnMul: 1, steerBurn: 0, fuelPrice: 0, fuelOutEnds: false, sparse: false, startCredits: 0,
+      },
+      easy: {
+        name: "Easy", about: ["Arrows point to your delivery sector, then to the station once you're in it", "A 50% bigger tank, and brakes that barely use fuel", "Tows are free, but your cargo is lost"],
+        maxJobs: 1, sectorArrow: true, stationArrowInSector: true, towFee: 0, towKeepsCargo: false,
+        tankMul: 1.5, brakeMul: 1.3, brakeBurnMul: 0.35, steerBurn: 0, fuelPrice: 0, fuelOutEnds: false, sparse: false, startCredits: 0,
+      },
+      standard: {
+        name: "Standard", about: ["You're told the sector, not the way there", "A tow costs 5 credits and your cargo"],
+        maxJobs: 1, sectorArrow: false, stationArrowInSector: false, towFee: 5, towKeepsCargo: false,
+        tankMul: 1, brakeMul: 1, brakeBurnMul: 1, steerBurn: 0, fuelPrice: 0, fuelOutEnds: false, sparse: false, startCredits: 0,
+      },
+      challenge: {
+        name: "Challenge", about: ["Far fewer fuel depots and data stations", "Fuel costs 5 credits a quarter tank, and steering uses fuel", "No tows: run dry and the game is over"],
+        maxJobs: 1, sectorArrow: false, stationArrowInSector: false, towFee: null, towKeepsCargo: false,
+        tankMul: 1, brakeMul: 1, brakeBurnMul: 1, steerBurn: 0.8, fuelPrice: 5, fuelOutEnds: true, sparse: true, startCredits: 20,
+      },
+    };
+    const mode = () => MODES[game.mode] || MODES.standard;
+
+    /* ───────── what the shop sells ─────────
+       Art comes from the .spr files next to this page. To add a pattern or sticker, drop its .spr
+       in and add a line here. Body paint and patterns replace the hull grey (#808080); pattern
+       colours are measured against that grey, so a pattern shows as drawn on a grey ship and takes
+       on the paint colour otherwise. Panel paint replaces the solar-panel blue (#0000ff). Any paint
+       can go on either. Stickers sit on the middle of the ship's body, on its grey parts only. */
+    const HULL_GREY = [128, 128, 128];
+    const PANEL_BLUE = [0, 0, 255];
+    const CATALOG = {
+      hulls: [
+        { id: "standard", name: "Standard", file: "satellite.spr" },
+        { id: "efficient", name: "Efficient", file: "satellite_efficient.spr", needs: { eff: 1 } },
+      ],
+      paints: [
+        { id: "grey", name: "Hull grey", hex: "#808080", price: 0 },
+        { id: "solar", name: "Solar blue", hex: "#0000ff", price: 0 },
+        { id: "white", name: "White", hex: "#d6dbe4", price: 100 },
+        { id: "charcoal", name: "Charcoal", hex: "#3b3f47", price: 100 },
+        { id: "red", name: "Red", hex: "#c8362e", price: 120 },
+        { id: "orange", name: "Orange", hex: "#e07d24", price: 120 },
+        { id: "gold", name: "Gold", hex: "#d9b12c", price: 160 },
+        { id: "green", name: "Green", hex: "#3f9b4c", price: 120 },
+        { id: "teal", name: "Teal", hex: "#2b9c99", price: 120 },
+        { id: "sky", name: "Sky", hex: "#6aa7e0", price: 120 },
+        { id: "purple", name: "Purple", hex: "#7b43b3", price: 140 },
+        { id: "pink", name: "Pink", hex: "#d65f9e", price: 140 },
+      ],
+      patterns: [
+        { id: "checker", name: "Checkerboard", file: "checker_board.spr", price: 300 },
+      ],
+      stickers: [
+        { id: "lights", name: "Blinking lights", file: "yellow_lights.spr", price: 250 },
+      ],
+    };
+    const UPGRADES = [
+      { id: "eff", name: "Fuel efficiency", about: "Burn less fuel for the same push. Level I refits you with the Efficient hull.",
+        values: [1, 0.85, 0.72, 0.6], prices: [250, 500, 900], show: (v) => `${Math.round(v * 100)}% fuel use` },
+      { id: "tank", name: "Fuel tank", about: "Carry more fuel between depots.",
+        values: [100, 130, 165, 200], prices: [200, 450, 800], show: (v) => `${Math.round(v * mode().tankMul)} fuel` },
+      { id: "power", name: "Booster & brakes", about: "Stronger thrust and stabilizers, and a higher top speed.",
+        values: [1, 1.2, 1.4, 1.65], prices: [250, 550, 950], show: (v) => `${Math.round(v * 100)}% power` },
+      { id: "dcfuel", name: "Refuel at data centers", about: "Data stations keep a small fuel reserve you can top up from while you're landed. It refills slowly once you've used it.",
+        values: [0, 15, 25, 40], prices: [300, 600, 1000], show: (v) => (v ? `${v} fuel in each data station` : "no fuel at data stations") },
+    ];
+    const upgradeValue = (id) => { const u = UPGRADES.find((x) => x.id === id); return u.values[clamp(game.upgrades[id] || 0, 0, u.values.length - 1)]; };
+    // what the ship can do right now, after upgrades
+    function stats() {
+      const power = upgradeValue("power"), m = mode();
+      return {
+        tank: upgradeValue("tank") * m.tankMul, burn: upgradeValue("eff"), dcFuel: upgradeValue("dcfuel"),
+        thrust: T.THRUST * power, brake: T.BRAKE * power * m.brakeMul, brakeBurn: m.brakeBurnMul,
+        maxSpeed: T.MAX_SPEED * (1 + (power - 1) * 0.5),
+      };
+    }
+    // fuel left in a data station's reserve (0 without the refuel upgrade); st.drawn is how much
+    // has been taken and not yet refilled
+    const reserveLeft = (st) => (st.kind === "data" ? Math.max(0, stats().dcFuel - (st.drawn || 0)) : 0);
+
+    const store = {
+      get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+      set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private mode etc. */ } },
+      del(k) { try { localStorage.removeItem(k); } catch { } },
+    };
+
+    /* ───────── seeded randomness: the map is the same every time ───────── */
+    function mulberry32(a) {
+      return () => {
+        a = (a + 0x6D2B79F5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+    const hash3 = (x, y, z) => {
+      let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(z | 0, 1442695041)) | 0;
+      h = Math.imul(h ^ (h >>> 13), 1274126177);
+      return (h ^ (h >>> 16)) >>> 0;
+    };
+
+    const NAMES = ["KESTREL", "VEGA", "ORION", "LYRA", "PETREL", "TERN", "CORVUS", "ALTAIR", "DENEB", "RIGEL", "SIRIUS", "CASTOR",
+      "POLLUX", "MERLIN", "OSPREY", "HERON", "IBIS", "CRANE", "SWIFT", "WREN", "FINCH", "LARK", "EGRET", "PLOVER", "CONDOR",
+      "FALCON", "HAWK", "KITE", "RAVEN", "ROOK", "MAGPIE", "SKUA", "GANNET", "PELICAN", "HALCYON", "NOVA", "QUASAR", "PULSAR",
+      "ZENITH", "NADIR", "APEX", "ARGO", "ATLAS", "HELIOS", "SELENE", "IRIS", "JUNO", "VESTA", "CERES", "PALLAS", "HEBE",
+      "TITAN", "RHEA", "DIONE", "TETHYS", "MIMAS", "JANUS", "PHOEBE", "ARIEL", "OBERON", "TRITON", "NEREID", "PUCK", "HYDRA",
+      "DRACO", "CYGNUS", "AQUILA", "PAVO", "TUCANA", "GRUS", "VOLANS", "CARINA", "VELA", "PYXIS", "NORMA", "LUPUS", "MENSA",
+      "FORNAX", "DORADO", "PICTOR", "ANTLIA", "CRATER", "SEXTANS", "LYNX", "AUK", "LOON", "SHRIKE", "VIREO"];
+
+    const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+    const sectorIndex = (x, y) => clamp(Math.floor(y / T.SECTOR), 0, T.SECTORS - 1) * T.SECTORS + clamp(Math.floor(x / T.SECTOR), 0, T.SECTORS - 1);
+    const sectorName = (i) => String.fromCharCode(65 + (i % T.SECTORS)) + "-" + (Math.floor(i / T.SECTORS) + 1);
+    const sectorCentre = (i) => ({ x: ((i % T.SECTORS) + 0.5) * T.SECTOR, y: (Math.floor(i / T.SECTORS) + 0.5) * T.SECTOR });
+    const sectorOf = (st) => sectorIndex(st.x, st.y);
+
+    /* ───────── the world ───────── */
+    let world;
+    // sparse (challenge) worlds have far fewer depots and data stations
+    function buildWorld(sparse = false) {
+      const rnd = mulberry32(WORLD_SEED + (sparse ? 1 : 0));
+      const stations = [];
+      const clear = (x, y, min) => stations.every((s) => (s.x - x) ** 2 + (s.y - y) ** 2 >= min * min);
+
+      // fuel depots: a jittered grid with some gaps, so a depot is sometimes in finder range and sometimes not
+      const cell = 50;
+      for (let gy = 0; gy < WORLD / cell; gy++) for (let gx = 0; gx < WORLD / cell; gx++) {
+        if (rnd() < (sparse ? 0.7 : 0.2)) continue;
+        for (let t = 0; t < 20; t++) {
+          const x = gx * cell + 5 + rnd() * (cell - 10), y = gy * cell + 5 + rnd() * (cell - 10);
+          if (clear(x, y, 14)) { stations.push({ kind: "fuel", x, y }); break; }
+        }
+      }
+      // data stations: none to three in each sector
+      for (let sy = 0; sy < T.SECTORS; sy++) for (let sx = 0; sx < T.SECTORS; sx++) {
+        const roll = rnd();
+        const n = sparse ? (roll < 0.4 ? 0 : roll < 0.85 ? 1 : 2) : roll < 0.12 ? 0 : roll < 0.5 ? 1 : roll < 0.85 ? 2 : 3;
+        for (let i = 0; i < n; i++) for (let t = 0; t < 25; t++) {
+          const x = sx * T.SECTOR + 4 + rnd() * (T.SECTOR - 8), y = sy * T.SECTOR + 4 + rnd() * (T.SECTOR - 8);
+          if (clear(x, y, 9)) { stations.push({ kind: "data", x, y }); break; }
+        }
+      }
+
+      const pool = NAMES.slice();
+      for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+      const used = new Set();
+      let k = 0, depot = 0;
+      stations.forEach((s, i) => {
+        s.id = i;
+        s.phase = rnd() * TAU;
+        if (s.kind === "fuel") { s.name = "DEPOT " + String(++depot).padStart(2, "0"); return; }
+        let name;
+        do { name = pool[k++ % pool.length] + "-" + (1 + Math.floor(rnd() * 9)); } while (used.has(name));
+        used.add(name);
+        s.name = name;
+        s.hasData = rnd() < 0.55;
+        s.regenAt = s.hasData ? 0 : T.REGEN[0] + rnd() * (T.REGEN[1] - T.REGEN[0]);
+      });
+
+      const fuels = stations.filter((s) => s.kind === "fuel");
+      const datas = stations.filter((s) => s.kind === "data");
+      // start near the middle, at a data station with a depot close by
+      const mid = { x: WORLD / 2, y: WORLD / 2 };
+      const byMid = datas.slice().sort((a, b) => dist(a, mid) - dist(b, mid));
+      const start = byMid.find((d) => fuels.some((f) => dist(d, f) <= 14)) || byMid[0];
+      start.hasData = true; start.regenAt = 0;
+      return { stations, fuels, datas, start };
+    }
+
+    /* ───────── game state ───────── */
+    const game = { state: "intro", mode: "free", slot: null, mapOpen: false, toasts: [], particles: [], upgrades: {}, jobs: [] };
+    const defaultLook = () => ({ hull: "standard", paint: "#808080", panels: "#0000ff", pattern: null, sticker: null });
+    const noneOwned = () => ({ paints: new Set(["grey"]), patterns: new Set(), stickers: new Set() });
+
+    // slot is 0-2, or null for the world drifting behind the title screen (never saved)
+    function newGame(modeId = "standard", slot = null) {
+      game.mode = MODES[modeId] ? modeId : "standard";
+      game.slot = slot;
+      world = buildWorld(mode().sparse);
+      const st = world.start;
+      Object.assign(game, {
+        t: 0,
+        ship: { x: st.x, y: st.y, vx: 0, vy: 0, a: 0, fuel: 0, thrusting: false, braking: false, refueling: false },
+        dockedAt: st, dockable: null, jobs: [], transfer: null, stranded: false, over: false,
+        stats: { deliveries: 0, kb: 0, tows: 0 },
+        credits: mode().startCredits, upgrades: { eff: 0, tank: 0, power: 0, dcfuel: 0 }, look: defaultLook(), owned: noneOwned(),
+        discovered: new Set(), visited: new Set(), lastSector: -1,
+        toasts: [], particles: [],
+      });
+      game.ship.fuel = stats().tank;
+      cam.x = st.x; cam.y = st.y;
+      discover();
+    }
+
+    function saveGame() {
+      if (!world || game.slot === null || game.state === "intro") return;
+      const s = game.ship, r = (v) => Math.round(v * 1000) / 1000;
+      store.set(SLOT_KEYS[game.slot], {
+        v: WORLD_VERSION, mode: game.mode, savedAt: Date.now(), over: game.over, t: r(game.t),
+        ship: [r(s.x), r(s.y), r(s.vx), r(s.vy), r(s.a), r(s.fuel)],
+        dock: game.dockedAt ? game.dockedAt.id : -1,
+        jobs: game.jobs,
+        stats: game.stats,
+        credits: Math.round(game.credits * 100) / 100, up: game.upgrades, look: game.look,
+        owned: { paints: [...game.owned.paints], patterns: [...game.owned.patterns], stickers: [...game.owned.stickers] },
+        disc: [...game.discovered],
+        vis: [...game.visited],
+        data: world.datas.map((d) => (d.hasData ? -1 : Math.round(d.regenAt))),
+        res: world.datas.filter((d) => d.drawn > 0).map((d) => [d.id, Math.round(d.drawn * 10) / 10]),
+      });
+    }
+
+    // what a slot holds, for the save screen (null when it's empty or unreadable)
+    function slotInfo(i) {
+      const d = store.get(SLOT_KEYS[i]);
+      if (!d || d.v !== WORLD_VERSION || !Array.isArray(d.ship)) return null;
+      return d;
+    }
+    const deleteSlot = (i) => store.del(SLOT_KEYS[i]);
+
+    // the single save from before there were slots becomes slot 1, on standard
+    function migrateOldSave() {
+      const old = store.get(OLD_KEYS.save);
+      if (old && !store.get(SLOT_KEYS[0])) {
+        old.mode = "standard";
+        old.savedAt = Date.now();
+        if (old.job) old.jobs = [old.job];
+        delete old.job;
+        store.set(SLOT_KEYS[0], old);
+      }
+      store.del(OLD_KEYS.save);
+      store.del(OLD_KEYS.best);
+    }
+
+    function loadSlot(slot) {
+      const d = slotInfo(slot);
+      if (!d) return false;
+      newGame(d.mode, slot);
+      if (!Array.isArray(d.data) || d.data.length !== world.datas.length) return false;
+      const byId = (id) => world.stations[id] || null;
+      game.over = !!d.over;
+      // saves from before the shop existed just get the defaults for these
+      game.credits = Math.max(0, +d.credits || 0);
+      for (const u of UPGRADES) game.upgrades[u.id] = clamp(Math.floor(+(d.up && d.up[u.id]) || 0), 0, u.values.length - 1);
+      game.look = Object.assign(defaultLook(), d.look);
+      const owned = d.owned || {};
+      game.owned = {
+        paints: new Set(["grey", ...(owned.paints || [])]),
+        patterns: new Set(owned.patterns || []),
+        stickers: new Set(owned.stickers || []),
+      };
+      const [x, y, vx, vy, a, fuel] = d.ship.map(Number);
+      Object.assign(game.ship, { x, y, vx, vy, a, fuel: clamp(fuel, 0, stats().tank) });
+      game.t = +d.t || 0;
+      game.dockedAt = d.dock >= 0 ? byId(d.dock) : null;
+      game.jobs = (d.jobs || (d.job ? [d.job] : []))
+        .filter((j) => j && byId(j.to) && byId(j.from))
+        .map((j) => ({ from: j.from, to: j.to, kb: +j.kb || 0, pay: +j.pay || bountyPay(byId(j.from), byId(j.to), +j.kb || 0) }));
+      game.stats = Object.assign({ deliveries: 0, kb: 0, tows: 0 }, d.stats);
+      game.discovered = new Set((d.disc || []).filter((id) => byId(id)));
+      game.visited = new Set((d.vis || []).filter((i) => i >= 0 && i < T.SECTORS * T.SECTORS));
+      world.datas.forEach((st, i) => { st.hasData = d.data[i] === -1; st.regenAt = st.hasData ? 0 : +d.data[i]; });
+      for (const [id, drawn] of d.res || []) { const st = byId(id); if (st && st.kind === "data") st.drawn = Math.max(0, +drawn || 0); }
+      cam.x = x; cam.y = y;
+      return true;
+    }
+
+    function toast(text, color = "#dfe8ff") {
+      game.toasts.push({ text, color, age: 0 });
+      if (game.toasts.length > 4) game.toasts.shift();
+    }
+
+    /* ───────── ship art: models, patterns and stickers ───────── */
+    const art = { hulls: new Map(), patterns: new Map(), stickers: new Map() };   // id -> loaded art
+
+    async function loadSpr(file) {
+      try { return await SPR.load(file); } catch { /* opened from disk, or the file is missing */ }
+      if (BUILTIN[file]) return SPR.fromBase64(BUILTIN[file]);
+      throw new Error(`${file} is missing.`);
+    }
+
+    // the RGBA pixels of one frame (cached; frames never change once loaded)
+    const pixelCache = new WeakMap();
+    function framePixels(anim, i) {
+      let per = pixelCache.get(anim);
+      if (!per) pixelCache.set(anim, (per = new Map()));
+      if (!per.has(i)) {
+        const s = anim.frameSize, c = document.createElement("canvas");
+        c.width = c.height = s;
+        const g = c.getContext("2d", { willReadFrequently: true });
+        anim.draw(g, i, 0, 0);
+        per.set(i, g.getImageData(0, 0, s, s).data);
+      }
+      return per.get(i);
+    }
+    const isHullGrey = (px, i) => px[i + 3] > 0 && px[i] === HULL_GREY[0] && px[i + 1] === HULL_GREY[1] && px[i + 2] === HULL_GREY[2];
+
+    // the biggest connected patch of hull grey: the ship's body, where stickers go and what it turns around
+    function findBody(px, size) {
+      const seen = new Uint8Array(size * size);
+      let best = null;
+      for (let start = 0; start < size * size; start++) {
+        if (seen[start] || !isHullGrey(px, start * 4)) continue;
+        let n = 0, x0 = size, y0 = size, x1 = -1, y1 = -1;
+        const stack = [start];
+        seen[start] = 1;
+        while (stack.length) {
+          const p = stack.pop(), x = p % size, y = (p - x) / size;
+          n++; x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+          for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+            if (nx < 0 || ny < 0 || nx >= size || ny >= size) continue;
+            const q = ny * size + nx;
+            if (!seen[q] && isHullGrey(px, q * 4)) { seen[q] = 1; stack.push(q); }
+          }
+        }
+        if (!best || n > best.n) best = { n, x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+      }
+      return best;
+    }
+
+    function addArt(kind, def, sprite) {
+      if (kind === "hulls") {
+        const float = sprite.get("float") || sprite.default;
+        const thruster = sprite.get("thruster") || float;
+        if (!float || !float.frameCount) throw new Error("That sprite has no frames.");
+        const size = sprite.frameSize;
+        const body = findBody(framePixels(float, 0), size);
+        // turn around the middle of the body (or of the art, if it has no grey), not the middle of the tile
+        const b = body || float.bounds(0) || { x: 0, y: 0, w: size, h: size };
+        art.hulls.set(def.id, { def, sprite, float, thruster, size, body, pivot: { x: b.x + b.w / 2, y: b.y + b.h / 2 } });
+      } else {
+        const anim = sprite.default;
+        if (!anim || !anim.frameCount) throw new Error("That sprite has no frames.");
+        art[kind].set(def.id, { def, sprite, anim });
+      }
+      shipCache.clear();
+      describeArt();
+    }
+
+    async function loadArt() {
+      const jobs = [loadStationArt()];
+      for (const kind of ["hulls", "patterns", "stickers"]) for (const def of CATALOG[kind]) {
+        jobs.push(loadSpr(def.file).then((sp) => addArt(kind, def, sp)).catch((e) => console.warn(`${def.file}: ${e.message}`)));
+      }
+      await Promise.all(jobs);
+      if (!art.hulls.size) throw new Error("no ship model could be loaded.");
+    }
+
+    function describeArt() {
+      const info = $("#dev-info");
+      if (!info) return;
+      const names = (m) => [...m.values()].map((a) => a.def.name).join(", ") || "none";
+      info.textContent = `Models: ${names(art.hulls)}\nPatterns: ${names(art.patterns)}\nStickers: ${names(art.stickers)}`;
+    }
+
+    const currentHull = () => art.hulls.get(game.look.hull) || art.hulls.get("standard") || art.hulls.values().next().value || null;
+    const hexRgb = (hex) => { const n = parseInt(String(hex).replace("#", ""), 16) || 0; return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+
+    /* The ship as it should look: one frame of the model, with its grey painted (and patterned), and
+       the sticker on its body. Built pixel by pixel once per combination, then reused. */
+    const shipCache = new Map();
+    function shipImage(look, hull, anim, frame, now) {
+      const pat = look.pattern ? art.patterns.get(look.pattern) : null;
+      const stk = look.sticker ? art.stickers.get(look.sticker) : null;
+      const pf = pat ? pat.anim.frameAt(now) : 0, sf = stk ? stk.anim.frameAt(now) : 0;
+      const key = [hull.def.id, anim === hull.thruster ? "t" : "f", frame, look.paint, look.panels, pat ? pat.def.id : "", pf, stk ? stk.def.id : "", sf].join("|");
+      const hit = shipCache.get(key);
+      if (hit) return hit;
+      if (shipCache.size > 300) shipCache.clear();
+
+      const size = hull.size, c = document.createElement("canvas");
+      c.width = c.height = size;
+      const g = c.getContext("2d");
+      const img = g.createImageData(size, size), out = img.data;
+      out.set(framePixels(anim, frame));
+      const tint = hexRgb(look.paint), panel = hexRgb(look.panels || "#0000ff");
+      const ox = hull.body ? hull.body.x : 0, oy = hull.body ? hull.body.y : 0;
+      const pp = pat && framePixels(pat.anim, pf), ps = pat ? pat.anim.frameSize : 0;
+      const grey = new Uint8Array(size * size);
+      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+        const i = (y * size + x) * 4;
+        if (out[i + 3] > 0 && out[i] === PANEL_BLUE[0] && out[i + 1] === PANEL_BLUE[1] && out[i + 2] === PANEL_BLUE[2]) {
+          out[i] = panel[0]; out[i + 1] = panel[1]; out[i + 2] = panel[2];
+          continue;
+        }
+        if (!isHullGrey(out, i)) continue;
+        grey[y * size + x] = 1;
+        let r = tint[0], gg = tint[1], b = tint[2];
+        if (pp) {
+          const j = ((((y - oy) % ps) + ps) % ps * ps + ((((x - ox) % ps) + ps) % ps)) * 4;
+          if (pp[j + 3] > 0) {
+            r = Math.min(255, Math.round(tint[0] * pp[j] / HULL_GREY[0]));
+            gg = Math.min(255, Math.round(tint[1] * pp[j + 1] / HULL_GREY[1]));
+            b = Math.min(255, Math.round(tint[2] * pp[j + 2] / HULL_GREY[2]));
+          }
+        }
+        out[i] = r; out[i + 1] = gg; out[i + 2] = b;
+      }
+      if (stk && hull.body) {
+        const sp = framePixels(stk.anim, sf), ss = stk.anim.frameSize;
+        const sx0 = Math.round(hull.body.x + hull.body.w / 2 - ss / 2), sy0 = Math.round(hull.body.y + hull.body.h / 2 - ss / 2);
+        for (let v = 0; v < ss; v++) for (let u = 0; u < ss; u++) {
+          const j = (v * ss + u) * 4, x = sx0 + u, y = sy0 + v;
+          if (sp[j + 3] < 128 || x < 0 || y < 0 || x >= size || y >= size || !grey[y * size + x]) continue;
+          const i = (y * size + x) * 4;
+          out[i] = sp[j]; out[i + 1] = sp[j + 1]; out[i + 2] = sp[j + 2]; out[i + 3] = 255;
+        }
+      }
+      g.putImageData(img, 0, 0);
+      shipCache.set(key, c);
+      return c;
+    }
+
+    // draws the ship centred on its pivot at (x, y), scaled k screen px per sprite px
+    function drawShipAt(g, look, thrusting, sinceThrust, now, x, y, angle, k) {
+      const hull = art.hulls.get(look.hull) || currentHull();
+      if (!hull) return;
+      const anim = thrusting ? hull.thruster : hull.float;
+      const frame = thrusting ? anim.frameAt(sinceThrust) : 0;
+      g.save();
+      g.translate(x, y);
+      g.rotate(angle);
+      g.imageSmoothingEnabled = false;
+      g.drawImage(shipImage(look, hull, anim, frame, now), -hull.pivot.x * k, -hull.pivot.y * k, hull.size * k, hull.size * k);
+      g.restore();
+    }
+
+    /* ───────── station art: data_station.spr and fuel_station.spr, drawn at 2× like the satellite ─────────
+       A data station's lamp is the green in its sprite; it's lit when the station has a bounty and
+       switched off (drawn grey) when it doesn't. With the refuel upgrade, stations that still have
+       fuel in their reserve show the sprite's fuel version instead. */
+    const STATION_ART = {
+      fuel: { file: "fuel_station.spr", anim: "blink" },
+      data: { file: "data_station.spr", anim: "basestationblink", fuelAnim: "fuelstationblink" },
+    };
+    const stationArt = {};   // kind -> { anim, fuelAnim, size }
+    async function loadStationArt() {
+      for (const [kind, a] of Object.entries(STATION_ART)) {
+        try {
+          const sprite = await loadSpr(a.file);
+          const anim = sprite.get(a.anim) || sprite.default;
+          stationArt[kind] = { anim, fuelAnim: (a.fuelAnim && sprite.get(a.fuelAnim)) || anim, size: sprite.frameSize };
+        } catch (e) { console.warn(`${a.file}: ${e.message}`); }
+      }
+    }
+    const isLampGreen = (px, i) => px[i + 3] > 0 && px[i + 1] > px[i] + 60 && px[i + 1] > px[i + 2] + 60;
+    const stationCache = new Map();
+    function stationImage(anim, frame, lampOff) {
+      const key = anim.name + "|" + anim.sheet.width + "|" + frame + "|" + lampOff;
+      let c = stationCache.get(key);
+      if (c) return c;
+      const size = anim.frameSize;
+      c = document.createElement("canvas");
+      c.width = c.height = size;
+      const g = c.getContext("2d");
+      const img = g.createImageData(size, size);
+      img.data.set(framePixels(anim, frame));
+      if (lampOff) for (let i = 0; i < img.data.length; i += 4) {
+        if (isLampGreen(img.data, i)) { img.data[i] = 58; img.data[i + 1] = 62; img.data[i + 2] = 70; }
+      }
+      g.putImageData(img, 0, 0);
+      stationCache.set(key, c);
+      return c;
+    }
+
+    /* ───────── input ───────── */
+    const keys = { left: false, right: false, thrust: false, brake: false, fuel: false };
+    const HOLD = { ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right", ArrowUp: "thrust", KeyW: "thrust", ArrowDown: "brake", KeyS: "brake", KeyR: "fuel" };
+    const releaseAll = () => { for (const k in keys) keys[k] = false; document.querySelectorAll(".touch .down").forEach((b) => b.classList.remove("down")); };
+
+    addEventListener("keydown", (e) => {
+      if (e.target.closest && e.target.closest(".dev")) return;
+      if (game.state === "intro" || game.state === "over") return;   // the menus are plain buttons
+      if (game.state === "shop") {
+        if (e.code === "Escape" || (e.code === "KeyU" && !e.repeat)) { closeShop(); e.preventDefault(); }
+        return;
+      }
+      if (HOLD[e.code]) { keys[HOLD[e.code]] = true; e.preventDefault(); return; }
+      if (e.repeat) return;
+      switch (e.code) {
+        case "KeyE": case "Space": case "Enter":
+          if (game.state === "play") { use(); e.preventDefault(); }
+          break;
+        case "KeyU": if (game.state === "play") openShop(); break;
+        case "KeyM": if (game.state === "play") toggleMap(); break;
+        case "KeyP": case "Escape":
+          if (game.mapOpen) toggleMap(false);
+          else if (game.state === "play") pause();
+          else if (game.state === "paused") resume();
+          break;
+        case "KeyT": if (game.state === "play") tow(); break;
+        case "KeyF": toggleFullscreen(); break;
+      }
+    });
+    addEventListener("keyup", (e) => { if (HOLD[e.code]) keys[HOLD[e.code]] = false; });
+    addEventListener("blur", () => { releaseAll(); if (game.state === "play") pause(); });
+    document.addEventListener("visibilitychange", () => { if (document.hidden) { releaseAll(); if (game.state === "play") pause(); saveGame(); } });
+    addEventListener("pagehide", saveGame);
+
+    // touch controls: shown on touch screens, or the first time the screen is touched
+    const touchEl = $("#touch");
+    const showTouch = () => { touchEl.hidden = false; };
+    if (matchMedia("(pointer: coarse)").matches) showTouch();
+    addEventListener("touchstart", showTouch, { once: true, passive: true });
+    touchEl.querySelectorAll("[data-hold]").forEach((b) => {
+      const k = b.dataset.hold;
+      const on = (e) => { e.preventDefault(); keys[k] = true; b.classList.add("down"); try { b.setPointerCapture(e.pointerId); } catch { } };
+      const off = () => { keys[k] = false; b.classList.remove("down"); };
+      b.addEventListener("pointerdown", on);
+      b.addEventListener("pointerup", off);
+      b.addEventListener("pointercancel", off);
+      b.addEventListener("lostpointercapture", off);
+    });
+    touchEl.querySelector("[data-tap=use]").addEventListener("pointerdown", (e) => { e.preventDefault(); if (game.state === "play") use(); });
+    touchEl.addEventListener("contextmenu", (e) => e.preventDefault());
+
+    /* ───────── menus ───────── */
+    const cv = $("#view");
+    const OVERLAYS = ["#intro", "#modes", "#paused", "#over", "#shop"];
+    function showOverlay(sel) { for (const o of OVERLAYS) $(o).hidden = o !== sel; }
+    function play() {
+      showOverlay(null);
+      game.state = "play";
+      cv.focus({ preventScroll: true });
+    }
+    function pause() {
+      game.state = "paused"; game.mapOpen = false; releaseAll(); saveGame();
+      const s = game.stats;
+      $("#paused-slot").textContent = `Save ${game.slot + 1} · ${mode().name}`;
+      $("#paused-stats").textContent = `${Math.floor(game.credits)} credits · ${s.deliveries} bount${s.deliveries === 1 ? "y" : "ies"} run · ${fmtKb(s.kb)} moved`;
+      showOverlay("#paused");
+      $("#btn-resume").focus({ preventScroll: true });
+    }
+    function resume() { play(); }
+    function toggleMap(force) {
+      game.mapOpen = typeof force === "boolean" ? force : !game.mapOpen;
+      releaseAll();
+    }
+    function toggleFullscreen() {
+      const d = document;
+      try {
+        if (d.fullscreenElement) d.exitFullscreen();
+        else (d.documentElement.requestFullscreen || d.documentElement.webkitRequestFullscreen)?.call(d.documentElement);
+      } catch { /* not allowed here */ }
+    }
+    $("#btn-resume").addEventListener("click", resume);
+
+    /* the save screen: three slots, each continue / new game (overwrite) / delete */
+    const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+    function ago(ms) {
+      const m = Math.round((Date.now() - ms) / 60000);
+      if (!(m >= 1)) return "just now";
+      if (m < 60) return `${m} min ago`;
+      const h = Math.round(m / 60);
+      if (h < 24) return `${h} hour${h === 1 ? "" : "s"} ago`;
+      const d = Math.round(h / 24);
+      return d < 30 ? `${d} day${d === 1 ? "" : "s"} ago` : new Date(ms).toLocaleDateString();
+    }
+    let askDelete = -1;   // slot waiting for "yes, delete"
+    function renderSlots() {
+      $("#slots").innerHTML = SLOT_KEYS.map((_, i) => {
+        const d = slotInfo(i);
+        const head = `<div class="slot-head"><b>Save ${i + 1}</b>${d ? `<span class="tag ${esc(d.mode)}">${esc((MODES[d.mode] || MODES.standard).name)}</span>` : ""}</div>`;
+        if (!d) return `<div class="slot empty">${head}<p class="slot-info"><span class="dim">Empty</span></p>
+          <div class="slot-actions"><button type="button" class="primary" data-act="new" data-slot="${i}">New game</button></div></div>`;
+        if (askDelete === i) return `<div class="slot">${head}<p class="ask">Delete save ${i + 1} for good?</p>
+          <div class="slot-actions"><button type="button" class="danger" data-act="delete-yes" data-slot="${i}">Yes, delete</button>
+          <button type="button" data-act="delete-no" data-slot="${i}">Keep it</button></div></div>`;
+        const [x, y] = d.ship.map(Number), s = d.stats || {};
+        const ups = Object.values(d.up || {}).reduce((a, b) => a + (+b || 0), 0);
+        const runs = +s.deliveries || 0;
+        const info = `Sector ${sectorName(sectorIndex(x, y))} <span class="dim">(${Math.round(x)}, ${Math.round(y)})</span><br>`
+          + `${Math.floor(+d.credits || 0)} cr · ${runs} bount${runs === 1 ? "y" : "ies"} · ${ups} upgrade${ups === 1 ? "" : "s"}<br>`
+          + `<span class="dim">${d.over ? "Ran out of fuel · " : ""}Saved ${d.savedAt ? ago(d.savedAt) : "earlier"}</span>`;
+        return `<div class="slot">${head}${d.over ? '<span class="tag done">Game over</span>' : ""}<p class="slot-info">${info}</p>
+          <div class="slot-actions">${d.over ? "" : `<button type="button" class="primary" data-act="continue" data-slot="${i}">Continue</button>`}
+          <button type="button" data-act="new" data-slot="${i}">New game</button>
+          <button type="button" class="danger" data-act="delete" data-slot="${i}">Delete</button></div></div>`;
+      }).join("");
+    }
+    function showSaves() {
+      if (game.slot !== null && game.state !== "intro" && !game.over) saveGame();
+      askDelete = -1;
+      // a free-play world drifts behind the menu; it's never saved
+      if (game.slot !== null) newGame("free", null);
+      game.state = "intro"; game.mapOpen = false; releaseAll();
+      renderSlots();
+      showOverlay("#intro");
+    }
+    let pickingFor = 0;   // slot the difficulty screen is for
+    function showModes(slot) {
+      pickingFor = slot;
+      const d = slotInfo(slot);
+      $("#modes-slot").textContent = `New game · Save ${slot + 1}`;
+      $("#modes-warn").hidden = !d;
+      if (d) $("#modes-warn").textContent = `This replaces Save ${slot + 1} (${(MODES[d.mode] || MODES.standard).name}, ${Math.floor(+d.credits || 0)} cr, ${+(d.stats && d.stats.deliveries) || 0} bounties).`;
+      $("#mode-list").innerHTML = Object.entries(MODES).map(([id, m]) =>
+        `<button type="button" class="mode ${id}" data-mode="${id}"><strong>${m.name}</strong><ul>${m.about.map((a) => `<li>${a}</li>`).join("")}</ul></button>`).join("");
+      showOverlay("#modes");
+      $("#mode-list button").focus({ preventScroll: true });
+    }
+    function startGame(modeId, slot) {
+      newGame(modeId, slot);
+      saveGame();
+      play();
+      toast(`${MODES[modeId].name}, save ${slot + 1}. There's a bounty waiting here: press E.`, "#8ab4ff");
+    }
+    function continueGame(slot) {
+      if (!loadSlot(slot)) { toast("That save couldn't be read.", "#ff6b6b"); showSaves(); return; }
+      sanitizeLook();
+      play();
+    }
+    // a look can point at art that's gone (a .spr loaded for one playtest session, or a file
+    // removed from the site); fall back to what's actually here
+    let artReady = false;
+    function sanitizeLook() {
+      if (!artReady) return;
+      const L = game.look;
+      if (!art.hulls.has(L.hull)) L.hull = art.hulls.has("standard") ? "standard" : art.hulls.keys().next().value;
+      if (L.pattern && !art.patterns.has(L.pattern)) L.pattern = null;
+      if (L.sticker && !art.stickers.has(L.sticker)) L.sticker = null;
+    }
+    $("#slots").addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-act]");
+      if (!b) return;
+      const i = +b.dataset.slot;
+      switch (b.dataset.act) {
+        case "continue": continueGame(i); return;
+        case "new": showModes(i); return;
+        case "delete": askDelete = i; break;
+        case "delete-yes": deleteSlot(i); askDelete = -1; break;
+        case "delete-no": askDelete = -1; break;
+      }
+      renderSlots();
+      const again = $(`#slots button[data-slot="${i}"]`);
+      if (again) again.focus({ preventScroll: true });
+    });
+    $("#mode-list").addEventListener("click", (e) => { const b = e.target.closest("[data-mode]"); if (b) startGame(b.dataset.mode, pickingFor); });
+    $("#btn-modes-back").addEventListener("click", () => { showOverlay("#intro"); renderSlots(); });
+    $("#btn-quit").addEventListener("click", showSaves);
+    $("#btn-over-menu").addEventListener("click", showSaves);
+
+    // challenge: the run ends when you're dry and can't get more
+    function gameOver(why) {
+      game.over = true;
+      game.state = "over"; game.mapOpen = false; releaseAll();
+      saveGame();
+      const s = game.stats;
+      $("#over-slot").textContent = `${mode().name} · Save ${game.slot + 1}`;
+      $("#over-stats").textContent = `${why} You ran ${s.deliveries} bount${s.deliveries === 1 ? "y" : "ies"}, moved ${fmtKb(s.kb)} and finished with ${Math.floor(game.credits)} credits.`;
+      showOverlay("#over");
+      $("#btn-over-menu").focus({ preventScroll: true });
+    }
+    $("#btn-map").addEventListener("click", () => { if (game.state === "play") toggleMap(); else if (game.state === "paused") { resume(); toggleMap(true); } });
+    $("#btn-shop").addEventListener("click", () => {
+      if (game.state === "shop") closeShop();
+      else { if (game.state === "paused") resume(); if (game.state === "play") openShop(); }
+    });
+    $("#btn-pause").addEventListener("click", () => { if (game.state === "play") pause(); else if (game.state === "paused") resume(); });
+    $("#btn-full").addEventListener("click", toggleFullscreen);
+    // don't leave the keyboard focus on a clicked button, where Space would click it again
+    document.querySelectorAll(".corner button").forEach((b) => b.addEventListener("click", () => { if (game.state !== "shop") cv.focus({ preventScroll: true }); }));
+
+    /* ───────── the shop: open while landed (anywhere, and free, in playtest) ───────── */
+    function openShop() {
+      if (!game.dockedAt && !PLAYTEST) { toast("Land at a station to use the shop.", "#ffc46b"); return; }
+      releaseAll(); game.mapOpen = false;
+      game.state = "shop";
+      $("#shop-note").textContent = "";
+      renderShop();
+      $("#shop").hidden = false;
+      $("#btn-shop-close").focus({ preventScroll: true });
+    }
+    function closeShop() { $("#shop").hidden = true; saveGame(); play(); }
+
+    const priceTag = (price, owned) => (owned ? '<span class="pr own">Owned</span>'
+      : PLAYTEST ? '<span class="pr own">Free (playtest)</span>' : `<span class="pr">${price} cr</span>`);
+    const hullUnlocked = (def) => PLAYTEST || !def.needs || Object.entries(def.needs).every(([id, lv]) => (game.upgrades[id] || 0) >= lv);
+
+    function renderShop() {
+      $("#shop-credits").textContent = `${Math.floor(game.credits)} cr`;
+      $("#shop-where").textContent = PLAYTEST ? "Playtest: everything is free" : `Outfitter · ${game.dockedAt ? game.dockedAt.name : ""}`;
+      document.querySelectorAll("#shop .playtest-only").forEach((el) => { el.hidden = !PLAYTEST; });
+      $("#shop-custom").value = game.look.paint;
+      $("#shop-custom-panels").value = game.look.panels;
+
+      $("#shop-upgrades").innerHTML = UPGRADES.map((u) => {
+        const lv = game.upgrades[u.id] || 0, max = u.values.length - 1, done = lv >= max;
+        const price = done ? 0 : u.prices[lv];
+        const can = done ? false : PLAYTEST || game.credits >= price;
+        const label = done ? "Maxed out" : PLAYTEST ? `Buy (free)` : `Buy · ${price} cr`;
+        return `<div class="upgrade">
+          <div>
+            <h3>${u.name} ${lv ? "· level " + ["I", "II", "III", "IV"][lv - 1] : ""}</h3>
+            <p>${u.about}</p>
+            <p class="now">${u.show(u.values[lv])}${done ? "" : ` → ${u.show(u.values[lv + 1])}`}</p>
+            <div class="pips" aria-label="level ${lv} of ${max}">${u.values.slice(1).map((_, i) => `<i class="${i < lv ? "on" : ""}"></i>`).join("")}</div>
+          </div>
+          <button type="button" class="buy" data-buy="${u.id}" ${can ? "" : "disabled"}>${label}</button>
+        </div>`;
+      }).join("");
+
+      const L = game.look;
+      $("#shop-hulls").innerHTML = CATALOG.hulls.filter((d) => art.hulls.has(d.id)).map((d) => {
+        const open = hullUnlocked(d), need = d.needs ? UPGRADES.find((u) => u.id === Object.keys(d.needs)[0]) : null;
+        const tag = open ? '<span class="pr own">' + (L.hull === d.id ? "Flying" : "Available") + "</span>"
+          : `<span class="pr own">Needs ${need ? need.name : "an upgrade"} I</span>`;
+        return `<button type="button" class="item${open ? "" : " locked"}" data-kind="hull" data-id="${d.id}" aria-pressed="${L.hull === d.id}">
+          <canvas class="sw wide" width="64" height="40" data-sw="hull:${d.id}"></canvas><span>${d.name}</span>${tag}</button>`;
+      }).join("");
+      // the same colours for the body and the panels; buying one unlocks it for both
+      const paintItems = (slot) => CATALOG.paints.map((p) => {
+        const owned = p.price === 0 || game.owned.paints.has(p.id);
+        return `<button type="button" class="item" data-kind="paint" data-slot="${slot}" data-id="${p.id}" aria-pressed="${L[slot].toLowerCase() === p.hex}">
+          <span class="sw" style="background:${p.hex}"></span><span>${p.name}</span>${priceTag(p.price, owned)}</button>`;
+      }).join("");
+      $("#shop-paints").innerHTML = paintItems("paint");
+      $("#shop-panels").innerHTML = paintItems("panels");
+      const lookItems = (kind, list, current) =>
+        `<button type="button" class="item" data-kind="${kind}" data-id="" aria-pressed="${!current}"><span class="sw"></span><span>None</span><span class="pr own">&nbsp;</span></button>` +
+        list.filter((d) => art[kind + "s"].has(d.id)).map((d) => {
+          const owned = !d.price || game.owned[kind + "s"].has(d.id);
+          return `<button type="button" class="item" data-kind="${kind}" data-id="${d.id}" aria-pressed="${current === d.id}">
+            <canvas class="sw" width="40" height="40" data-sw="${kind}:${d.id}"></canvas><span>${d.name}</span>${priceTag(d.price, owned)}</button>`;
+        }).join("");
+      $("#shop-patterns").innerHTML = lookItems("pattern", CATALOG.patterns, L.pattern);
+      $("#shop-stickers").innerHTML = lookItems("sticker", CATALOG.stickers, L.sticker);
+      drawSwatches(performance.now());
+    }
+
+    // the little pictures on the model / pattern / sticker buttons
+    function drawSwatches(now) {
+      document.querySelectorAll("#shop canvas.sw").forEach((c) => {
+        const [kind, id] = c.dataset.sw.split(":"), g = c.getContext("2d");
+        g.clearRect(0, 0, c.width, c.height);
+        g.imageSmoothingEnabled = false;
+        if (kind === "hull") {
+          const h = art.hulls.get(id);
+          if (h) drawShipAt(g, Object.assign({}, game.look, { hull: id }), false, 0, now, c.width / 2, c.height / 2 + 2, 0, Math.max(1, Math.floor(64 / h.size)));
+        } else if (kind === "pattern") {
+          const p = art.patterns.get(id);
+          if (!p) return;
+          // the pattern as it would look in your current paint
+          const s = p.anim.frameSize, px = framePixels(p.anim, p.anim.frameAt(now)), tint = hexRgb(game.look.paint);
+          const tile = g.createImageData(s, s);
+          for (let i = 0; i < s * s * 4; i += 4) {
+            for (let ch = 0; ch < 3; ch++) tile.data[i + ch] = Math.min(255, Math.round(tint[ch] * px[i + ch] / HULL_GREY[ch]));
+            tile.data[i + 3] = px[i + 3];
+          }
+          const t = document.createElement("canvas"); t.width = t.height = s; t.getContext("2d").putImageData(tile, 0, 0);
+          const k = Math.max(1, Math.floor(40 / s));
+          for (let y = 0; y < 40; y += s * k) for (let x = 0; x < 40; x += s * k) g.drawImage(t, x, y, s * k, s * k);
+        } else if (kind === "sticker") {
+          const st = art.stickers.get(id);
+          if (!st) return;
+          g.fillStyle = game.look.paint; g.fillRect(0, 0, 40, 40);
+          const s = st.anim.frameSize, k = Math.floor(40 / s);
+          st.anim.draw(g, st.anim.frameAt(now), (40 - s * k) / 2, (40 - s * k) / 2, s * k, s * k);
+        }
+      });
+    }
+
+    function buyUpgrade(id) {
+      const u = UPGRADES.find((x) => x.id === id), lv = game.upgrades[id] || 0;
+      if (!u || lv >= u.values.length - 1) return;
+      const price = u.prices[lv];
+      if (!PLAYTEST) {
+        if (game.credits < price) { $("#shop-note").textContent = `You need ${Math.ceil(price - game.credits)} more credits for that.`; return; }
+        game.credits -= price;
+      }
+      game.upgrades[id] = lv + 1;
+      let note = `${u.name} upgraded: ${u.show(u.values[lv + 1])}.`;
+      if (id === "eff" && lv === 0 && art.hulls.has("efficient")) { game.look.hull = "efficient"; note += " Your ship was refitted with the Efficient hull."; }
+      $("#shop-note").textContent = note;
+      renderShop(); saveGame();
+    }
+
+    function chooseLook(kind, id, slot = "paint") {
+      const note = (t) => { $("#shop-note").textContent = t; };
+      if (kind === "hull") {
+        const d = CATALOG.hulls.find((x) => x.id === id);
+        if (!d || !hullUnlocked(d)) { note("That model comes with the first Fuel efficiency upgrade."); return; }
+        game.look.hull = id;
+      } else if (kind === "paint") {
+        const p = CATALOG.paints.find((x) => x.id === id);
+        if (!p) return;
+        if (!(p.price === 0 || game.owned.paints.has(id) || PLAYTEST)) {
+          if (game.credits < p.price) { note(`${p.name} paint costs ${p.price} cr. You need ${Math.ceil(p.price - game.credits)} more.`); return; }
+          game.credits -= p.price; game.owned.paints.add(id); note(`Bought ${p.name} paint. You can use it on the body or the panels.`);
+        }
+        game.look[slot === "panels" ? "panels" : "paint"] = p.hex;
+      } else {
+        const list = kind === "pattern" ? CATALOG.patterns : CATALOG.stickers, owned = game.owned[kind + "s"];
+        const d = id ? list.find((x) => x.id === id) : null;
+        if (id && !d) return;
+        if (d && d.price && !owned.has(id) && !PLAYTEST) {
+          if (game.credits < d.price) { note(`${d.name} costs ${d.price} cr. You need ${Math.ceil(d.price - game.credits)} more.`); return; }
+          game.credits -= d.price; owned.add(id); note(`Bought ${d.name}.`);
+        }
+        game.look[kind] = d ? id : null;
+      }
+      renderShop(); saveGame();
+    }
+
+    $("#shop").addEventListener("click", (e) => {
+      const tab = e.target.closest("[data-tab]");
+      if (tab) {
+        document.querySelectorAll("#shop [data-tab]").forEach((t) => t.setAttribute("aria-selected", String(t === tab)));
+        document.querySelectorAll("#shop [data-panel]").forEach((p) => { p.hidden = p.dataset.panel !== tab.dataset.tab; });
+        return;
+      }
+      const buy = e.target.closest("[data-buy]");
+      if (buy) { buyUpgrade(buy.dataset.buy); return; }
+      const item = e.target.closest(".item");
+      if (item) chooseLook(item.dataset.kind, item.dataset.id, item.dataset.slot);
+    });
+    for (const input of [$("#shop-custom"), $("#shop-custom-panels")]) {
+      input.addEventListener("input", (e) => { game.look[e.target.dataset.slot] = e.target.value; renderShop(); });
+      input.addEventListener("change", saveGame);
+    }
+    $("#btn-shop-close").addEventListener("click", closeShop);
+
+    /* ───────── simulation ───────── */
+    const cam = { x: WORLD / 2, y: WORLD / 2 };
+
+    function burn(amount) {
+      const s = game.ship;
+      if (s.fuel <= 0) return;
+      s.fuel = Math.max(0, s.fuel - amount);
+      if (s.fuel === 0) toast("Out of fuel!", "#ff6b6b");
+    }
+
+    const jobsFor = (st) => game.jobs.filter((j) => j.to === st.id);
+    const canTakeJob = () => game.jobs.length < mode().maxJobs;
+    const fuelPriceNote = () => (mode().fuelPrice ? ` (${mode().fuelPrice} cr a quarter tank)` : "");
+
+    function dock(st, quiet = false) {
+      const s = game.ship;
+      game.dockedAt = st; game.dockable = game.dockNear = null;
+      s.vx = 0; s.vy = 0; s.x = st.x; s.y = st.y;
+      if (quiet) return;
+      if (st.kind === "fuel") { toast(`Landed at ${st.name}. Hold R to refuel${fuelPriceNote()}.`, "#ffc46b"); return; }
+      const topUp = reserveLeft(st) >= 1 && s.fuel < stats().tank ? " Hold R to top up from its fuel reserve." : "";
+      if (jobsFor(st).length) { startTransfer("deliver"); if (topUp) toast(topUp.trim(), "#ffc46b"); return; }
+      toast(`Landed at ${st.name}.` + (canTakeJob() && st.hasData ? " It has a bounty: press E." : "") + topUp);
+    }
+
+    /* bounties: pay grows with the distance and the size of the packet */
+    function bountyPay(from, to, kb) {
+      return Math.round((35 + dist(from, to) * 1.1 + kb / 40) / 5) * 5;
+    }
+    // what a data station is offering, made up the first time you look and kept until it's taken
+    function offerAt(st) {
+      if (!st.hasData) return null;
+      if (!st.offer) {
+        const dest = pickDestination(st);
+        const kb = 64 * (4 + Math.floor(Math.random() * 29));
+        st.offer = { from: st.id, to: dest.id, kb, pay: bountyPay(st, dest, kb) };
+      }
+      return st.offer;
+    }
+    function undock() {
+      if (game.transfer) { toast("Transfer cancelled: you left the station.", "#ffc46b"); game.transfer = null; }
+      game.dockedAt = null;
+    }
+    function startTransfer(kind) { game.transfer = { kind, t: 0, station: game.dockedAt }; }
+
+    function pickDestination(from) {
+      const others = world.datas.filter((d) => d !== from);
+      const band = others.filter((d) => { const r = dist(d, from); return r >= 45 && r <= 170; });
+      const pool = band.length ? band : others;
+      return pool[Math.floor(Math.random() * pool.length)];
+    }
+
+    function finishTransfer() {
+      const { kind, station: st } = game.transfer;
+      game.transfer = null;
+      if (kind === "collect") {
+        const offer = offerAt(st);
+        if (!offer) return;
+        const dest = world.stations[offer.to];
+        game.jobs.push({ ...offer });
+        st.hasData = false; st.offer = null;
+        st.regenAt = game.t + T.REGEN[0] + Math.random() * (T.REGEN[1] - T.REGEN[0]);
+        toast(`Bounty accepted: deliver ${fmtKb(offer.kb)} to ${dest.name} in sector ${sectorName(sectorOf(dest))} for ${offer.pay} cr.`, "#7ee787");
+      } else {
+        const done = jobsFor(st);
+        if (!done.length) return;
+        game.jobs = game.jobs.filter((j) => !done.includes(j));
+        const pay = done.reduce((a, j) => a + j.pay, 0), kb = done.reduce((a, j) => a + j.kb, 0);
+        game.credits += pay;
+        game.stats.deliveries += done.length;
+        game.stats.kb += kb;
+        if (!st.hasData && Math.random() < 0.5) { st.hasData = true; st.regenAt = 0; st.offer = null; }
+        toast(`+${pay} cr. Delivered ${fmtKb(kb)} to ${st.name}!` + (st.hasData && canTakeJob() ? " It has a bounty too: press E." : ""), "#7ee787");
+        saveGame();
+      }
+    }
+
+    function use() {
+      const st = game.dockedAt;
+      if (!st) {
+        // landing is up to you: get close and slow, then press E
+        if (game.dockable) dock(game.dockable);
+        else if (game.dockNear) toast(`Too fast to land at ${game.dockNear.name}. Brake first.`, "#ffc46b");
+        else toast("Fly slowly up to a station, then press E to land.");
+        return;
+      }
+      if (st.kind === "fuel") { toast(game.ship.fuel >= stats().tank ? "Tank full. Thrust to launch, or U for the shop." : "Hold R to refuel.", "#ffc46b"); return; }
+      if (game.transfer) return;
+      if (jobsFor(st).length) { startTransfer("deliver"); return; }
+      if (st.hasData && canTakeJob()) { startTransfer("collect"); return; }
+      if (st.hasData) {
+        const d = world.stations[game.jobs[0].to];
+        toast(`Deliver your data for ${d.name} in sector ${sectorName(sectorOf(d))} first.`);
+        return;
+      }
+      toast("No outgoing data here. Look for a green light.");
+    }
+
+    function tow() {
+      const s = game.ship, m = mode();
+      if (m.towFee === null || s.fuel > 0) return;
+      if (game.dockedAt && game.dockedAt.kind === "fuel") return;
+      let bestSt = null, bd = Infinity;
+      for (const f of world.fuels) { const d = dist(f, s); if (d < bd) { bd = d; bestSt = f; } }
+      if (!bestSt) return;
+      if (!m.towKeepsCargo) {
+        if (game.jobs.length) toast(`Your cargo was lost in the tow.`, "#ff6b6b");
+        game.jobs = [];
+      }
+      game.transfer = null;
+      game.stats.tows++;
+      const fee = Math.min(game.credits, m.towFee);
+      game.credits -= fee;
+      game.dockedAt = null;
+      dock(bestSt, true);
+      cam.x = bestSt.x; cam.y = bestSt.y;
+      toast(`Towed ${Math.round(bd)} bits to ${bestSt.name}${fee ? ` for ${Math.round(fee)} cr` : " for free"}. Hold R to refuel.`, "#ffc46b");
+      discover();
+    }
+
+    function discover() {
+      const s = game.ship;
+      for (const st of world.stations) {
+        if (game.discovered.has(st.id)) continue;
+        if (dist(st, s) <= T.RADAR) {
+          game.discovered.add(st.id);
+          if (jobsFor(st).length) toast(`Found ${st.name}! Follow the green marker.`, "#7ee787");
+        }
+      }
+    }
+
+    function update(dt) {
+      game.t += dt;
+      const s = game.ship, ship = stats(), m = mode();
+      s.thrusting = false; s.braking = false; s.refueling = false; s.broke = false;
+
+      // turning works while landed so you can aim before launching (and costs fuel on challenge)
+      const turn = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+      if (turn && (!m.steerBurn || s.fuel > 0)) {
+        s.a += turn * T.TURN * dt;
+        if (m.steerBurn) burn(m.steerBurn * ship.burn * dt);
+      }
+      if (s.a > Math.PI) s.a -= TAU; else if (s.a < -Math.PI) s.a += TAU;
+
+      if (game.dockedAt) {
+        if (keys.thrust && s.fuel > 0) undock();
+        else {
+          const st = game.dockedAt;
+          s.x = st.x; s.y = st.y; s.vx = 0; s.vy = 0;
+          // refuel only while R is held: a depot, or (with the upgrade) a data station's small reserve
+          if (keys.fuel && s.fuel < ship.tank) {
+            let take = Math.min(ship.tank - s.fuel, st.kind === "fuel" ? T.REFUEL * dt : Math.min(T.DC_REFUEL * dt, reserveLeft(st)));
+            if (m.fuelPrice && take > 0) {
+              const perFuel = m.fuelPrice / (ship.tank * 0.25);
+              take = Math.min(take, game.credits / perFuel);
+              game.credits = Math.max(0, game.credits - take * perFuel);
+              if (take <= 1e-6) s.broke = true;
+            }
+            if (take > 1e-6) {
+              s.fuel += take;
+              if (st.kind === "data") st.drawn = (st.drawn || 0) + take;
+              s.refueling = true;
+            }
+          }
+          if (game.transfer) { game.transfer.t += dt; if (game.transfer.t >= T.TRANSFER) finishTransfer(); }
+        }
+      }
+
+      if (!game.dockedAt) {
+        if (keys.thrust && s.fuel > 0) {
+          s.vx += Math.sin(s.a) * ship.thrust * dt;
+          s.vy -= Math.cos(s.a) * ship.thrust * dt;
+          burn(T.BURN_THRUST * ship.burn * dt);
+          s.thrusting = true;
+        }
+        let sp = Math.hypot(s.vx, s.vy);
+        if (keys.brake && s.fuel > 0 && sp > 0.02) {
+          const k = Math.max(0, sp - ship.brake * dt) / sp;
+          s.vx *= k; s.vy *= k;
+          burn(T.BURN_BRAKE * ship.burn * ship.brakeBurn * dt);
+          s.braking = true;
+          if (Math.random() < 0.6) puff(s, sp);
+        }
+        // speed entropy: nothing coasts forever. Speed bleeds away (faster when you're going fast)
+        // until you come to a stop, so staying quick means working the thruster.
+        sp = Math.hypot(s.vx, s.vy);
+        if (sp > 0) {
+          const k = Math.max(0, sp - (T.FRICTION + T.DRAG * sp) * dt) / sp;
+          s.vx *= k; s.vy *= k;
+        }
+        sp = Math.hypot(s.vx, s.vy);
+        if (sp > ship.maxSpeed) { s.vx *= ship.maxSpeed / sp; s.vy *= ship.maxSpeed / sp; }
+
+        // past the edge of charted space, a current drifts you back in
+        const pull = 2.5;
+        if (s.x < 0) s.vx += -s.x * pull * dt; else if (s.x > WORLD) s.vx -= (s.x - WORLD) * pull * dt;
+        if (s.y < 0) s.vy += -s.y * pull * dt; else if (s.y > WORLD) s.vy -= (s.y - WORLD) * pull * dt;
+
+        s.x += s.vx * dt;
+        s.y += s.vy * dt;
+
+        // the station you could land on with E: the nearest one in range, if you're slow enough
+        sp = Math.hypot(s.vx, s.vy);
+        game.dockNear = null;
+        let nd = T.DOCK_RANGE;
+        for (const st of world.stations) { const d = dist(st, s); if (d <= nd) { nd = d; game.dockNear = st; } }
+        game.dockable = game.dockNear && sp <= T.DOCK_SPEED ? game.dockNear : null;
+      }
+
+      game.stranded = s.fuel <= 0 && !(game.dockedAt && (game.dockedAt.kind === "fuel" || reserveLeft(game.dockedAt) >= 0.5));
+
+      // challenge: no tows, so being dry with no way to get fuel ends the run
+      if (m.fuelOutEnds && s.fuel <= 0 && !game.transfer && game.slot !== null) {
+        const st = game.dockedAt;
+        const canFill = st && (st.kind === "fuel" || reserveLeft(st) >= 0.5) && (!m.fuelPrice || game.credits >= 0.01);
+        const stopped = !st && Math.hypot(s.vx, s.vy) < 0.05 && !game.dockable;
+        if ((st && !canFill && !jobsFor(st).length) || stopped) {
+          gameOver(st ? `You're out of fuel at ${st.name} with no way to buy more.` : "You're out of fuel, adrift in empty space.");
+          return;
+        }
+      }
+
+      const sec = sectorIndex(s.x, s.y);
+      if (sec !== game.lastSector) {
+        if (game.lastSector !== -1 && s.x >= 0 && s.y >= 0 && s.x < WORLD && s.y < WORLD) toast(`Entering sector ${sectorName(sec)}`, "#8ab4ff");
+        game.lastSector = sec;
+      }
+      game.visited.add(sec);
+      discover();
+      for (const d of world.datas) {
+        if (!d.hasData && d.regenAt <= game.t) { d.hasData = true; d.regenAt = 0; d.offer = null; }
+        // reserves refill slowly, but only once you've left (so an empty one stays empty while you sit there)
+        if (d.drawn > 0 && game.dockedAt !== d) d.drawn = Math.max(0, d.drawn - T.DC_REGEN * dt);
+      }
+
+      for (const p of game.particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.age += dt; }
+      game.particles = game.particles.filter((p) => p.age < p.life);
+
+      autosave += dt;
+      if (autosave > 4) { autosave = 0; saveGame(); }
+    }
+    let autosave = 0;
+
+    function puff(s, sp) {
+      // stabilizer jets fire forward along the direction of travel
+      const ux = s.vx / sp, uy = s.vy / sp, side = Math.random() < 0.5 ? -1 : 1;
+      game.particles.push({
+        x: s.x + ux * 0.45 - uy * 0.35 * side, y: s.y + uy * 0.45 + ux * 0.35 * side,
+        vx: s.vx + ux * 3 + (Math.random() - 0.5), vy: s.vy + uy * 3 + (Math.random() - 0.5),
+        age: 0, life: 0.35 + Math.random() * 0.2,
+      });
+    }
+
+    /* ───────── drawing ───────── */
+    const ctx = cv.getContext("2d");
+    let W = 0, H = 0, DPR = 1, zoom = 1, ui = 1;
+    function resize() {
+      DPR = Math.min(2, window.devicePixelRatio || 1);
+      W = cv.clientWidth; H = cv.clientHeight;
+      cv.width = Math.max(1, Math.round(W * DPR));
+      cv.height = Math.max(1, Math.round(H * DPR));
+      zoom = clamp(Math.min(W, H * 1.6) / 900, 0.62, 1.25);
+      ui = clamp(Math.min(W, H * 1.5) / 760, 0.8, 1.2);
+    }
+    addEventListener("resize", resize);
+
+    const S = () => T.BIT * zoom;                                  // screen px per bit
+    const toScreen = (x, y) => [(x - cam.x) * S() + W / 2, (y - cam.y) * S() + H / 2];
+    const font = (px, weight = 400) => `${weight} ${Math.round(px * ui)}px ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace`;
+    const fmtKb = (kb) => (kb >= 1024 ? (kb / 1024).toFixed(kb >= 10240 ? 0 : 1) + " MB" : kb + " kB");
+    const blink = (now, hz = 2) => Math.floor(now / (500 / hz)) % 2 === 0;
+    const isTouch = () => !touchEl.hidden;
+    const cornerEl = $(".corner");
+
+    /* Where the HUD pieces go. On touch screens the bottom belongs to the buttons, so the cargo
+       card moves up under the status panel and the radar sits just above the buttons. `safe` is
+       the area the navigation arrows stay inside. */
+    function hudLayout() {
+      const pad = 12 * ui, touch = isTouch();
+      const panelW = 248 * ui, panelH = 132 * ui;
+      // on narrow screens the corner buttons don't fit beside the status panel, so it moves below them
+      const corner = cornerEl.getBoundingClientRect();
+      const panelY = corner.left < pad + panelW + 6 ? corner.bottom + 8 : pad;
+      const cardW = Math.min(360 * ui, W - pad * 2), cardH = 52 * ui;
+      const touchH = touch ? touchEl.getBoundingClientRect().height : 0;
+      const R = (touch ? 54 : 70) * ui;
+      // the cargo card goes under the status panel when the bottom is taken (touch buttons) or too
+      // narrow to hold it beside the radar
+      const stacked = touch || cardW + 2 * R + pad * 3 > W;
+      const card = stacked ? { x: pad, y: panelY + panelH + 8 * ui } : { x: pad, y: H - cardH - pad };
+      const radar = { x: W - R - pad, y: touch ? H - touchH - R - 22 * ui : H - R - pad, r: R };
+      // messages get their own slot at the top; the arrows start below it
+      const toastY = stacked ? card.y + cardH + 22 * ui : Math.max(58 * ui, panelY > pad ? panelY + panelH + 22 * ui : 0);
+      const bottom = touch ? H - touchH - 16 * ui : stacked ? H - 2 * R - pad * 2 : H - 88 * ui;
+      let top = Math.min(toastY + 72 * ui, H * 0.4);
+      if (bottom - top < 80 * ui) top = Math.max(40 * ui, bottom - 80 * ui);   // short screens: let them overlap instead
+      const side = (touch ? 40 : 44) * ui;
+      return { pad, touch, panelW, panelH, panelY, cardW, cardH, card, radar, toastY, safe: { top, bottom, left: side, right: W - side } };
+    }
+
+    function panel(x, y, w, h, r = 10 * ui) {
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+      else ctx.rect(x, y, w, h);
+      ctx.fillStyle = "rgba(9, 13, 24, .82)";
+      ctx.fill();
+      ctx.strokeStyle = "#26314d";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    const TINTS = ["#1c2f7a", "#3c1f7a", "#1a5b73", "#62204f", "#1d6b44", "#6b4a1d", "#28306b"];
+    function drawBackground(now) {
+      ctx.fillStyle = "#03050b";
+      ctx.fillRect(0, 0, W, H);
+
+      // each sector has its own faint nebula colour, so you can tell them apart
+      const sb = S(), halfW = W / 2 / sb, halfH = H / 2 / sb;
+      const sx0 = Math.floor((cam.x - halfW) / T.SECTOR) - 1, sx1 = Math.floor((cam.x + halfW) / T.SECTOR) + 1;
+      const sy0 = Math.floor((cam.y - halfH) / T.SECTOR) - 1, sy1 = Math.floor((cam.y + halfH) / T.SECTOR) + 1;
+      ctx.globalAlpha = 0.22;
+      for (let sy = sy0; sy <= sy1; sy++) for (let sx = sx0; sx <= sx1; sx++) {
+        if (sx < 0 || sy < 0 || sx >= T.SECTORS || sy >= T.SECTORS) continue;
+        const [cx, cy] = toScreen((sx + 0.5) * T.SECTOR, (sy + 0.5) * T.SECTOR);
+        const r = T.SECTOR * 0.75 * sb;
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+        g.addColorStop(0, TINTS[hash3(sx, sy, 7) % TINTS.length]);
+        g.addColorStop(1, "rgba(3,5,11,0)");
+        ctx.fillStyle = g;
+        ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+      }
+      ctx.globalAlpha = 1;
+
+      // three layers of stars; the far ones barely move
+      const CH = 256;
+      [[0.12, 7, 1], [0.3, 6, 1.4], [0.6, 4, 2]].forEach(([f, n, size], layer) => {
+        const ox = cam.x * sb * f, oy = cam.y * sb * f;
+        const cx0 = Math.floor((ox - W / 2) / CH), cx1 = Math.floor((ox + W / 2) / CH);
+        const cy0 = Math.floor((oy - H / 2) / CH), cy1 = Math.floor((oy + H / 2) / CH);
+        for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) {
+          const rnd = mulberry32(hash3(cx, cy, layer + 11));
+          for (let i = 0; i < n; i++) {
+            const x = cx * CH + rnd() * CH - ox + W / 2, y = cy * CH + rnd() * CH - oy + H / 2;
+            const tw = rnd();
+            ctx.globalAlpha = 0.35 + 0.65 * tw;
+            ctx.fillStyle = tw > 0.85 ? "#cfe0ff" : "#ffffff";
+            ctx.fillRect(Math.round(x), Math.round(y), size, size);
+          }
+        }
+      });
+      ctx.globalAlpha = 1;
+
+      // sector lines and names
+      ctx.strokeStyle = "rgba(138,180,255,.09)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let sx = Math.max(0, sx0 + 1); sx <= Math.min(T.SECTORS, sx1); sx++) {
+        const [x] = toScreen(sx * T.SECTOR, 0);
+        const [, ya] = toScreen(0, 0), [, yb] = toScreen(0, WORLD);
+        ctx.moveTo(Math.round(x) + 0.5, ya); ctx.lineTo(Math.round(x) + 0.5, yb);
+      }
+      for (let sy = Math.max(0, sy0 + 1); sy <= Math.min(T.SECTORS, sy1); sy++) {
+        const [, y] = toScreen(0, sy * T.SECTOR);
+        const [xa] = toScreen(0, 0), [xb] = toScreen(WORLD, 0);
+        ctx.moveTo(xa, Math.round(y) + 0.5); ctx.lineTo(xb, Math.round(y) + 0.5);
+      }
+      ctx.stroke();
+      ctx.font = font(34, 700);
+      ctx.fillStyle = "rgba(138,180,255,.08)";
+      ctx.textAlign = "left"; ctx.textBaseline = "top";
+      for (let sy = Math.max(0, sy0); sy <= Math.min(T.SECTORS - 1, sy1); sy++) for (let sx = Math.max(0, sx0); sx <= Math.min(T.SECTORS - 1, sx1); sx++) {
+        const [x, y] = toScreen(sx * T.SECTOR + 1.2, sy * T.SECTOR + 1.2);
+        ctx.fillText(sectorName(sy * T.SECTORS + sx), x, y);
+      }
+
+      // the edge of charted space
+      const [ex0, ey0] = toScreen(0, 0), [ex1, ey1] = toScreen(WORLD, WORLD);
+      ctx.save();
+      ctx.setLineDash([10, 8]);
+      ctx.strokeStyle = "rgba(255,107,107,.35)";
+      ctx.strokeRect(ex0, ey0, ex1 - ex0, ey1 - ey0);
+      ctx.restore();
+    }
+
+    function drawStations(now) {
+      const sb = S(), k = 2 * zoom, margin = 32 * k;
+      const dests = new Set(game.jobs.map((j) => j.to));
+      ctx.imageSmoothingEnabled = false;
+      ctx.textAlign = "center"; ctx.textBaseline = "top";
+      for (const st of world.stations) {
+        const art = stationArt[st.kind];
+        if (!art) continue;
+        const [x, y] = toScreen(st.x, st.y);
+        if (x < -margin || y < -margin || x > W + margin || y > H + margin) continue;
+        const size = art.size * k;
+        const left = Math.round(x - size / 2), top = Math.round(y - size / 2);
+        const anim = st.kind === "data" && reserveLeft(st) >= 1 ? art.fuelAnim : art.anim;
+        // each station blinks on its own schedule
+        const frame = anim.frameAt(now + st.phase * 1000);
+        ctx.drawImage(stationImage(anim, frame, st.kind === "data" && !st.hasData), left, top, size, size);
+
+        const isDest = dests.has(st.id);
+        if (isDest && game.discovered.has(st.id)) {
+          const pulse = 0.5 + 0.5 * Math.sin(now / 250);
+          ctx.strokeStyle = `rgba(126,231,135,${0.45 + 0.4 * pulse})`;
+          ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(x, y, size * (0.62 + 0.08 * pulse), 0, TAU); ctx.stroke();
+        }
+        if (game.discovered.has(st.id)) {
+          ctx.font = font(11, isDest ? 700 : 400);
+          ctx.fillStyle = isDest ? "#7ee787" : st.kind === "fuel" ? "rgba(255,196,107,.8)" : "rgba(223,232,255,.7)";
+          ctx.fillText(st.name, x, top + size + 2);
+        }
+      }
+
+      // landing ring around the nearest station while you're approaching it
+      const s = game.ship;
+      if (!game.dockedAt) {
+        let near = null, nd = Infinity;
+        for (const st of world.stations) { const d = dist(st, s); if (d < nd) { nd = d; near = st; } }
+        if (near && nd < 5) {
+          const sp = Math.hypot(s.vx, s.vy), ok = sp <= T.DOCK_SPEED;
+          const [x, y] = toScreen(near.x, near.y);
+          ctx.save();
+          ctx.setLineDash([6, 6]);
+          ctx.lineDashOffset = -now / 60;
+          ctx.strokeStyle = ok ? "rgba(126,231,135,.8)" : "rgba(255,196,107,.8)";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.arc(x, y, T.DOCK_RANGE * sb, 0, TAU); ctx.stroke();
+          ctx.restore();
+        }
+      }
+    }
+
+    let thrustStarted = 0;
+    function drawShip(now) {
+      const s = game.ship;
+      ctx.fillStyle = "rgba(190,200,220,.8)";
+      for (const p of game.particles) {
+        const [x, y] = toScreen(p.x, p.y);
+        const a = 1 - p.age / p.life, r = (2 + 3 * (1 - a)) * zoom;
+        ctx.globalAlpha = a * 0.8;
+        ctx.fillRect(x - r / 2, y - r / 2, r, r);
+      }
+      ctx.globalAlpha = 1;
+      if (s.thrusting && !thrustStarted) thrustStarted = now;
+      if (!s.thrusting) thrustStarted = 0;
+      const [x, y] = toScreen(s.x, s.y);
+      drawShipAt(ctx, game.look, s.thrusting, now - thrustStarted, now, Math.round(x), Math.round(y), s.a, T.SAT_SCALE * zoom);
+    }
+
+    /* an arrow at the edge of the screen pointing at something, or brackets around it if it's on screen */
+    function marker(wx, wy, color, label, now, L) {
+      const [sx, sy] = toScreen(wx, wy);
+      const b = L.safe;   // stay clear of the HUD panels and the touch buttons
+      ctx.fillStyle = color; ctx.strokeStyle = color;
+      ctx.font = font(11, 700);
+      if (sx > b.left && sx < b.right && sy > b.top && sy < b.bottom) {
+        const r = 30 * zoom + 4 * Math.sin(now / 200), c = 9 * ui;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (const [dx, dy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+          const cx = sx + dx * r, cy = sy + dy * r;
+          ctx.moveTo(cx, cy - dy * c); ctx.lineTo(cx, cy); ctx.lineTo(cx - dx * c, cy);
+        }
+        ctx.stroke();
+        ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+        ctx.fillText(label, sx, sy - r - 4);
+        return;
+      }
+      // from the middle of the screen toward the target, stopping at the edge of the safe area
+      const cx = W / 2, cy = clamp(H / 2, b.top + 1, b.bottom - 1), dx = sx - cx, dy = sy - cy;
+      const f = Math.min((dx > 0 ? b.right - cx : cx - b.left) / Math.abs(dx || 1e-6),
+                         (dy > 0 ? b.bottom - cy : cy - b.top) / Math.abs(dy || 1e-6));
+      const ax = cx + dx * f, ay = cy + dy * f, ang = Math.atan2(dy, dx);
+      ctx.save();
+      ctx.translate(ax, ay);
+      ctx.rotate(ang);
+      const a = 13 * ui;
+      ctx.beginPath(); ctx.moveTo(a, 0); ctx.lineTo(-a * 0.7, -a * 0.75); ctx.lineTo(-a * 0.35, 0); ctx.lineTo(-a * 0.7, a * 0.75); ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+      // the label sits on the screen side of the arrow
+      const lx = ax - Math.cos(ang) * 24 * ui, ly = ay - Math.sin(ang) * 20 * ui;
+      ctx.textAlign = Math.cos(ang) > 0.35 ? "right" : Math.cos(ang) < -0.35 ? "left" : "center";
+      ctx.textBaseline = "middle";
+      ctx.lineWidth = 3; ctx.strokeStyle = "rgba(3,5,11,.9)";
+      ctx.strokeText(label, lx, ly);
+      ctx.fillText(label, lx, ly);
+    }
+
+    // the nearest place to get fuel: a depot, or (with the refuel upgrade) a data station with some
+    // fuel left in its reserve
+    function nearestFuel() {
+      let st = null, d = Infinity;
+      const places = stats().dcFuel ? world.stations.filter((x) => x.kind === "fuel" || reserveLeft(x) >= 5) : world.fuels;
+      for (const f of places) { const r = dist(f, game.ship); if (r < d) { d = r; st = f; } }
+      return { st, d };
+    }
+
+    const jobsByDistance = () => game.jobs.slice().sort((a, b) => dist(world.stations[a.to], game.ship) - dist(world.stations[b.to], game.ship));
+
+    function drawHud(now) {
+      const L = hudLayout(), pad = L.pad;
+      const s = game.ship;
+      const sp = Math.hypot(s.vx, s.vy);
+      const sec = sectorIndex(s.x, s.y);
+      const tank = stats().tank;
+      const low = s.fuel < T.FUEL_LOW * tank && !(game.dockedAt && (game.dockedAt.kind === "fuel" || reserveLeft(game.dockedAt) >= 1));
+      const nf = low ? nearestFuel() : null;
+
+      // status panel
+      const pw = L.panelW, ph = L.panelH;
+      panel(pad, L.panelY, pw, ph);
+      ctx.textAlign = "left"; ctx.textBaseline = "top";
+      let y = L.panelY + 10 * ui;
+      const x = pad + 12 * ui, lineH = 20 * ui;
+      ctx.font = font(11, 700);
+      ctx.fillStyle = "#8d9ab8";
+      ctx.fillText("FUEL", x, y);
+      const bx = x + 58 * ui, bw = pw - 58 * ui - 24 * ui - 40 * ui, bh = 10 * ui, pct = clamp(s.fuel / tank, 0, 1);
+      ctx.fillStyle = "#141a2b"; ctx.fillRect(bx, y + 1, bw, bh);
+      const fuelCol = pct < T.FUEL_LOW ? (blink(now, 2) ? "#ff6b6b" : "#8a2f2f") : pct < 0.6 ? "#ffc46b" : "#7ee787";
+      ctx.fillStyle = fuelCol; ctx.fillRect(bx, y + 1, bw * pct, bh);
+      ctx.fillStyle = "#dfe8ff"; ctx.textAlign = "right";
+      ctx.fillText(Math.ceil(pct * 100) + "%", pad + pw - 12 * ui, y);
+      ctx.textAlign = "left";
+      y += lineH;
+      ctx.fillStyle = "#8d9ab8"; ctx.fillText("SPEED", x, y);
+      ctx.fillStyle = "#dfe8ff"; ctx.fillText(`${sp.toFixed(1)} bits/s`, bx, y);
+      y += lineH;
+      ctx.fillStyle = "#8d9ab8"; ctx.fillText("SECTOR", x, y);
+      ctx.fillStyle = "#dfe8ff"; ctx.fillText(`${sectorName(sec)}   ${Math.round(s.x)}, ${Math.round(s.y)}`, bx, y);
+      y += lineH;
+      ctx.fillStyle = "#8d9ab8"; ctx.fillText("CREDITS", x, y);
+      ctx.fillStyle = "#ffc46b"; ctx.fillText(`${Math.floor(game.credits)} cr`, bx, y);
+      y += lineH;
+      ctx.fillStyle = "#8d9ab8"; ctx.fillText("RUNS", x, y);
+      ctx.fillStyle = "#dfe8ff"; ctx.fillText(`${game.stats.deliveries} · ${fmtKb(game.stats.kb)}`, bx, y);
+      ctx.fillStyle = "#6b7794"; ctx.textAlign = "right";
+      ctx.fillText(mode().name.toUpperCase(), pad + pw - 12 * ui, y);
+      ctx.textAlign = "left";
+
+      // cargo card: the nearest delivery (free play can carry several)
+      const cw = L.cardW, ch = L.cardH, cx = L.card.x, cy = L.card.y;
+      panel(cx, cy, cw, ch);
+      ctx.font = font(11, 700);
+      let l1, l2, c2 = "#c5cde0";
+      const jobs = jobsByDistance();
+      if (jobs.length) {
+        const job = jobs[0], dest = world.stations[job.to];
+        const ds = sectorOf(dest), more = jobs.length > 1 ? ` (+${jobs.length - 1} more)` : "";
+        l1 = `BOUNTY ${job.pay} cr · ${fmtKb(job.kb)} → ${dest.name} · SECTOR ${sectorName(ds)}${more}`;
+        if (game.discovered.has(dest.id)) { l2 = `Located, ${dist(dest, s).toFixed(1)} bits away. Land there to deliver.`; c2 = "#7ee787"; }
+        else if (sec === ds) { l2 = `You're in ${sectorName(ds)}. Search it: the station shows on radar within ${T.RADAR} bits.`; c2 = "#8ab4ff"; }
+        else l2 = `Head for sector ${sectorName(ds)} (M for the map).`;
+      } else {
+        l1 = "NO BOUNTY";
+        l2 = "Land at a data station with a green light to see what it pays.";
+      }
+      ctx.fillStyle = "#dfe8ff"; ctx.fillText(fit(l1, cw - 24 * ui), cx + 12 * ui, cy + 10 * ui);
+      ctx.font = font(11);
+      ctx.fillStyle = c2; ctx.fillText(fit(l2, cw - 24 * ui), cx + 12 * ui, cy + 28 * ui);
+
+      drawRadar(now, L);
+      drawCentreStatus(now, sp, low, nf);
+
+      // navigation markers go on top of the panels, so a panel never hides one
+      // (sector arrows only on free play and easy; easy also points to the station once you're in its sector)
+      const m = mode(), sectorsShown = new Set();
+      for (const job of jobs.slice(0, 5)) {
+        const dest = world.stations[job.to], ds = sectorOf(dest);
+        if (game.dockedAt === dest) continue;
+        const label = `${dest.name} · ${dist(dest, s).toFixed(1)} bits`;
+        if (game.discovered.has(dest.id)) marker(dest.x, dest.y, "#7ee787", label, now, L);
+        else if (sec === ds) { if (m.stationArrowInSector) marker(dest.x, dest.y, "#7ee787", label, now, L); }
+        else if (m.sectorArrow && !sectorsShown.has(ds)) {
+          sectorsShown.add(ds);
+          const c = sectorCentre(ds);
+          marker(c.x, c.y, "#8ab4ff", `SECTOR ${sectorName(ds)} · ${Math.round(dist(c, s))} bits`, now, L);
+        }
+      }
+      // the fuel finder: only when fuel is low, and only for a depot within FUEL_FINDER bits
+      if (low && nf.st && nf.d <= T.FUEL_FINDER) {
+        marker(nf.st.x, nf.st.y, "#ffc46b", `${nf.st.kind === "fuel" ? "FUEL" : "FUEL RESERVE"} · ${nf.d.toFixed(1)} bits`, now, L);
+      }
+
+      // messages last only a few seconds, so they draw over everything else
+      drawToasts(L);
+    }
+
+    function fit(text, maxW) {
+      if (ctx.measureText(text).width <= maxW) return text;
+      let t = text;
+      while (t.length > 4 && ctx.measureText(t + "…").width > maxW) t = t.slice(0, -1);
+      return t + "…";
+    }
+
+    function drawRadar(now, L) {
+      const s = game.ship, R = L.radar.r, cx = L.radar.x, cy = L.radar.y;
+      ctx.save();
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU);
+      ctx.fillStyle = "rgba(9,13,24,.85)"; ctx.fill();
+      ctx.strokeStyle = "#26314d"; ctx.lineWidth = 1; ctx.stroke();
+      ctx.clip();
+      ctx.strokeStyle = "rgba(138,180,255,.15)";
+      ctx.beginPath(); ctx.arc(cx, cy, R / 2, 0, TAU); ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy); ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R); ctx.stroke();
+      const sweep = (now / 1400) % TAU;
+      const g = ctx.createLinearGradient(cx, cy, cx + Math.cos(sweep) * R, cy + Math.sin(sweep) * R);
+      g.addColorStop(0, "rgba(138,180,255,.0)"); g.addColorStop(1, "rgba(138,180,255,.35)");
+      ctx.strokeStyle = g; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(sweep) * R, cy + Math.sin(sweep) * R); ctx.stroke();
+
+      const dests = new Set(game.jobs.map((j) => j.to));
+      for (const st of world.stations) {
+        const dx = st.x - s.x, dy = st.y - s.y;
+        if (dx * dx + dy * dy > T.RADAR * T.RADAR) continue;
+        const px = cx + (dx / T.RADAR) * R, py = cy + (dy / T.RADAR) * R;
+        if (st.kind === "fuel") { ctx.fillStyle = "#ffc46b"; ctx.fillRect(px - 3, py - 3, 6, 6); }
+        else {
+          ctx.fillStyle = st.hasData ? "#7ee787" : "#6fa8d8";
+          ctx.beginPath(); ctx.arc(px, py, 3, 0, TAU); ctx.fill();
+        }
+        if (dests.has(st.id)) {
+          ctx.strokeStyle = "#7ee787"; ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.arc(px, py, 6 + 2 * Math.sin(now / 200), 0, TAU); ctx.stroke();
+        }
+      }
+      // you, and which way you're pointing
+      ctx.fillStyle = "#dfe8ff";
+      ctx.translate(cx, cy); ctx.rotate(s.a);
+      ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(4, 5); ctx.lineTo(-4, 5); ctx.closePath(); ctx.fill();
+      ctx.restore();
+      ctx.font = font(10, 700); ctx.fillStyle = "#8d9ab8"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+      ctx.fillText(`RADAR ${T.RADAR} BITS`, cx, cy + R + 3 * ui > H - 12 ? cy - R - 14 * ui : cy + R + 3 * ui);
+    }
+
+    function drawCentreStatus(now, sp, low, nf) {
+      const s = game.ship;
+      let text = null, color = "#dfe8ff", progress = -1;
+      const st = game.dockedAt;
+      const tank = stats().tank, m = mode();
+      const refuelHint = () => (s.broke ? "Not enough credits for fuel" : `Hold R to refuel${fuelPriceNote()}`);
+      if (!st && game.dockable) {
+        text = `Press E to land at ${game.dockable.name}`; color = "#7ee787";
+      } else if (game.stranded) {
+        text = m.towFee === null ? "OUT OF FUEL: you're drifting. Press E to land if you reach a station."
+          : m.towFee === 0 ? `OUT OF FUEL: press T for a free tow${m.towKeepsCargo ? "" : " (you'll lose any cargo)"}`
+          : `OUT OF FUEL: press T to call a tow (${m.towFee} cr, and you'll lose any cargo)`;
+        color = blink(now, 1.5) ? "#ff6b6b" : "#ffb0b0";
+      } else if (st && game.transfer) {
+        text = `${game.transfer.kind === "collect" ? "DOWNLOADING" : "DELIVERING"} DATA`;
+        color = "#7ee787"; progress = game.transfer.t / T.TRANSFER;
+      } else if (st && st.kind === "fuel") {
+        if (s.refueling) { text = "REFUELING"; color = "#ffc46b"; progress = s.fuel / tank; }
+        else if (s.fuel < tank) { text = refuelHint(); color = s.broke ? "#ff6b6b" : "#ffc46b"; }
+        else text = "Tank full. Thrust (W) to launch, or U for the shop.";
+      } else if (st && st.kind === "data") {
+        const offer = canTakeJob() && offerAt(st);
+        const carrying = jobsByDistance();
+        if (offer) {
+          const dest = world.stations[offer.to];
+          text = `BOUNTY: ${fmtKb(offer.kb)} to ${dest.name} (sector ${sectorName(sectorOf(dest))}) pays ${offer.pay} cr. Press E to accept.`;
+          color = "#7ee787";
+        } else if (!carrying.length) text = "No bounty here right now. Thrust (W) to launch, or U for the shop.";
+        else if (st.hasData) text = `This station has a bounty, but deliver your data for ${world.stations[carrying[0].to].name} first.`;
+        else text = carrying.length > 1 ? `Carrying ${carrying.length} bounties. Thrust (W) to launch.`
+          : `Carrying data for ${world.stations[carrying[0].to].name}. Thrust (W) to launch.`;
+      } else if (low && nf && nf.d > T.FUEL_FINDER) {
+        text = `LOW FUEL: no ${stats().dcFuel ? "fuel" : "depot"} within ${T.FUEL_FINDER} bits`;
+        color = blink(now, 1) ? "#ff6b6b" : "#ffb0b0";
+      } else {
+        let nd = Infinity;
+        for (const x of world.stations) nd = Math.min(nd, dist(x, s));
+        if (nd < 5 && sp > T.DOCK_SPEED) { text = `Too fast to land (${sp.toFixed(1)} bits/s). Brake with S.`; color = "#ffc46b"; }
+        else if (s.x < 0 || s.y < 0 || s.x > WORLD || s.y > WORLD) { text = "Leaving charted space. Turn back."; color = "#ff6b6b"; }
+      }
+      // a second line for a data station's fuel reserve, so the bounty stays readable. The reserve
+      // only refills once you leave, so this can't flip back and forth while you sit there.
+      let sub = null;
+      if (st && st.kind === "data" && stats().dcFuel && s.fuel < tank && !game.transfer) {
+        const left = reserveLeft(st);
+        if (s.refueling) sub = `Refueling from the reserve: ${Math.floor(left)} fuel left here`;
+        else if (left < 0.5) sub = "This station's fuel reserve is empty (it refills after you leave)";
+        else if (s.broke) sub = "Not enough credits for fuel";
+        else sub = `Hold R to top up from the reserve (${Math.floor(left)} fuel here${m.fuelPrice ? `, ${m.fuelPrice} cr a quarter tank` : ""})`;
+      }
+      if (!text) return;
+      ctx.font = font(13, 700);
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      text = fit(text, W - 56 * ui);
+      const y = H / 2 + 70 * zoom + 18 * ui;
+      let w = ctx.measureText(text).width + 28 * ui;
+      if (sub) { ctx.font = font(11); sub = fit(sub, W - 56 * ui); w = Math.max(w, ctx.measureText(sub).width + 28 * ui); ctx.font = font(13, 700); }
+      const h = (progress >= 0 ? 44 : 30) * ui + (sub ? 18 * ui : 0);
+      panel(W / 2 - w / 2, y - 15 * ui, w, h, 8 * ui);
+      ctx.fillStyle = color; ctx.fillText(text, W / 2, y);
+      if (progress >= 0) {
+        const bw = w - 28 * ui;
+        ctx.fillStyle = "#141a2b"; ctx.fillRect(W / 2 - bw / 2, y + 12 * ui, bw, 6 * ui);
+        ctx.fillStyle = color; ctx.fillRect(W / 2 - bw / 2, y + 12 * ui, bw * clamp(progress, 0, 1), 6 * ui);
+      }
+      if (sub) {
+        ctx.font = font(11);
+        ctx.fillStyle = "#ffc46b";
+        ctx.fillText(sub, W / 2, y + (progress >= 0 ? 32 : 18) * ui);
+      }
+    }
+
+    function drawToasts(L) {
+      ctx.font = font(12, 700);
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      let y = L.toastY;
+      for (const t of game.toasts) {
+        const a = clamp(Math.min(t.age / 0.2, (4.5 - t.age) / 0.5), 0, 1);
+        if (a <= 0) continue;
+        ctx.globalAlpha = a;
+        const text = fit(t.text, W - 40 * ui);
+        const w = ctx.measureText(text).width + 24 * ui;
+        panel(W / 2 - w / 2, y - 13 * ui, w, 26 * ui, 7 * ui);
+        ctx.fillStyle = t.color; ctx.fillText(text, W / 2, y);
+        y += 32 * ui;
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function drawMap(now) {
+      ctx.fillStyle = "rgba(2,4,10,.9)";
+      ctx.fillRect(0, 0, W, H);
+      const top = 56 * ui, size = Math.min(W - 60 * ui, H - top - 70 * ui);
+      const ox = (W - size) / 2 + 10 * ui, oy = top + 20 * ui, cs = size / T.SECTORS;
+      const destSecs = new Set(game.jobs.map((j) => sectorOf(world.stations[j.to])));
+      for (let i = 0; i < T.SECTORS * T.SECTORS; i++) {
+        const sx = i % T.SECTORS, sy = Math.floor(i / T.SECTORS);
+        ctx.fillStyle = game.visited.has(i) ? "#0f1732" : "#06090f";
+        ctx.fillRect(ox + sx * cs, oy + sy * cs, cs, cs);
+        if (destSecs.has(i)) {
+          ctx.fillStyle = `rgba(126,231,135,${0.14 + 0.1 * Math.sin(now / 250)})`;
+          ctx.fillRect(ox + sx * cs, oy + sy * cs, cs, cs);
+        }
+      }
+      ctx.strokeStyle = "rgba(138,180,255,.18)"; ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let i = 0; i <= T.SECTORS; i++) {
+        ctx.moveTo(ox + i * cs, oy); ctx.lineTo(ox + i * cs, oy + size);
+        ctx.moveTo(ox, oy + i * cs); ctx.lineTo(ox + size, oy + i * cs);
+      }
+      ctx.stroke();
+      ctx.strokeStyle = "#7ee787"; ctx.lineWidth = 2;
+      for (const ds of destSecs) ctx.strokeRect(ox + (ds % T.SECTORS) * cs + 1, oy + Math.floor(ds / T.SECTORS) * cs + 1, cs - 2, cs - 2);
+      ctx.font = font(11, 700); ctx.fillStyle = "#8d9ab8";
+      ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+      for (let i = 0; i < T.SECTORS; i++) ctx.fillText(String.fromCharCode(65 + i), ox + (i + 0.5) * cs, oy - 4);
+      ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      for (let i = 0; i < T.SECTORS; i++) ctx.fillText(String(i + 1), ox - 6, oy + (i + 0.5) * cs);
+
+      const m = size / WORLD, dests = new Set(game.jobs.map((j) => j.to));
+      for (const st of world.stations) {
+        if (!game.discovered.has(st.id)) continue;
+        const px = ox + st.x * m, py = oy + st.y * m;
+        if (st.kind === "fuel") { ctx.fillStyle = "#ffc46b"; ctx.fillRect(px - 2.5, py - 2.5, 5, 5); }
+        else { ctx.fillStyle = st.hasData ? "#7ee787" : "#6fa8d8"; ctx.beginPath(); ctx.arc(px, py, 2.4, 0, TAU); ctx.fill(); }
+        if (dests.has(st.id)) { ctx.strokeStyle = "#7ee787"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(px, py, 6, 0, TAU); ctx.stroke(); }
+      }
+      const s = game.ship;
+      ctx.save();
+      ctx.translate(ox + clamp(s.x, 0, WORLD) * m, oy + clamp(s.y, 0, WORLD) * m);
+      ctx.rotate(s.a);
+      ctx.fillStyle = blink(now, 3) ? "#ffffff" : "#8ab4ff";
+      ctx.beginPath(); ctx.moveTo(0, -7); ctx.lineTo(5, 6); ctx.lineTo(-5, 6); ctx.closePath(); ctx.fill();
+      ctx.restore();
+
+      ctx.textAlign = "left"; ctx.textBaseline = "top";
+      ctx.font = font(15, 700); ctx.fillStyle = "#dfe8ff";
+      ctx.fillText("CHARTED SPACE", ox, 16 * ui);
+      // legend with real colour swatches
+      ctx.font = font(11);
+      ctx.textBaseline = "middle";
+      let lx = ox;
+      const ly = oy + size + 16 * ui;
+      const item = (draw, label) => {
+        draw(lx + 5 * ui, ly);
+        ctx.fillStyle = "#8d9ab8";
+        ctx.fillText(label, lx + 14 * ui, ly);
+        lx += 14 * ui + ctx.measureText(label).width + 16 * ui;
+      };
+      item((x, y) => { ctx.fillStyle = "#ffc46b"; ctx.fillRect(x - 3, y - 3, 6, 6); }, "fuel");
+      item((x, y) => { ctx.fillStyle = "#6fa8d8"; ctx.beginPath(); ctx.arc(x, y, 3, 0, TAU); ctx.fill(); }, "data");
+      item((x, y) => { ctx.fillStyle = "#7ee787"; ctx.beginPath(); ctx.arc(x, y, 3, 0, TAU); ctx.fill(); }, "has data");
+      item((x, y) => { ctx.strokeStyle = "#7ee787"; ctx.lineWidth = 1.5; ctx.strokeRect(x - 4, y - 4, 8, 8); }, "delivery sector");
+      ctx.fillStyle = "#6b7794";
+      ctx.fillText(fit("Only places you've found are shown. M to close.", W - ox - 12), ox, ly + 18 * ui);
+    }
+
+    function draw(now) {
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      if (!world) { ctx.fillStyle = "#03050b"; ctx.fillRect(0, 0, W, H); return; }
+      drawBackground(now);
+      drawStations(now);
+      drawShip(now);
+      drawHud(now);
+      if (game.mapOpen) drawMap(now);
+      if (game.state === "shop") drawShopPreview(now);
+    }
+
+    // the big ship in the shop, thrusting so the flame and any sticker animate
+    const previewCv = $("#shop-preview"), previewCtx = previewCv.getContext("2d");
+    let swatchTick = 0;
+    function drawShopPreview(now) {
+      const hull = currentHull();
+      previewCtx.clearRect(0, 0, previewCv.width, previewCv.height);
+      if (hull) {
+        const k = Math.floor(Math.min(previewCv.width, previewCv.height) / hull.size) - 1;
+        drawShipAt(previewCtx, game.look, true, now, now, previewCv.width / 2, previewCv.height / 2 - 6, 0, Math.max(1, k));
+      }
+      if (now - swatchTick > 120) { swatchTick = now; drawSwatches(now); }   // blinking stickers on their buttons too
+    }
+
+    /* ───────── main loop ───────── */
+    let last = performance.now();
+    function frame(now) {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      if (world && game.state === "play" && !game.mapOpen) update(dt);
+      if (world) {
+        // the camera leads a little in the direction you're drifting
+        const s = game.ship, tx = s.x + s.vx * 0.35, ty = s.y + s.vy * 0.35;
+        const f = Math.min(1, dt * 4);
+        cam.x += (tx - cam.x) * f; cam.y += (ty - cam.y) * f;
+      }
+      for (const t of game.toasts) t.age += dt;
+      game.toasts = game.toasts.filter((t) => t.age < 4.5);
+      draw(now);
+      requestAnimationFrame(frame);
+    }
+
+    /* ───────── playtest tools (standalone page only) ───────── */
+    function setupDev() {
+      if (!PLAYTEST) return;
+      $("#dev").hidden = false;
+      // a .spr loaded here joins the catalog for this session, shows up in the shop, and is put on
+      let custom = 0;
+      const tryFile = async (file) => {
+        if (!file) return;
+        const kind = $("#dev-kind").value;
+        try {
+          const sprite = await SPR.fromFile(file);
+          const def = { id: `custom-${++custom}`, name: file.name.replace(/\.spr$/i, ""), price: 0 };
+          addArt(kind, def, sprite);
+          CATALOG[kind].push(def);
+          if (kind === "hulls") game.look.hull = def.id;
+          else game.look[kind === "patterns" ? "pattern" : "sticker"] = def.id;
+          toast(`Loaded ${file.name} as a ${kind === "hulls" ? "ship model" : kind.slice(0, -1)}.`, "#8ab4ff");
+          if (game.state === "shop") renderShop();
+        } catch (e) {
+          $("#dev-info").textContent = `${file.name}: ${e.message}`;
+          toast(e.message, "#ff6b6b");
+        }
+      };
+      $("#dev-file").addEventListener("change", (e) => { tryFile(e.target.files[0]); e.target.value = ""; });
+      addEventListener("dragover", (e) => { e.preventDefault(); document.body.classList.add("drag"); });
+      addEventListener("dragleave", (e) => { if (!e.relatedTarget) document.body.classList.remove("drag"); });
+      addEventListener("drop", (e) => { e.preventDefault(); document.body.classList.remove("drag"); tryFile(e.dataTransfer.files[0]); });
+
+      $("#dev-shop").addEventListener("click", () => { if (game.state !== "play") play(); openShop(); });
+      $("#dev-cash").addEventListener("click", () => { game.credits += 1000; if (game.state === "shop") renderShop(); saveGame(); });
+      const setAll = (maxed) => {
+        for (const u of UPGRADES) game.upgrades[u.id] = maxed ? u.values.length - 1 : 0;
+        if (!maxed && game.look.hull === "efficient") game.look.hull = "standard";
+        game.ship.fuel = Math.min(game.ship.fuel, stats().tank);
+        if (game.state === "shop") renderShop();
+        saveGame();
+      };
+      $("#dev-max").addEventListener("click", () => setAll(true));
+      $("#dev-min").addEventListener("click", () => setAll(false));
+      $("#dev-fuel").addEventListener("click", () => { game.ship.fuel = stats().tank; game.stranded = false; });
+      $("#dev-reveal").addEventListener("click", () => {
+        world.stations.forEach((st) => game.discovered.add(st.id));
+        for (let i = 0; i < T.SECTORS * T.SECTORS; i++) game.visited.add(i);
+      });
+      $("#dev-data").addEventListener("click", () => world.datas.forEach((d) => { d.hasData = true; d.regenAt = 0; }));
+      $("#dev-erase").addEventListener("click", showSaves);
+      // keep game keys from firing while you use the panel
+      $("#dev").addEventListener("keydown", (e) => e.stopPropagation());
+      // for the browser console: satellite.T holds the tuning values (change them live);
+      // satellite.step(2) runs two seconds of game time at once
+      window.satellite = {
+        T, game, keys, cam, art, CATALOG, UPGRADES, stats,
+        get world() { return world; },
+        step(seconds = 1, dt = 1 / 60) { for (let t = 0; t < seconds; t += dt) update(dt); },
+      };
+    }
+
+    /* ───────── start ───────── */
+    resize();
+    migrateOldSave();
+    newGame("free", null);
+    renderSlots();
+    setupDev();
+    loadArt().then(() => { artReady = true; sanitizeLook(); }).catch((e) => {
+      const n = $("#intro-note");
+      n.hidden = false;
+      n.textContent = "The ship couldn't be loaded: " + e.message;
+    });
+    requestAnimationFrame(frame);
+  })();
+  </script>
+</body>
+</html>
