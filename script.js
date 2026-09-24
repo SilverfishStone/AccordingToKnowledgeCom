@@ -296,6 +296,25 @@
   /* one reader for both kinds of writing */
   const DIRS = { story: "stories", article: "articles" };
   let docToken = 0;
+  // downloads come from shared/export.js (the same as on accordingtoknowledge.com), fetched when first needed
+  let exportLoad = null;
+  async function downloadDoc(doc, format, button) {
+    const was = button.textContent;
+    button.disabled = true; button.textContent = "preparing…";
+    try {
+      await (window.ATKExport ? null : (exportLoad ||= new Promise((res, rej) => {
+        const s = document.createElement("script");
+        s.src = "shared/export.js"; s.onload = res; s.onerror = () => { exportLoad = null; rej(new Error()); };
+        document.head.appendChild(s);
+      })));
+      await ATKExport.download({
+        title: doc.title, subtitle: doc.subtitle, author: SITE.author, date: doc.published,
+        url: location.href, html: DOMPurify.sanitize(String(doc.html || "")),
+      }, format);
+    } catch { alert("The download didn't work. Check your connection and try again."); }
+    finally { button.disabled = false; button.textContent = was; }
+  }
+
   async function renderDoc(kind, slug) {
     const box = $(kind === "story" ? "#story-box" : "#article-box");
     const mine = ++docToken;
@@ -347,6 +366,18 @@
         a.href = `https://accordingtoknowledge.com/article/${encodeURIComponent(slug)}#comments`;
         a.textContent = "Comments and discussion on accordingtoknowledge.com ↗";
         p.appendChild(a); parts.push(p);
+      }
+      // to read offline or open in a word processor
+      {
+        const p = document.createElement("p"); p.className = "doc-source doc-download";
+        p.append("Download: ");
+        [["docx", "Word document"], ["html", "web page"]].forEach(([format, label], i) => {
+          const b = document.createElement("button"); b.type = "button"; b.className = "link-button text-link"; b.textContent = label;
+          b.addEventListener("click", () => downloadDoc(doc, format, b));
+          if (i) p.append(" · ");
+          p.append(b);
+        });
+        parts.push(p);
       }
       if (kind === "article" && doc.source && /^https:\/\//.test(doc.source)) {
         const p = document.createElement("p"); p.className = "doc-source";

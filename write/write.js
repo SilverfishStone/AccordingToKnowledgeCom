@@ -791,27 +791,25 @@
 
   $("#m-delete").addEventListener("click", () => { closeMenu(); if (cur) deleteDraft(cur.id); });
 
-  $("#m-export").addEventListener("click", () => {
+  // downloads come from ../shared/export.js (the same as on accordingtoknowledge.com), fetched when first needed
+  let exportLoad = null;
+  async function exportDraft(format) {
     closeMenu();
-    const title = titleEl.value.trim() || "Untitled";
-    const body = DOMPurify.sanitize(quill.root.innerHTML);
-    const doc = `<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(title)}</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css">
-<style>
-body{max-width:720px;margin:40px auto;padding:0 20px;font:18px/1.75 Georgia,serif;color:#111}
-.ql-editor{padding:0;overflow:visible;height:auto}.ql-editor p{margin:0 0 1em}.ql-editor img{max-width:100%}
-.ql-font-sans{font-family:system-ui,sans-serif}.ql-font-serif{font-family:Georgia,serif}
-.ql-font-palatino{font-family:"Palatino Linotype",Palatino,serif}.ql-font-garamond{font-family:Garamond,serif}
-.ql-font-monospace{font-family:"Courier New",monospace}.ql-font-cursive{font-family:"Segoe Script","Brush Script MT",cursive}
-</style></head><body class="ql-snow"><h1>${esc(title)}</h1><div class="ql-editor">${body}</div></body></html>`;
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([doc], { type: "text/html" }));
-    a.download = (slugify(title) || "draft") + ".html";
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-  });
+    try {
+      await (window.ATKExport ? null : (exportLoad ||= new Promise((res, rej) => {
+        const s = document.createElement("script");
+        s.src = "../shared/export.js"; s.onload = res;
+        s.onerror = () => { exportLoad = null; rej(new Error("The download couldn't start. Check your connection.")); };
+        document.head.appendChild(s);
+      })));
+      await ATKExport.download({
+        title: titleEl.value.trim() || "Untitled", subtitle: subtitleEl.value.trim(), author: SITE_CFG.author || "Silver",
+        date: cur && cur.published ? cur.published : Date.now(), html: DOMPurify.sanitize(quill.root.innerHTML),
+      }, format);
+    } catch (err) { toast(err.message || "The download didn't work.", "err"); }
+  }
+  $("#m-export").addEventListener("click", () => exportDraft("html"));
+  $("#m-export-docx").addEventListener("click", () => exportDraft("docx"));
 
   $("#m-refresh").addEventListener("click", () => { closeMenu(); refreshRemote(true); });
   $("#m-connect").addEventListener("click", async () => {
@@ -883,9 +881,14 @@ body{max-width:720px;margin:40px auto;padding:0 20px;font:18px/1.75 Georgia,seri
       ? "Publishing yours replaces the changes made on the site. Loading the site's version keeps your draft as a separate copy in the list."
       : "Loading keeps your draft as a separate copy in the list, so nothing is lost.";
     return new Promise((resolve) => {
-      syncDialog.addEventListener("close", () => resolve(syncDialog.returnValue || "cancel"), { once: true });
-      syncDialog.returnValue = "";
-      syncDialog.showModal();
+      const dlg = syncDialog;
+      const ac = new AbortController();
+      const finish = (v) => { ac.abort(); if (dlg.open) dlg.close(); resolve(v); };
+      dlg.querySelectorAll("button[value]").forEach((b) => b.addEventListener("click", (e) => { e.preventDefault(); finish(b.value); }, { signal: ac.signal }));
+      dlg.addEventListener("cancel", (e) => { e.preventDefault(); finish("cancel"); }, { signal: ac.signal });   // Esc
+      dlg.addEventListener("close", () => finish(dlg.returnValue || "cancel"), { signal: ac.signal });
+      dlg.returnValue = "";
+      dlg.showModal();
     });
   }
   // replace the open draft with what's published, keeping what was here as a copy

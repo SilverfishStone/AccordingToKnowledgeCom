@@ -398,3 +398,11 @@ button.item { width: 100%; border: 0; background: none; color: inherit; font: in
 .parch-dialog h2 { margin: 0; font-size: 21px; }
 .parch-dialog p { margin: 0; font-size: 15.5px; line-height: 1.5; }
 .dialog-row { justify-content: flex-end; }
+
+/* deleting */
+.manage { margin: -8px 0 18px; text-align: center; }
+.link-btn.danger-link { color: #8f1d10; }
+.w-row { position: relative; }
+.w-row + .w-row { border-top: 1px dashed var(--line); }
+.w-row .item { padding-right: 70px; border-top: 0 !important; }
+.w-row .w-del { position: absolute; right: 12px; top: 16px; }

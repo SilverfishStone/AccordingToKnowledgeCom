@@ -92,6 +92,8 @@ const ROUTES = [
   ["GET", /^\/api\/admin\/submissions\/(\d+)$/, adminSubmission],
   ["POST", /^\/api\/admin\/submissions\/(\d+)$/, adminReview],
   ["POST", /^\/api\/admin\/writer-requests\/(\d+)$/, adminWriterRequest],
+  ["POST", /^\/api\/community\/([a-z0-9-]+)\/delete$/, deleteCommunityArticle],
+  ["POST", /^\/api\/admin\/articles\/([a-z0-9-]+)\/delete$/, deleteOfficialArticle],
 ];
 
 async function route(request, env, ctx, url) {
@@ -935,12 +937,11 @@ async function writingAction(c) {
     case "withdraw":
       await run(c.env, "UPDATE writings SET state = 'draft' WHERE id = ?1", w.id);
       return json({ ok: true });
-    case "delete":
-      await c.env.DB.batch([
-        c.env.DB.prepare("DELETE FROM community WHERE writing_id = ?1").bind(w.id),
-        c.env.DB.prepare("DELETE FROM writings WHERE id = ?1").bind(w.id),
-      ]);
-      return json({ ok: true });   // an official article stays on the site; only this draft goes
+    case "delete": {   // an official article stays on the site; only this draft goes
+      const live = await one(c.env, "SELECT slug, title FROM community WHERE writing_id = ?1", w.id);
+      await removeCommunity(c, w, live);
+      return json({ ok: true });
+    }
     case "unpublish":
       if (w.kind === "community") {
         await run(c.env, "DELETE FROM community WHERE writing_id = ?1", w.id);
@@ -989,6 +990,44 @@ async function requestToWrite(c) {
   await run(c.env, "INSERT INTO writer_requests (user_id, note, created_at) VALUES (?1, ?2, ?3) ON CONFLICT (user_id) DO UPDATE SET note = ?2, created_at = ?3",
     u.id, note, Date.now());
   notify(c, `${u.username} asked to write`, [`${u.username} asked to write for the site:`, "", excerpt(note, 1000)]);
+  return json({ ok: true });
+}
+
+// a community piece and everything hanging off it (its published copy and that copy's comments)
+async function removeCommunity(c, w, live) {
+  await c.env.DB.batch([
+    ...(live ? [c.env.DB.prepare("DELETE FROM comments WHERE slug = ?1").bind(`c:${live.slug}`)] : []),
+    c.env.DB.prepare("DELETE FROM community WHERE writing_id = ?1").bind(w.id),
+    c.env.DB.prepare("DELETE FROM writings WHERE id = ?1").bind(w.id),
+  ]);
+  if (w.user_id !== c.user.id && w.kind === "community") {
+    await adminMessage(c.env, w.user_id, `I've deleted your article “${(live && live.title) || w.title || "Untitled"}” from the site.`);
+  }
+}
+
+// from a published community article's page: its writer, or Silver, can delete it
+async function deleteCommunityArticle(c) {
+  const u = need(c);
+  const live = await one(c.env, "SELECT slug, title, writing_id, user_id FROM community WHERE slug = ?1", c.params[0]);
+  if (!live) throw new HttpError(404, "That article is already gone.");
+  if (live.user_id !== u.id && u.role !== "admin") throw new HttpError(403, "Only its writer can delete it.");
+  const w = (await one(c.env, "SELECT id, user_id, kind, title FROM writings WHERE id = ?1", live.writing_id)) || { id: live.writing_id, user_id: live.user_id, kind: "community", title: live.title };
+  await removeCommunity(c, w, live);
+  return json({ ok: true });
+}
+
+// Silver deleting one of their own articles for good: off the repo (so both sites), drafts here, comments
+async function deleteOfficialArticle(c) {
+  need(c, true);
+  const slug = c.params[0];
+  ghReady(c.env);
+  const title = ((await articles(c)).get(slug) || {}).title || slug;
+  await removeFromRepo(c.env, slug, title);
+  await c.env.DB.batch([
+    c.env.DB.prepare("DELETE FROM writings WHERE kind = 'official' AND slug = ?1").bind(slug),
+    c.env.DB.prepare("DELETE FROM comments WHERE slug = ?1").bind(slug),
+  ]);
+  articleCache = null;
   return json({ ok: true });
 }
 
@@ -1226,13 +1265,17 @@ async function siteVersion(env, slug) {
   return e ? { updated: e.updated || e.published, words: e.words || 0, title: e.title } : null;
 }
 
+async function removeFromRepo(env, slug, title, verb = "Delete") {
+  const path = `articles/${slug}.json`;
+  const f = await ghGet(env, path);
+  if (f) await ghDelete(env, path, f.sha, `${verb} article: ${title}`);
+  await ghUpdateList(env, "articles/index.json", (l) => l.filter((a) => a.slug !== slug), `${verb} article index: ${title}`);
+}
+
 async function unpublishOfficial(c, w) {
   const env = c.env;
   ghReady(env);
-  const path = `articles/${w.slug}.json`;
-  const f = await ghGet(env, path);
-  if (f) await ghDelete(env, path, f.sha, `Unpublish article: ${w.title}`);
-  await ghUpdateList(env, "articles/index.json", (l) => l.filter((a) => a.slug !== w.slug), `Unpublish article index: ${w.title}`);
+  await removeFromRepo(env, w.slug, w.title, "Unpublish");
   await run(env, "UPDATE writings SET slug = NULL, updated_at = ?1 WHERE id = ?2", Date.now(), w.id);
   articleCache = null;
 }

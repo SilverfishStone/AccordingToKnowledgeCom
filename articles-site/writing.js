@@ -54,7 +54,11 @@
         <button class="btn small-btn" value="load">Load the site's version</button>
       </div></form>`;
     return new Promise((resolve) => {
-      dlg.addEventListener("close", () => resolve(dlg.returnValue || "cancel"), { once: true });
+      const ac = new AbortController();
+      const finish = (v) => { ac.abort(); if (dlg.open) dlg.close(); resolve(v); };
+      dlg.querySelectorAll("button[value]").forEach((b) => b.addEventListener("click", (e) => { e.preventDefault(); finish(b.value); }, { signal: ac.signal }));
+      dlg.addEventListener("cancel", (e) => { e.preventDefault(); finish("cancel"); }, { signal: ac.signal });   // Esc
+      dlg.addEventListener("close", () => finish(dlg.returnValue || "cancel"), { signal: ac.signal });
       dlg.returnValue = "";
       dlg.showModal();
     });
@@ -118,9 +122,11 @@
     };
     const item = (w) => {
       const [text, cls] = label(w);
-      return `<a class="item w-item" href="write/${w.id}" data-link>
-        <span class="item-title">${esc(w.title || "Untitled")}</span>
-        <span class="meta"><span class="state ${cls}">${text}</span> · edited ${esc(when(w.updated))}</span></a>`;
+      return `<div class="w-row" data-id="${w.id}" data-title="${esc(w.title || "Untitled")}" data-kind="${w.kind}" data-published="${w.published ? 1 : ""}">
+        <a class="item w-item" href="write/${w.id}" data-link>
+          <span class="item-title">${esc(w.title || "Untitled")}</span>
+          <span class="meta"><span class="state ${cls}">${text}</span> · edited ${esc(when(w.updated))}</span></a>
+        <button class="link-btn danger-link w-del" type="button" aria-label="Delete ${esc(w.title || "Untitled")}">Delete</button></div>`;
     };
     // Silver: the site's published articles that haven't been opened here yet
     const opened = new Set(mine.filter((w) => w.kind === "official" && w.slug).map((w) => w.slug));
@@ -136,6 +142,20 @@
           <span class="item-title">${esc(a.title)}</span><span class="meta"><span class="state live">On the site</span> · open to edit</span></button>`).join("")}</div>` : ""}`;
     $("#w-new", box).addEventListener("click", (e) => busy(e.target, "Starting…", async () => {
       try { const r = await api("writing", {}); go(`/write/${r.id}`); } catch (err) { alert(err.message); }
+    }));
+    box.querySelectorAll(".w-del").forEach((b) => b.addEventListener("click", async () => {
+      const row = b.closest(".w-row"), official = row.dataset.kind === "official", published = !!row.dataset.published;
+      const sure = await L().confirmBox({
+        title: "Delete this?", yes: "Delete it", danger: true,
+        text: official && published
+          ? `This deletes your draft of “${row.dataset.title}” here. The article stays on the site; to take it down, open it on the site and use Delete there.`
+          : published ? `“${row.dataset.title}” will be deleted for good, and taken off the site along with its comments.`
+          : `“${row.dataset.title}” will be deleted for good.`,
+      });
+      if (!sure) return;
+      busy(b, "Deleting…", async () => {
+        try { await api(`writing/${row.dataset.id}/delete`, {}); row.remove(); } catch (err) { alert(err.message); }
+      });
     }));
     box.querySelectorAll(".w-import").forEach((b) => b.addEventListener("click", () => busy(b, "Opening…", async () => {
       try { const r = await api("writing/import", { slug: b.dataset.slug }); go(`/write/${r.id}`); } catch (err) { alert(err.message); }
@@ -184,6 +204,10 @@
       <div id="w-preview" class="story-body ql-snow" hidden><div class="ql-editor"></div></div>
       <footer class="w-foot" id="w-foot"></footer>
       <details class="w-more"><summary>More</summary>
+        <div class="row">
+          <button class="btn ghost small-btn" type="button" data-download="docx">Download as Word</button>
+          <button class="btn ghost small-btn" type="button" data-download="html">Download as a web page</button>
+        </div>
         <div class="row">
           ${w.published ? `<button class="btn ghost small-btn" type="button" id="w-unpublish">${official ? "Take it off the site" : "Unpublish"}</button>` : ""}
           <button class="btn danger small-btn" type="button" id="w-delete">Delete this ${official && w.published ? "draft (the site keeps the article)" : "draft"}</button>
@@ -251,8 +275,10 @@
     $("#w-main", box)?.addEventListener("click", (e) => busy(e.target, official ? "Publishing…" : "Sending…", async () => {
       if (!f.title.value.trim()) { note("Give it a title first.", "err"); f.title.focus(); return; }
       if (!ed.words()) { note("There's nothing written yet.", "err"); return; }
-      if (official && !confirm(`${w.published ? "Update" : "Publish"} “${f.title.value.trim()}” on both sites?`)) return;
-      if (!official && !confirm(w.published ? "Send your changes to Silver for review? The published version stays up until they're approved." : "Send this to Silver for review? You can't change it while it's waiting, unless you withdraw it.")) return;
+      const go_ = await L().confirmBox(official
+        ? { title: w.published ? "Update it on the site?" : "Publish it?", yes: w.published ? "Update" : "Publish", text: `“${f.title.value.trim()}” will ${w.published ? "be updated" : "go up"} on both sites.` }
+        : { title: "Send it for review?", yes: "Send it", text: w.published ? "Your changes go to Silver. The published version stays up until they're approved." : "It goes to Silver to read. You can't change it while it's waiting, unless you withdraw it." });
+      if (!go_) return;
       dirty = true; await save();
       if (dirty) return;   // the save failed; the status says why
       try {
@@ -276,18 +302,26 @@
     $("#w-withdraw", box)?.addEventListener("click", (e) => busy(e.target, "Withdrawing…", async () => {
       try { await api(`writing/${w.id}/withdraw`, {}); editorPage(box, w.id); } catch (err) { note(err.message, "err"); }
     }));
-    $("#w-unpublish", box)?.addEventListener("click", (e) => {
-      if (!confirm(official ? "Take this article off both sites? This draft stays here, and you can publish it again." : "Unpublish this article? It stays here as a draft, and you can send it for review again.")) return;
+    $("#w-unpublish", box)?.addEventListener("click", async (e) => {
+      if (!(await L().confirmBox({ title: official ? "Take it off the site?" : "Unpublish it?", yes: official ? "Take it off" : "Unpublish", danger: true,
+        text: official ? "The article comes off both sites. This draft stays here, and you can publish it again." : "It comes off the site. It stays here as a draft, and you can send it for review again." }))) return;
       busy(e.target, "Working…", async () => {
         try { await api(`writing/${w.id}/unpublish`, {}); editorPage(box, w.id); } catch (err) { note(err.message, "err"); }
       });
     });
-    $("#w-delete", box).addEventListener("click", (e) => {
-      if (!confirm(official && w.published ? "Delete this draft? The article stays on the site; you can open it again from Your articles." : "Delete this for good? If it's published, it comes down too.")) return;
+    $("#w-delete", box).addEventListener("click", async (e) => {
+      if (!(await L().confirmBox({ title: "Delete this?", yes: "Delete it", danger: true,
+        text: official && w.published ? "This deletes the draft. The article stays on the site; you can open it again from Your articles."
+          : w.published ? "It will be deleted for good, and taken off the site along with its comments." : "It will be deleted for good." }))) return;
       busy(e.target, "Deleting…", async () => {
         try { dirty = false; await api(`writing/${w.id}/delete`, {}); open = null; go("/write"); } catch (err) { note(err.message, "err"); }
       });
     });
+    box.querySelectorAll("[data-download]").forEach((b) => b.addEventListener("click", () => L().download({
+      title: f.title.value.trim() || "Untitled", subtitle: f.subtitle.value.trim(),
+      author: official ? "Silver" : st.user.username, date: Date.now(),
+      html: official ? DOMPurify.sanitize(ed.html()) : cleanCommunity(ed.html()),
+    }, b.dataset.download, b)));
     if (!w.title) f.title.focus();
 
     const loadSite = async () => {
@@ -376,7 +410,11 @@
       <p class="small community-note">Community articles are written by readers. I read each one before it's published, but the views are the writer's own.</p>`;
     writing.site.inkRule($(".ink-rule", box));
     setTitle(a.title, a.summary || "");
-    community.article(slug, { title: a.title }, { key: `c:${slug}`, path: `/community/${slug}`, host: "#community-extras" });
+    community.article(slug, { title: a.title, html: cleanCommunity(a.html) }, {
+      key: `c:${slug}`, path: `/community/${slug}`, host: "#community-extras",
+      info: { subtitle: a.subtitle, author: a.author.username, date: a.published },
+      owner: { kind: "community", authorId: a.author.id },
+    });
   }
 
   /* ───────── /people/<username> ───────── */

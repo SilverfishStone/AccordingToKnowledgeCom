@@ -164,7 +164,10 @@
       inkRule($(".ink-rule", box));
       $(".ql-editor", box).innerHTML = DOMPurify.sanitize(String(doc.html || ""));
       setTitle(doc.title || "Untitled", doc.summary || ATK.description);
-      community.article(slug, doc);
+      community.article(slug, doc, {
+        info: { subtitle: doc.subtitle, author: "Silver", date: doc.published, html: DOMPurify.sanitize(String(doc.html || "")) },
+        owner: { kind: "official" },
+      });
     } catch {
       if (mine !== docToken) return;
       showMissing();

@@ -70,6 +70,46 @@
     return box.innerHTML;
   }
 
+  /* ───────── "are you sure?" ───────── */
+  function confirmBox({ title, text, yes = "Yes", no = "Cancel", danger = false }) {
+    let dlg = $("#confirm-dialog");
+    if (!dlg) {
+      dlg = document.createElement("dialog");
+      dlg.id = "confirm-dialog"; dlg.className = "parch-dialog";
+      dlg.setAttribute("aria-labelledby", "cf-h");
+      document.body.appendChild(dlg);
+    }
+    dlg.innerHTML = `<form method="dialog"><h2 id="cf-h">${esc(title)}</h2><p>${esc(text)}</p>
+      <div class="row dialog-row"><button class="btn ghost small-btn" value="no">${esc(no)}</button>
+      <button class="btn ${danger ? "danger" : ""} small-btn" value="yes">${esc(yes)}</button></div></form>`;
+    return new Promise((resolve) => {
+      const ac = new AbortController();
+      const finish = (v) => { ac.abort(); if (dlg.open) dlg.close(); resolve(v); };
+      dlg.querySelectorAll("button[value]").forEach((b) => b.addEventListener("click", (e) => { e.preventDefault(); finish(b.value === "yes"); }, { signal: ac.signal }));
+      dlg.addEventListener("cancel", (e) => { e.preventDefault(); finish(false); }, { signal: ac.signal });   // Esc
+      dlg.addEventListener("close", () => finish(dlg.returnValue === "yes"), { signal: ac.signal });
+      dlg.returnValue = "";
+      dlg.showModal();
+      dlg.querySelector("[value=no]").focus();
+    });
+  }
+
+  /* ───────── downloading an article (shared/export.js, fetched when first needed) ───────── */
+  let exportLoad = null;
+  const loadExport = () => (window.ATKExport ? Promise.resolve() : (exportLoad ||= new Promise((res, rej) => {
+    const sc = document.createElement("script");
+    sc.src = "shared/export.js"; sc.onload = res;
+    sc.onerror = () => { exportLoad = null; rej(new Error("The download couldn't start. Check your connection.")); };
+    document.head.appendChild(sc);
+  })));
+  async function download(info, format, button) {
+    const was = button ? button.textContent : "";
+    if (button) { button.disabled = true; button.textContent = "Preparing…"; }
+    try { await loadExport(); await ATKExport.download(info, format); }
+    catch (err) { alert(err.message || "The download didn't work."); }
+    finally { if (button) { button.disabled = false; button.textContent = was; } }
+  }
+
   /* ───────── who's signed in ───────── */
   let state = { user: null, unread: 0 };
   let meLoad = null;
@@ -483,7 +523,10 @@
     }
     box.innerHTML = `<p class="note">Loading…</p>`;
     let d, words;
-    try { [d, words] = await Promise.all([api("admin/overview"), api("admin/words")]); }
+    try {
+      [d, words] = await Promise.all([api("admin/overview"), api("admin/words")]);
+      d.community = (await api("community?limit=200").catch(() => ({ articles: [] }))).articles;
+    }
     catch (err) { box.innerHTML = `<p class="note">${esc(err.message)}</p>`; return; }
     const em = d.email || {}, last = em.last;
     box.innerHTML = `
@@ -506,6 +549,16 @@
             <div class="row"><button class="btn ghost small-btn" type="button" data-act="review">Read it</button></div>
             <div class="review-panel"></div>
           </article>`).join("") : `<p class="small">Nothing to review.</p>`}
+      </section>
+
+      <section class="card-sec" id="community-articles">
+        <h2>Community articles <span class="count">${(d.community || []).length}</span></h2>
+        ${(d.community || []).length ? `<ul class="users">${d.community.map((a) => `
+          <li data-community="${esc(a.slug)}" data-title="${esc(a.title)}">
+            <div class="u-main"><a class="text-link" href="community/${esc(a.slug)}" data-link><b>${esc(a.title)}</b></a>
+              <span class="meta">by ${esc(a.author.username)} · ${esc(when(a.published))}</span></div>
+            <div class="row"><button class="btn danger small-btn" type="button" data-act="delete-community">Delete</button></div>
+          </li>`).join("")}</ul>` : `<p class="small">None published yet.</p>`}
       </section>
 
       <section class="card-sec" id="writer-requests">
@@ -591,8 +644,16 @@
     if (!b) return;
     const box = $("#admin-box");
     const comment = b.closest("[data-comment]"), pic = b.closest("[data-picture]"), user = b.closest("[data-user]");
-    const sub = b.closest("[data-submission]"), wreq = b.closest("[data-writer-request]");
+    const sub = b.closest("[data-submission]"), wreq = b.closest("[data-writer-request]"), carticle = b.closest("[data-community]");
     try {
+      if (carticle && b.dataset.act === "delete-community") {
+        const sure = await confirmBox({ title: "Delete this article?", yes: "Delete it", danger: true,
+          text: `“${carticle.dataset.title}” and its comments will be deleted for good. The writer will get a message saying so.` });
+        if (!sure) return;
+        await api(`community/${carticle.dataset.community}/delete`, {});
+        carticle.innerHTML = `<p class="form-note ok">Deleted.</p>`;
+        return;
+      }
       if (sub && b.dataset.act === "review") { await openReview(sub); return; }
       if (sub && (b.dataset.act === "approve" || b.dataset.act === "return")) {
         const note = sub.querySelector("textarea") ? sub.querySelector("textarea").value : "";
@@ -724,13 +785,19 @@
         ${navigator.share ? `<button class="chip" type="button" data-share>Share…</button>` : ""}
         <button class="chip" type="button" data-copy-link>Copy link</button>
         ${links.map(([name, href]) => `<a class="chip" href="${esc(href)}" target="_blank" rel="noopener">${name}</a>`).join("")}
+      </div>
+      <div class="share" aria-label="Download this article">
+        <span class="share-label">Download</span>
+        <button class="chip" type="button" data-download="docx" title="Opens in Word, Google Docs, LibreOffice or Pages">Word document</button>
+        <button class="chip" type="button" data-download="html" title="One file that reads offline in any browser, pictures included">Web page</button>
       </div>`;
   }
 
   let articleToken = 0;
   // key: what comments are filed under ("<slug>" for Silver's articles, "c:<slug>" for community
   // ones); path: the article's address; host: where to draw it
-  async function article(slug, doc, { key = slug, path = `/article/${slug}`, host: hostSel = "#article-extras" } = {}) {
+  // info: what a download holds; owner: who besides Silver may delete it ({ kind, authorId })
+  async function article(slug, doc, { key = slug, path = `/article/${slug}`, host: hostSel = "#article-extras", info = null, owner = null } = {}) {
     const host = $(hostSel), mine = ++articleToken;
     document.querySelectorAll(".article-extras").forEach((el) => { if (el !== host) el.innerHTML = ""; });   // one set of comments at a time
     const url = `${location.origin}${path}`;
@@ -747,10 +814,34 @@
       setTimeout(() => { e.target.textContent = "Copy link"; }, 1600);
     });
     host.querySelector("[data-share]")?.addEventListener("click", () => navigator.share({ title: doc.title, url }).catch(() => {}));
+    host.querySelectorAll("[data-download]").forEach((b) => b.addEventListener("click", () =>
+      download({ url, title: doc.title, html: doc.html, ...(info || {}) }, b.dataset.download, b)));
 
     const [st, data] = await Promise.all([loadMe(), api("comments?slug=" + encodeURIComponent(key)).catch((err) => ({ error: err }))]);
     await avatarsLoaded;
     if (mine !== articleToken) return;
+    // deleting: Silver can delete any article; a community writer can delete their own
+    const me = st.user;
+    if (owner && me && (me.role === "admin" || (owner.kind === "community" && owner.authorId === me.id))) {
+      host.insertAdjacentHTML("afterbegin", `<p class="manage"><button class="link-btn danger-link" type="button" data-delete-article>Delete this article</button></p>`);
+      host.querySelector("[data-delete-article]").addEventListener("click", async (e) => {
+        const official = owner.kind === "official";
+        const sure = await confirmBox({
+          title: "Delete this article?", yes: "Delete it", danger: true,
+          text: official
+            ? `“${doc.title}” will be taken off both sites for good, along with its comments and any drafts of it on this site. (Drafts in the editor on silverfishstone.com stay in that browser.)`
+            : `“${doc.title}” and its comments will be deleted for good.${owner.authorId !== me.id ? " The writer will get a message saying so." : ""}`,
+        });
+        if (!sure) return;
+        busy(e.target, "Deleting…", async () => {
+          try {
+            await api(official ? `admin/articles/${slug}/delete` : `community/${slug}/delete`, {});
+            go(official ? "/" : "/community");
+            if (official) alert("Deleted. It disappears from both sites within a couple of minutes.");
+          } catch (err) { alert(err.message); }
+        });
+      });
+    }
     const list = $("#comment-list", host), formHost = $("#comment-form", host);
     if (data.error) {
       list.innerHTML = `<p class="note">${data.error.status === 503 ? "Comments aren't switched on yet." : "Comments couldn't be loaded right now."}</p>`;
@@ -835,7 +926,7 @@
     article,
     refresh: () => loadMe(true),
     // for writing.js
-    lib: { api, esc, when, paragraphs, avatarImg, nameTag, say, busy, loadMe, cleanCommunity, state: () => state },
+    lib: { api, esc, when, paragraphs, avatarImg, nameTag, say, busy, loadMe, cleanCommunity, confirmBox, download, state: () => state },
   };
   loadMe();
 })();
