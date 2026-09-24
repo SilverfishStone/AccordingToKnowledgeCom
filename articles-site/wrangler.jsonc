@@ -1,0 +1,13 @@
+// Cloudflare settings for the articles site. `name` must be exactly the Worker's name in the
+// Cloudflare dashboard, or the deploy stops with "The name in your Wrangler configuration file
+// must match the name of your Worker".
+{
+  "name": "accordingtoknowledgecom",
+  "compatibility_date": "2026-09-24",
+  "assets": {
+    // made by build.sh
+    "directory": "./dist",
+    // any address that isn't a file gets index.html, so /article/<slug> and /contact work
+    "not_found_handling": "single-page-application"
+  }
+}
