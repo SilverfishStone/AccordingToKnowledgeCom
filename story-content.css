@@ -42,6 +42,32 @@
 .story-body .ql-editor blockquote {
   border-left: 3px solid #8ab4ff; padding-left: 1em; color: #b7bcc0; font-style: italic;
 }
+/* quote styles (the "Quote style" picker in the editor). Each line of a quote is its own
+   <blockquote>, so consecutive lines of the same style are joined into one block. */
+.story-body .ql-editor blockquote.ql-quote-center {
+  border-left: 0; margin: 1.4em 0; padding: 1.1em 1.5em; text-align: center; color: var(--story-text);
+  border-top: 1px solid var(--story-line); border-bottom: 1px solid var(--story-line);
+}
+.story-body .ql-editor blockquote.ql-quote-center:has(+ blockquote.ql-quote-center) { border-bottom: 0; padding-bottom: 0; margin-bottom: 0; }
+.story-body .ql-editor blockquote.ql-quote-center + blockquote.ql-quote-center { border-top: 0; padding-top: .35em; margin-top: 0; }
+
+.story-body .ql-editor blockquote.ql-quote-pull {
+  border-left: 0; margin: 1.6em 0; padding: 0 1.2em; text-align: center; color: #dfe8ff;
+  font-family: Georgia, "Times New Roman", serif; font-size: 1.35em; line-height: 1.45;
+}
+.story-body .ql-editor blockquote.ql-quote-pull::before {
+  content: "\201C"; display: block; height: .55em; margin-bottom: .15em;
+  font-size: 2.6em; line-height: 1; font-style: normal; color: #8ab4ff;
+}
+.story-body .ql-editor blockquote.ql-quote-pull:has(+ blockquote.ql-quote-pull) { margin-bottom: 0; }
+.story-body .ql-editor blockquote.ql-quote-pull + blockquote.ql-quote-pull { margin-top: .4em; }
+.story-body .ql-editor blockquote.ql-quote-pull + blockquote.ql-quote-pull::before { content: none; }
+
+.story-body .ql-editor blockquote.ql-quote-indent {
+  border-left: 0; padding: 0 2em; font-style: normal; color: var(--story-text);
+}
+.story-body .ql-editor blockquote.ql-quote-indent:has(+ blockquote.ql-quote-indent) { margin-bottom: .5em; }
+
 .story-body .ql-editor pre.ql-syntax {
   background: #16181c; color: #e7e9ea; border: 1px solid var(--story-line);
   border-radius: 8px; padding: 12px 14px; overflow-x: auto; font-size: 15px; margin: 0 0 1em;

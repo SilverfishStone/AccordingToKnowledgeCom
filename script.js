@@ -534,11 +534,8 @@
     }
   }
 
-  /* ───────── home: about, pinned article, gallery button, the rules ───────── */
-  const boldify = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  /* ───────── home: about, pinned article, gallery button ───────── */
   $("#h-home").textContent = SITE.about || "";
-  $("#h-rules").textContent = SITE.rulesTitle || "Rules";
-  $("#rules-list").innerHTML = (SITE.rules || []).map((r) => `<li><span>${boldify(r)}</span></li>`).join("");
 
   async function showHome() {
     const [articles, gallery, stories, seriesMeta] = await Promise.allSettled([loadArticles(), loadGallery(), loadStories(), loadSeriesMeta()]);

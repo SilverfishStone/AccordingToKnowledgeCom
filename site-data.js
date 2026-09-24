@@ -44,20 +44,7 @@ const SITE = {
   /* HOME PAGE — the short "About me" text. */
   about: "Welcome! This website is a small display of me, my interests, and some of my hobbies.",
 
-  /* HOME PAGE — the Nine Rules. One string per rule. Wrap text in **double
-     asterisks** to make it bold. */
-  rulesTitle: "Nine Rules for Discourse and Engagement",
-  rules: [
-    "Everyone knows as much about their belief as you know about yours. Everyone knows as much about your belief as you know about theirs (little to nothing).",
-    "Every belief is somehow reasonable, or no one would believe it.",
-    "A belief system that has existed for more than 50 years has heard every rebuttal or disproof you could imagine.",
-    "Nobody thinks they are wrong, or they would change their mind.",
-    "Nobody lies about what they believe. Nobody lies about what they think you believe.",
-    "The few who knowingly lie about what they believe are grifters and shysters to begin with. They are a tiny minority.",
-    "What people claim to believe is always what they **want** to believe. When people lie to themselves subconciously, there is not intent or subterfuge behind it.",
-    "People don't usually settle on the system that answers their questions best, they settle on the system that answers their questions first.",
-    "Smart people are the people most likely to convert to another religion, because they are the most likely to question what they believe in to begin with.",
-  ],
+  /* The Nine Rules now live on the articles site: articles-site/config.js */
 
   /* While reading a story or article the page switches to two panels so the
      text gets more room. Which side panel steps aside: "right" (latest

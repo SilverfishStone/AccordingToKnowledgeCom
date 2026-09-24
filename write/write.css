@@ -157,6 +157,15 @@ body:not(.locked) .gate { display: none; }
 .ql-snow .ql-picker.ql-font .ql-picker-label[data-value=monospace]::before, .ql-snow .ql-picker.ql-font .ql-picker-item[data-value=monospace]::before { content: "Typewriter"; font-family: "Courier New", monospace; }
 .ql-snow .ql-picker.ql-font .ql-picker-label[data-value=cursive]::before, .ql-snow .ql-picker.ql-font .ql-picker-item[data-value=cursive]::before { content: "Script"; font-family: "Segoe Script", "Brush Script MT", cursive; }
 
+/* picker labels: quote style (no value = the side-bar quote). Dimmed until the cursor is in a quote. */
+.ql-snow .ql-picker.ql-quote { width: 104px; transition: opacity .15s; }
+.ql-snow .ql-picker.ql-quote.not-quote { opacity: .5; }
+.ql-snow .ql-picker.ql-quote .ql-picker-label::before,
+.ql-snow .ql-picker.ql-quote .ql-picker-item::before { content: "Side bar"; }
+.ql-snow .ql-picker.ql-quote .ql-picker-label[data-value=center]::before, .ql-snow .ql-picker.ql-quote .ql-picker-item[data-value=center]::before { content: "Centered"; }
+.ql-snow .ql-picker.ql-quote .ql-picker-label[data-value=pull]::before, .ql-snow .ql-picker.ql-quote .ql-picker-item[data-value=pull]::before { content: "Pull quote"; }
+.ql-snow .ql-picker.ql-quote .ql-picker-label[data-value=indent]::before, .ql-snow .ql-picker.ql-quote .ql-picker-item[data-value=indent]::before { content: "Indented"; }
+
 /* picker labels: size (value 19 = the default) */
 .ql-snow .ql-picker.ql-size { width: 58px; }
 .ql-snow .ql-picker.ql-size .ql-picker-label::before,

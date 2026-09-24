@@ -304,6 +304,13 @@
   class Divider extends BlockEmbed {}
   Divider.blotName = "divider"; Divider.tagName = "hr";
   Quill.register(Divider);
+  // quote styles: a class on a quote line (no class = the usual quote with a bar down the left).
+  // Styled in story-content.css so the site shows them the same way.
+  const Parchment = Quill.import("parchment");
+  const QuoteStyle = new Parchment.ClassAttributor("quote", "ql-quote", {
+    scope: Parchment.Scope.BLOCK, whitelist: ["center", "pull", "indent"],
+  });
+  Quill.register(QuoteStyle, true);
 
   let quill;   // assigned just below; handlers only run after that
   quill = new Quill("#editor", {
@@ -315,6 +322,16 @@
         handlers: {
           undo() { quill.history.undo(); },
           redo() { quill.history.redo(); },
+          // turning a quote off also drops its style, so the style doesn't linger on a plain paragraph
+          blockquote(on) {
+            const r = quill.getSelection(true);
+            quill.formatLine(r.index, r.length, on ? { blockquote: true } : { blockquote: false, quote: false }, "user");
+          },
+          // picking a style makes the line a quote too
+          quote(style) {
+            const r = quill.getSelection(true);
+            quill.formatLine(r.index, r.length, { blockquote: true, quote: style || false }, "user");
+          },
           divider() {
             const r = quill.getSelection(true);
             quill.insertEmbed(r.index, "divider", true, "user");
@@ -343,6 +360,12 @@
   // custom (any-color) pickers: remember the selection, since the native dialog steals focus
   let lastRange = null;
   quill.on("selection-change", (range) => { if (range) lastRange = range; });
+  // the quote-style picker only means something inside a quote
+  const quotePicker = document.querySelector("#toolbar .ql-picker.ql-quote");
+  quill.on("editor-change", () => {
+    const r = quill.getSelection();
+    if (quotePicker && r) quotePicker.classList.toggle("not-quote", !quill.getFormat(r).blockquote);
+  });
   function wireColor(inputSel, format) {
     const input = $(inputSel);
     input.addEventListener("input", () => { input.parentElement.style.setProperty("--c", input.value); });

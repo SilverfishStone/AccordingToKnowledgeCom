@@ -1,0 +1,148 @@
+*, *::before, *::after { box-sizing: border-box; }
+
+:root {
+  --paper: #e9cb77;       /* the middle of assets/parchment.png */
+  --frame-color: #e0bf65; /* its darker edge */
+  --ink: #1f160a;
+  --ink-soft: #3b2c14;
+  --dim: #6e5628;
+  --accent: #7b2d12;      /* oxblood: links, rule numbers */
+  --line: rgba(70, 45, 10, .32);
+  --ui: "Open Sans", "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+  --frame: clamp(40px, 9vw, 104px);   /* how wide the parchment's rough edge is drawn */
+}
+
+html { background: var(--frame-color); color-scheme: light; }
+body { margin: 0; color: var(--ink); font: 16px/1.5 var(--ui); -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.center { text-align: center; }
+.text-link { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.text-link:hover { text-decoration-thickness: 2px; }
+
+/* the whole page is one sheet of parchment (assets/parchment.png, cut up by make_edges.py):
+   the top and bottom edges stretch across the window, the side edges repeat down however long
+   the page is, and the middle is the flat paper colour. Small repeating pieces, rather than one
+   picture stretched over the page, because a long article can be 20,000 px tall. */
+.paper {
+  min-height: 100vh;
+  padding: calc(var(--frame) + 4px) calc(var(--frame) + clamp(6px, 3vw, 36px)) calc(var(--frame) + 8px);
+  background:
+    url("assets/edge-top.png") left top / 100% var(--frame) no-repeat,
+    url("assets/edge-bottom.png") left bottom / 100% var(--frame) no-repeat,
+    url("assets/edge-left.png") left top / var(--frame) auto repeat-y,
+    url("assets/edge-right.png") right top / var(--frame) auto repeat-y,
+    var(--paper);
+}
+main, .masthead, .foot { max-width: 760px; margin: 0 auto; }
+main:focus { outline: none; }
+
+/* ── masthead: the badge (to the contact page) and the name ── */
+.masthead { position: relative; min-height: 84px; display: flex; align-items: center; justify-content: center; padding-left: 92px; margin-top: calc(var(--frame) * -.55); }
+.badge { position: absolute; left: 0; top: 0; width: 84px; height: 84px; border-radius: 50%; transition: transform .15s ease; }
+.badge img { display: block; width: 100%; height: 100%; }
+.badge:hover { transform: rotate(-6deg) scale(1.05); }
+.site-name { font-weight: 700; font-size: clamp(21px, 3.8vw, 36px); line-height: 1.15; text-decoration: none; text-align: center; letter-spacing: .01em; }
+@media (min-width: 760px) {
+  .masthead { padding-left: 0; min-height: 112px; }
+  .badge { width: 108px; height: 108px; }
+}
+
+/* hand-drawn ink lines between sections (drawn by site.js, each a little different) */
+.ink-rule { height: 14px; margin: 26px -6px; }
+.ink-rule svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ink-rule path { fill: none; stroke: #0d0904; stroke-width: 4; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+
+.eyebrow { margin: 0 0 6px; text-align: center; font-size: 12px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--dim); }
+.meta { display: block; margin-top: 8px; font-size: 13px; color: var(--dim); }
+.section-h { margin: 0 0 18px; text-align: center; font-size: clamp(22px, 3.4vw, 28px); font-weight: 700; line-height: 1.25; }
+
+/* ── home: the latest (or pinned) article ── */
+.featured { display: block; padding: 6px 12px 10px; border-radius: 10px; text-align: center; text-decoration: none; transition: background .15s; }
+.featured:hover { background: rgba(120, 80, 20, .09); }
+.featured-title { display: block; font-size: clamp(24px, 4vw, 32px); font-weight: 700; line-height: 1.2; }
+.featured-sub { display: block; margin-top: 4px; font-size: 18px; font-weight: 600; color: var(--ink-soft); }
+.featured-summary { display: block; margin: 10px auto 0; max-width: 560px; font-size: 17px; font-weight: 600; line-height: 1.45; }
+.featured-sub:empty, .featured-summary:empty { display: none; }
+
+/* ── home: the list, with a category picker that reads as part of the heading ── */
+.section-h .pick { position: relative; display: inline-block; }
+.section-h select {
+  appearance: none; -webkit-appearance: none; margin: 0; padding: 0 26px 2px 4px; border: 0; border-bottom: 3px solid var(--ink);
+  border-radius: 0; background: transparent; color: inherit; font: inherit; cursor: pointer;
+  field-sizing: content;   /* as wide as the chosen option, where supported */
+}
+.section-h option { font-size: 16px; font-weight: 600; background: var(--paper); color: var(--ink); }
+.section-h .pick::after { content: ""; position: absolute; right: 6px; top: 50%; width: 9px; height: 9px; margin-top: -8px; border: solid var(--ink); border-width: 0 3px 3px 0; transform: rotate(45deg); pointer-events: none; }
+.section-h select:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.article-list { display: grid; gap: 4px; }
+.item { display: block; padding: 12px 14px; border-radius: 10px; text-decoration: none; transition: background .15s; }
+.item:hover { background: rgba(120, 80, 20, .09); }
+.item + .item { border-top: 1px dashed var(--line); border-radius: 0 0 10px 10px; }
+.item-title { display: block; font-size: 20px; font-weight: 700; line-height: 1.25; }
+.item-sub { display: block; font-weight: 600; color: var(--ink-soft); }
+.item p { margin: 6px 0 0; font-size: 15.5px; color: var(--ink-soft); }
+.item .meta { margin-top: 4px; }
+.empty { text-align: center; color: var(--dim); }
+
+/* ── home: the rules ── */
+.rules ol { list-style: none; margin: 0; padding: 0; counter-reset: rule; }
+.rules li { counter-increment: rule; display: flex; align-items: baseline; gap: 18px; padding: 14px 4px; border-bottom: 1px dashed var(--line); }
+.rules li:last-child { border-bottom: 0; }
+.rules li::before { content: counter(rule); flex: none; width: 1.2em; text-align: center; font: 700 32px/1 Georgia, "Times New Roman", serif; color: var(--accent); }
+.rules li span { font-family: Calibri, Carlito, "Segoe UI", sans-serif; font-size: 19px; line-height: 1.5; }
+.rules strong { color: #000; }
+
+/* ── an article ── */
+.back { display: inline-block; margin: 4px 0 18px; font-size: 14px; font-weight: 700; color: var(--accent); text-decoration: none; }
+.back:hover { text-decoration: underline; }
+.doc h1.doc-title { margin: 0; text-align: center; font-size: clamp(28px, 5vw, 40px); font-weight: 800; line-height: 1.15; }
+.doc .doc-sub { margin: 8px 0 0; text-align: center; font-size: 19px; font-weight: 600; color: var(--ink-soft); }
+.doc .meta { text-align: center; }
+.tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 12px 0 0; }
+.tag { padding: 2px 10px; border: 1.5px solid var(--ink-soft); border-radius: 999px; font-size: 12.5px; font-weight: 600; text-decoration: none; }
+a.tag:hover { background: rgba(120, 80, 20, .12); }
+.doc .ink-rule { margin: 22px -6px 28px; }
+.doc .note { text-align: center; color: var(--dim); }
+
+/* story-content.css is written for a dark page; here the ink is dark and the paper is light */
+.story-body { --story-text: var(--ink); --story-line: var(--line); }
+.story-body .ql-editor a { color: var(--accent); }
+.story-body .ql-editor blockquote { border-left-color: var(--accent); color: #4a3a1c; }
+.story-body .ql-editor blockquote.ql-quote-center,
+.story-body .ql-editor blockquote.ql-quote-indent { color: var(--ink); }
+.story-body .ql-editor blockquote.ql-quote-pull { color: #2a1c08; }
+.story-body .ql-editor blockquote.ql-quote-pull::before { color: var(--accent); }
+.story-body .ql-editor pre.ql-syntax, .story-body .ql-editor code { background: rgba(255, 246, 214, .55); color: var(--ink); }
+.story-body .ql-editor pre.ql-syntax { border-color: var(--line); }
+.story-body .ql-editor hr::before { color: var(--dim); }
+.story-body .ql-editor img { box-shadow: 0 2px 10px rgba(60, 40, 10, .25); }
+
+/* ── contact ── */
+.contact { text-align: center; }
+.contact-badge { display: block; width: min(180px, 50vw); height: auto; margin: 4px auto 10px; }
+.contact h1 { margin: 0; font-size: 34px; font-weight: 800; }
+.contact-sub { max-width: 460px; margin: 6px auto 0; font-size: 17px; font-weight: 600; color: var(--ink-soft); }
+.links { list-style: none; margin: 0 auto; padding: 0; max-width: 420px; display: grid; gap: 6px; }
+.links a { display: block; padding: 10px 14px; border-radius: 10px; text-decoration: none; transition: background .15s; }
+.links a:hover { background: rgba(120, 80, 20, .09); }
+.links small { display: block; font-size: 11.5px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--dim); }
+.links b { font-size: 19px; color: var(--accent); overflow-wrap: anywhere; }
+
+.missing-h { margin: 20px 0 6px; text-align: center; font-size: 30px; }
+
+.foot { margin-top: 18px; text-align: center; font-size: 13px; color: var(--dim); }
+.foot .ink-rule { margin-bottom: 10px; }
+.foot p { margin: 0; }
+
+@media (max-width: 520px) {
+  .paper { padding-inline: calc(var(--frame) + 2px); }
+  .masthead { min-height: 64px; padding-left: 70px; }
+  .badge { width: 62px; height: 62px; }
+  .rules li { gap: 12px; }
+  .rules li::before { font-size: 26px; }
+  .rules li span { font-size: 17.5px; }
+  .story-body .ql-editor { font-size: 17.5px; }
+}

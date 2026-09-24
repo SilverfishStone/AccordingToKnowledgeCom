@@ -412,17 +412,20 @@ body.reading .reader-bar { padding-left: 56px; }
 .gallery-key-label small { font-size: 14px; color: var(--dim); }
 .gallery-key-label::after { content: "Browse the gallery \2192"; margin-top: 6px; font-size: 14px; color: var(--accent); }
 
-.rules { margin-top: 48px; }
-.rules h2 { margin-bottom: 18px; font-family: Georgia, "Times New Roman", serif; font-size: 27px; line-height: 1.2; }
-.rules ol { list-style: none; counter-reset: rule; border-top: 1px solid var(--line); }
-.rules li { counter-increment: rule; display: flex; align-items: baseline; gap: 20px; padding: 18px 4px; border-bottom: 1px solid var(--line); }
-.rules li::before { content: counter(rule); flex: none; width: 1.3em; font-family: Georgia, serif; font-size: 34px; line-height: 1; text-align: center; color: var(--accent); }
-.rules li span { font-family: var(--reading-font); font-size: 19px; line-height: 1.5; }
-.rules strong { color: #fff; }
+/* the ghost under the bottom-right corner of the home page: hidden until you hover the empty space,
+   then the top of its head pokes up at a tilt (a link to #ghost, the "missing page") */
+.ghost-peek { position: relative; display: block; width: 180px; height: 96px; margin: 24px 0 0 auto; overflow: hidden; outline: none; }
+.ghost-peek img {
+  position: absolute; left: 20px; top: 100%; width: 160px; height: auto;
+  transform-origin: 40% 30%; transform: translateY(8px) rotate(0deg); opacity: 0;
+  transition: transform .45s cubic-bezier(.3, 1.5, .5, 1), opacity .2s ease;
+  pointer-events: none;
+}
+.ghost-peek:hover img, .ghost-peek:focus-visible img { transform: translateY(-58px) rotate(20deg); opacity: 1; }
+@media (hover: none) { .ghost-peek { height: 64px; } }
+@media (prefers-reduced-motion: reduce) { .ghost-peek img { transition: opacity .2s ease; } }
 @media (max-width: 480px) {
   .gallery-key img { width: 96px; height: 96px; }
-  .rules li { gap: 14px; }
-  .rules li::before { font-size: 28px; }
 }
 
 /* mobile bottom bar */

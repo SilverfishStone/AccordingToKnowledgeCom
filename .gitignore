@@ -1,0 +1,4 @@
+# copies made by articles-site/build.sh (Cloudflare makes its own when it builds)
+articles-site/articles/
+articles-site/story-content.css
+__pycache__/

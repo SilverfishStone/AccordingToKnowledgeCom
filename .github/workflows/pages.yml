@@ -24,7 +24,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
       - name: Assemble site
-        run: rsync -a --exclude='.git' --exclude='.github' --exclude='.claude' ./ _site/
+        # articles-site/ is the separate articles site, deployed by Cloudflare Pages
+        run: rsync -a --exclude='.git' --exclude='.github' --exclude='.claude' --exclude='articles-site' --exclude='.gitignore' ./ _site/
       # Pages lets browsers cache each file for 10 minutes on its own, which can pair a new
       # script.js with an old site-data.js. Stamping the commit id onto every asset URL makes
       # a page always fetch the set of files that was deployed together.
