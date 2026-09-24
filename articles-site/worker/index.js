@@ -1,8 +1,10 @@
 /* The articles site's server (a Cloudflare Worker). Everything under /api/ comes here; every
    other address is a file from dist/ (see wrangler.jsonc).
 
-   It keeps accounts, comments, messages and picture requests in a D1 database (binding DB)
-   and emails Silver about new comments, messages and picture requests (binding EMAIL).
+   It keeps accounts, comments, messages, picture requests and community writing in a D1
+   database (binding DB), emails Silver about new comments, messages and requests (binding
+   EMAIL), and publishes Silver's own articles to the GitHub repo (secret GITHUB_TOKEN), the
+   same way the editor on silverfishstone.com does.
 
    Accounts hold only a username, a password and a picture:
    - The browser stretches the password first (PBKDF2, see community.js), so the
@@ -76,6 +78,20 @@ const ROUTES = [
   ["GET", /^\/api\/admin\/words$/, adminWords],
   ["POST", /^\/api\/admin\/words$/, adminSaveWords],
   ["POST", /^\/api\/admin\/users\/(\d+)$/, adminUser],
+  // writing
+  ["GET", /^\/api\/writing$/, myWriting],
+  ["POST", /^\/api\/writing$/, newWriting],
+  ["POST", /^\/api\/writing\/import$/, importOfficial],
+  ["GET", /^\/api\/writing\/(\d+)$/, getWriting],
+  ["POST", /^\/api\/writing\/(\d+)$/, saveWriting],
+  ["POST", /^\/api\/writing\/(\d+)\/(submit|withdraw|delete|unpublish|publish|keep|reload)$/, writingAction],
+  ["POST", /^\/api\/writer\/request$/, requestToWrite],
+  ["GET", /^\/api\/community$/, communityList],
+  ["GET", /^\/api\/community\/([a-z0-9-]+)$/, communityArticle],
+  ["GET", /^\/api\/people\/([A-Za-z0-9_.-]+)$/, person],
+  ["GET", /^\/api\/admin\/submissions\/(\d+)$/, adminSubmission],
+  ["POST", /^\/api\/admin\/submissions\/(\d+)$/, adminReview],
+  ["POST", /^\/api\/admin\/writer-requests\/(\d+)$/, adminWriterRequest],
 ];
 
 async function route(request, env, ctx, url) {
@@ -119,6 +135,31 @@ const MIGRATIONS = [
     `CREATE TABLE messages (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, from_admin INTEGER NOT NULL, body TEXT NOT NULL, created_at INTEGER NOT NULL, read_at INTEGER)`,
     `CREATE INDEX messages_user ON messages (user_id, created_at)`,
     `CREATE TABLE limits (key TEXT PRIMARY KEY, win INTEGER NOT NULL, count INTEGER NOT NULL, expires INTEGER NOT NULL)`,
+  ],
+  [
+    // drafts: Silver's articles for the site ("official") and community writers' ("community")
+    `CREATE TABLE writings (
+      id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, kind TEXT NOT NULL, slug TEXT,
+      title TEXT NOT NULL DEFAULT '', subtitle TEXT NOT NULL DEFAULT '', summary TEXT NOT NULL DEFAULT '',
+      categories TEXT NOT NULL DEFAULT '[]', html TEXT NOT NULL DEFAULT '', delta TEXT NOT NULL DEFAULT '{"ops":[]}',
+      words INTEGER NOT NULL DEFAULT 0, pinned INTEGER NOT NULL DEFAULT 0, source TEXT,
+      state TEXT NOT NULL DEFAULT 'draft', note TEXT,
+      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, submitted_at INTEGER)`,
+    `CREATE INDEX writings_user ON writings (user_id, updated_at)`,
+    `CREATE INDEX writings_state ON writings (state, submitted_at)`,
+    // what readers see of community articles (a copy made when Silver approves)
+    `CREATE TABLE community (
+      slug TEXT PRIMARY KEY, writing_id INTEGER NOT NULL UNIQUE, user_id INTEGER NOT NULL,
+      title TEXT NOT NULL, subtitle TEXT NOT NULL, summary TEXT NOT NULL, categories TEXT NOT NULL,
+      html TEXT NOT NULL, words INTEGER NOT NULL, published_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
+    `CREATE INDEX community_user ON community (user_id)`,
+    `CREATE INDEX community_published ON community (published_at)`,
+    `CREATE TABLE writer_requests (user_id INTEGER PRIMARY KEY, note TEXT NOT NULL, created_at INTEGER NOT NULL)`,
+  ],
+  [
+    // for Silver's articles: the published version ("updated" time) a draft started from, so an
+    // edit made meanwhile on silverfishstone.com/write isn't quietly overwritten
+    `ALTER TABLE writings ADD COLUMN base TEXT`,
   ],
 ];
 let schemaReady = null;
@@ -230,6 +271,15 @@ async function flaggedWord(env, textToCheck) {
 }
 
 /* ───────── articles and avatars (read from the site's own files) ───────── */
+// what a comment can be attached to: one of Silver's articles ("<slug>") or a community one ("c:<slug>")
+async function commentable(c, key) {
+  if (key.startsWith("c:")) {
+    const row = await one(c.env, "SELECT slug, title FROM community WHERE slug = ?1", key.slice(2));
+    return row && { title: row.title, path: `/community/${row.slug}` };
+  }
+  const a = (await articles(c)).get(key);
+  return a && { title: a.title, path: `/article/${a.slug}` };
+}
 let articleCache = null;
 async function articles(c) {
   if (articleCache && articleCache.at > Date.now() - 60000) return articleCache.map;
@@ -283,7 +333,7 @@ function need(c, admin = false) {
 }
 // what the site is told about an account
 const publicUser = (u) => u && ({
-  id: u.id, username: u.username, avatar: u.avatar, role: u.role === "admin" ? "admin" : "user",
+  id: u.id, username: u.username, avatar: u.avatar, role: u.role === "admin" || u.role === "writer" ? u.role : "user",
   picture: u.avatar === "custom" && u.picture_at ? `/api/picture/${u.id}?v=${u.picture_at}` : null,
 });
 
@@ -353,6 +403,9 @@ async function me(c) {
   // their own picture: approved (so they can switch back to it) and/or waiting for approval
   const p = await one(c.env, "SELECT approved IS NOT NULL AS has, pending IS NOT NULL AS waiting, updated_at FROM pictures WHERE user_id = ?1", c.user.id);
   out.pictureWaiting = !!(p && p.waiting);
+  if (c.user.role === "user") out.writerRequest = !!(await one(c.env, "SELECT 1 AS x FROM writer_requests WHERE user_id = ?1", c.user.id));
+  if (c.user.role === "admin") out.pending.writing = (await one(c.env,
+    "SELECT (SELECT COUNT(*) FROM writings WHERE state = 'submitted') + (SELECT COUNT(*) FROM writer_requests) AS n")).n;
   out.ownPicture = p && p.has ? `/api/picture/${c.user.id}?v=${p.updated_at}` : null;
   return json(out);
 }
@@ -478,6 +531,9 @@ async function removeUser(env, id) {
     env.DB.prepare("DELETE FROM comments WHERE user_id = ?1").bind(id),
     env.DB.prepare("DELETE FROM messages WHERE user_id = ?1").bind(id),
     env.DB.prepare("DELETE FROM pictures WHERE user_id = ?1").bind(id),
+    env.DB.prepare("DELETE FROM writings WHERE user_id = ?1").bind(id),
+    env.DB.prepare("DELETE FROM community WHERE user_id = ?1").bind(id),
+    env.DB.prepare("DELETE FROM writer_requests WHERE user_id = ?1").bind(id),
     env.DB.prepare("DELETE FROM users WHERE id = ?1").bind(id),
   ]);
 }
@@ -522,7 +578,7 @@ async function listComments(c) {
 async function postComment(c) {
   const u = need(c);
   const slug = String(c.body.slug || "");
-  const art = (await articles(c)).get(slug);
+  const art = await commentable(c, slug);
   if (!art) throw new HttpError(404, "That article doesn't exist.");
   const body = text(c.body.body, "Your comment", LIMITS.comment);
   await limit(c, "comment", 10, 3600, "u" + u.id);
@@ -534,7 +590,7 @@ async function postComment(c) {
   if (u.role !== "admin") {
     notify(c, hit ? `Comment held for review on “${art.title}”` : `New comment on “${art.title}”`, [
       `${u.username} commented on “${art.title}”${hit ? ` (held because it contains “${hit}”)` : ""}:`, "", excerpt(body),
-      "", hit ? "It won't show until you approve it." : `It's live: ${c.url.origin}/article/${slug}#comments`,
+      "", hit ? "It won't show until you approve it." : `It's live: ${c.url.origin}${art.path}#comments`,
     ]);
   }
   const r = await one(c.env, `${COMMENT_SELECT} WHERE c.id = ?1`, row.id);
@@ -589,7 +645,20 @@ async function adminOverview(c) {
   try { email = emailRow ? JSON.parse(emailRow.value) : null; } catch { }
   return json({
     email: { setUp: !!(c.env.EMAIL && c.env.ALERT_TO), last: email },
-    comments: comments.map((r) => ({ ...commentRow(r, null), article: { slug: r.slug, title: (arts.get(r.slug) || {}).title || r.slug } })),
+    comments: await Promise.all(comments.map(async (r) => {
+      const where = r.slug.startsWith("c:") ? await commentable(c, r.slug) : null;
+      return { ...commentRow(r, null), article: where ? { path: where.path, title: where.title } : { path: `/article/${r.slug}`, title: (arts.get(r.slug) || {}).title || r.slug } };
+    })),
+    writerRequests: (await all(c.env,
+      `SELECT r.note, r.created_at, u.id, u.username, u.avatar, u.role, p.updated_at AS picture_at
+       FROM writer_requests r JOIN users u ON u.id = r.user_id LEFT JOIN pictures p ON p.user_id = u.id ORDER BY r.created_at`))
+      .map((r) => ({ user: publicUser(r), note: r.note, created: r.created_at })),
+    submissions: (await all(c.env,
+      `SELECT w.id, w.title, w.submitted_at, u.id AS uid, u.username, u.avatar, u.role, p.updated_at AS picture_at, cm.slug AS live
+       FROM writings w JOIN users u ON u.id = w.user_id LEFT JOIN pictures p ON p.user_id = u.id LEFT JOIN community cm ON cm.writing_id = w.id
+       WHERE w.state = 'submitted' ORDER BY w.submitted_at`))
+      .map((r) => ({ id: r.id, title: r.title || "Untitled", submitted: r.submitted_at, update: !!r.live,
+        user: publicUser({ id: r.uid, username: r.username, avatar: r.avatar, role: r.role, picture_at: r.picture_at }) })),
     pictures: pictures.map((p) => ({ user: { id: p.user_id, username: p.username }, url: `/api/picture/${p.user_id}?pending=1&v=${p.updated_at}` })),
     threads: threads.map((t) => ({ user: publicUser(t), last: t.last, unread: t.unread, preview: excerpt(t.preview || "", 140) })),
   });
@@ -700,6 +769,470 @@ async function adminUser(c) {
       ]);
       return json({ ok: true });
     case "delete": await removeUser(c.env, id); return json({ ok: true });
+    case "writer":
+      await c.env.DB.batch([
+        c.env.DB.prepare("UPDATE users SET role = 'writer' WHERE id = ?1").bind(id),
+        c.env.DB.prepare("DELETE FROM writer_requests WHERE user_id = ?1").bind(id),
+      ]);
+      return json({ ok: true });
+    case "unwriter": await run(c.env, "UPDATE users SET role = 'user' WHERE id = ?1 AND role = 'writer'", id); return json({ ok: true });
   }
   throw new HttpError(400, "Unknown action.");
+}
+
+/* ═════════════════ writing ═════════════════
+   Two kinds of writing share one editor and one table:
+   - "official": Silver's articles for the site. Drafts live here; Publish writes
+     articles/<slug>.json and articles/index.json to the GitHub repo (exactly what the editor on
+     silverfishstone.com writes), and both sites rebuild from that.
+   - "community": approved writers' articles. Submitting sends a draft to Silver; approving
+     copies it into `community`, which is what readers see. Edits to a published article wait
+     for approval the same way, while the published copy stays up. */
+const W = { title: 150, subtitle: 200, summary: 400, category: 40, categories: 5, html: 400000, delta: 900000, perUser: 100 };
+const slugify = (t) => String(t).toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "")
+  .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60).replace(/-+$/, "");
+const parseJSON = (s, fallback) => { try { return JSON.parse(s); } catch { return fallback; } };
+const canWrite = (u) => !!u && (u.role === "writer" || u.role === "admin");
+function needWriter(c) {
+  const u = need(c);
+  if (!canWrite(u)) throw new HttpError(403, "Only approved writers can do that.");
+  return u;
+}
+async function ownWriting(c, id) {
+  const w = await one(c.env, "SELECT * FROM writings WHERE id = ?1", Number(id));
+  if (!w || (w.user_id !== c.user.id && c.user.role !== "admin")) throw new HttpError(404, "That piece doesn't exist.");
+  return w;
+}
+const adminMessage = (env, userId, body) =>
+  run(env, "INSERT INTO messages (user_id, from_admin, body, created_at) VALUES (?1, 1, ?2, ?3)", userId, body, Date.now());
+
+function writingOut(w, live) {
+  return {
+    id: w.id, kind: w.kind, slug: w.slug, title: w.title, subtitle: w.subtitle, summary: w.summary,
+    categories: parseJSON(w.categories, []), html: w.html, delta: parseJSON(w.delta, { ops: [] }), words: w.words,
+    pinned: !!w.pinned, state: w.state, note: w.note, created: w.created_at, updated: w.updated_at, submitted: w.submitted_at, base: w.base || null,
+    published: w.kind === "official" ? !!w.slug : !!live,
+    live: live ? { slug: live.slug, published: live.published_at, updated: live.updated_at } : null,
+  };
+}
+
+// what the editor sends when saving; drafts can be half-finished, so only lengths are checked
+function writingFields(b) {
+  const str = (v, max, name) => {
+    const s = typeof v === "string" ? v.replace(/\s+/g, " ").trim() : "";
+    if (s.length > max) throw new HttpError(400, `${name} is too long (${s.length} of ${max} characters).`);
+    return s;
+  };
+  const cats = [];   // no duplicates (ignoring capitals); the first spelling wins
+  for (const x of Array.isArray(b.categories) ? b.categories : []) {
+    const name = String(x).replace(/\s+/g, " ").trim().slice(0, W.category);
+    if (name && !cats.some((c) => c.toLowerCase() === name.toLowerCase())) cats.push(name);
+  }
+  cats.splice(W.categories);
+  const html = typeof b.html === "string" ? b.html : "";
+  if (html.length > W.html) throw new HttpError(400, "That's too long to save here (the limit is roughly 50,000 words).");
+  const delta = b.delta && typeof b.delta === "object" ? JSON.stringify(b.delta) : '{"ops":[]}';
+  if (delta.length > W.delta) throw new HttpError(400, "That's too long to save here (the limit is roughly 50,000 words).");
+  return {
+    title: str(b.title, W.title, "The title"), subtitle: str(b.subtitle, W.subtitle, "The subtitle"),
+    summary: str(b.summary, W.summary, "The summary"), categories: JSON.stringify(cats),
+    html, delta, words: Math.max(0, Math.min(1e6, Math.floor(Number(b.words) || 0))), pinned: b.pinned ? 1 : 0,
+  };
+}
+
+async function myWriting(c) {
+  const u = needWriter(c);
+  const rows = await all(c.env,
+    `SELECT w.id, w.kind, w.slug, w.title, w.state, w.note, w.updated_at, w.submitted_at, cm.slug AS live
+     FROM writings w LEFT JOIN community cm ON cm.writing_id = w.id WHERE w.user_id = ?1 ORDER BY w.updated_at DESC`, u.id);
+  return json({ writings: rows.map((r) => ({
+    id: r.id, kind: r.kind, title: r.title, state: r.state, note: r.note, updated: r.updated_at,
+    published: r.kind === "official" ? !!r.slug : !!r.live, slug: r.kind === "official" ? r.slug : r.live,
+  })) });
+}
+
+async function newWriting(c) {
+  const u = needWriter(c);
+  const n = await one(c.env, "SELECT COUNT(*) AS n FROM writings WHERE user_id = ?1", u.id);
+  if (n.n >= W.perUser) throw new HttpError(400, `You have ${n.n} pieces already. Delete some old drafts first.`);
+  await limit(c, "new-writing", 30, 3600, "u" + u.id);
+  const now = Date.now();
+  const row = await one(c.env, "INSERT INTO writings (user_id, kind, created_at, updated_at) VALUES (?1, ?2, ?3, ?3) RETURNING id",
+    u.id, u.role === "admin" ? "official" : "community", now);
+  return json({ id: row.id });
+}
+
+// open one of the site's published articles for editing here (Silver only)
+async function importOfficial(c) {
+  const u = need(c, true);
+  const slug = String(c.body.slug || "");
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) throw new HttpError(400, "That isn't an article address.");
+  const have = await one(c.env, "SELECT id FROM writings WHERE kind = 'official' AND slug = ?1 ORDER BY updated_at DESC LIMIT 1", slug);
+  if (have) return json({ id: have.id });
+  // the repo is the freshest copy; the site's own files are a moment behind after a publish
+  let doc = null, pinned = false;
+  if (c.env.GITHUB_TOKEN && c.env.GITHUB_REPO) {
+    const f = await ghGet(c.env, `articles/${slug}.json`);
+    doc = f && parseJSON(f.text, null);
+    const idx = await ghGet(c.env, "articles/index.json");
+    pinned = !!(parseJSON(idx ? idx.text : "[]", []).find((a) => a.slug === slug) || {}).pinned;
+  } else {
+    const res = await c.env.ASSETS.fetch(new Request(new URL(`/articles/${slug}.json`, c.url)));
+    doc = res.ok ? await res.json() : null;
+    pinned = !!((await articles(c)).get(slug) || {}).pinned;
+  }
+  if (!doc) throw new HttpError(404, "That article's file is missing from the site.");
+  const now = Date.now();
+  const row = await one(c.env,
+    `INSERT INTO writings (user_id, kind, slug, title, subtitle, summary, categories, html, delta, words, pinned, source, created_at, updated_at, base)
+     VALUES (?1, 'official', ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12, ?13) RETURNING id`,
+    u.id, slug, doc.title || "", doc.subtitle || "", doc.summary || "", JSON.stringify(Array.isArray(doc.categories) ? doc.categories : []),
+    String(doc.html || ""), JSON.stringify(doc.delta && doc.delta.ops ? doc.delta : { ops: [] }), Number(doc.words) || 0, pinned ? 1 : 0,
+    doc.source || null, now, doc.updated || doc.published || null);
+  return json({ id: row.id });
+}
+
+async function getWriting(c) {
+  need(c);
+  const w = await ownWriting(c, c.params[0]);
+  const live = w.kind === "community" ? await one(c.env, "SELECT slug, published_at, updated_at FROM community WHERE writing_id = ?1", w.id) : null;
+  const out = writingOut(w, live);
+  if (w.kind === "official" && w.slug) out.site = await siteVersion(c.env, w.slug).catch(() => null);
+  return json({ writing: out });
+}
+
+async function saveWriting(c) {
+  const u = need(c);
+  const w = await ownWriting(c, c.params[0]);
+  if (w.state === "submitted" && u.role !== "admin") throw new HttpError(409, "It's waiting for review. Withdraw it to make changes.");
+  await limit(c, "save", 240, 3600, "u" + u.id);
+  const f = writingFields(c.body);
+  const now = Date.now();
+  await run(c.env,
+    `UPDATE writings SET title = ?1, subtitle = ?2, summary = ?3, categories = ?4, html = ?5, delta = ?6, words = ?7, pinned = ?8, updated_at = ?9
+     WHERE id = ?10`, f.title, f.subtitle, f.summary, f.categories, f.html, f.delta, f.words, w.kind === "official" ? f.pinned : 0, now, w.id);
+  return json({ updated: now });
+}
+
+async function writingAction(c) {
+  const u = need(c);
+  const w = await ownWriting(c, c.params[0]);
+  const action = c.params[1];
+  const mine = w.user_id === u.id;
+  switch (action) {
+    case "submit": {
+      if (w.kind !== "community" || !mine) throw new HttpError(400, "Only community articles are sent for review.");
+      if (!canWrite(u)) throw new HttpError(403, "Only approved writers can do that.");
+      if (!w.title.trim()) throw new HttpError(400, "Give it a title first.");
+      if (!w.words) throw new HttpError(400, "There's nothing written yet.");
+      await limit(c, "submit", 10, 86400, "u" + u.id);
+      await run(c.env, "UPDATE writings SET state = 'submitted', submitted_at = ?1, note = NULL WHERE id = ?2", Date.now(), w.id);
+      const live = await one(c.env, "SELECT slug FROM community WHERE writing_id = ?1", w.id);
+      notify(c, `${live ? "Changes" : "Article"} to review: “${w.title}”`, [
+        `${u.username} sent ${live ? "changes to their published article" : "an article"} for review: “${w.title}” (${w.words} words).`]);
+      return json({ ok: true });
+    }
+    case "withdraw":
+      await run(c.env, "UPDATE writings SET state = 'draft' WHERE id = ?1", w.id);
+      return json({ ok: true });
+    case "delete":
+      await c.env.DB.batch([
+        c.env.DB.prepare("DELETE FROM community WHERE writing_id = ?1").bind(w.id),
+        c.env.DB.prepare("DELETE FROM writings WHERE id = ?1").bind(w.id),
+      ]);
+      return json({ ok: true });   // an official article stays on the site; only this draft goes
+    case "unpublish":
+      if (w.kind === "community") {
+        await run(c.env, "DELETE FROM community WHERE writing_id = ?1", w.id);
+        return json({ ok: true });
+      }
+      need(c, true);
+      if (!w.slug) throw new HttpError(400, "It isn't on the site.");
+      await unpublishOfficial(c, w);
+      return json({ ok: true });
+    case "publish":
+      need(c, true);
+      if (w.kind !== "official") throw new HttpError(400, "Community articles are published by approving them.");
+      return json(await publishOfficial(c, w));
+    case "keep": {   // "keep my draft": stop asking about this version of the site's copy
+      need(c, true);
+      const v = String(c.body.version || "");
+      if (!v || isNaN(Date.parse(v))) throw new HttpError(400, "That isn't a version.");
+      await run(c.env, "UPDATE writings SET base = ?1 WHERE id = ?2", v, w.id);
+      return json({ ok: true });
+    }
+    case "reload": {   // "load the site's version": this draft becomes what's published; what was here is kept as a copy
+      need(c, true);
+      if (w.kind !== "official" || !w.slug) throw new HttpError(400, "It isn't on the site.");
+      const doc = await publishedDoc(c, w.slug);
+      if (!doc) throw new HttpError(404, "That article's file is missing from the site.");
+      const now = Date.now();
+      await c.env.DB.batch([
+        c.env.DB.prepare(`INSERT INTO writings (user_id, kind, title, subtitle, summary, categories, html, delta, words, created_at, updated_at)
+          SELECT user_id, 'official', title || ' (my earlier draft)', subtitle, summary, categories, html, delta, words, ?1, ?1 FROM writings WHERE id = ?2`).bind(now, w.id),
+        c.env.DB.prepare(`UPDATE writings SET title = ?1, subtitle = ?2, summary = ?3, categories = ?4, html = ?5, delta = ?6, words = ?7, source = ?8, base = ?9, updated_at = ?10 WHERE id = ?11`)
+          .bind(doc.title || "", doc.subtitle || "", doc.summary || "", JSON.stringify(Array.isArray(doc.categories) ? doc.categories : []),
+            String(doc.html || ""), JSON.stringify(doc.delta && doc.delta.ops ? doc.delta : { ops: [] }), Number(doc.words) || 0,
+            doc.source || null, doc.updated || doc.published || null, now, w.id),
+      ]);
+      return json({ ok: true });
+    }
+  }
+  throw new HttpError(400, "Unknown action.");
+}
+
+async function requestToWrite(c) {
+  const u = need(c);
+  if (canWrite(u)) throw new HttpError(400, "You can already write.");
+  const note = text(c.body.note, "Your note", 1000, 10);
+  await limit(c, "writer-request", 3, 86400, "u" + u.id);
+  await run(c.env, "INSERT INTO writer_requests (user_id, note, created_at) VALUES (?1, ?2, ?3) ON CONFLICT (user_id) DO UPDATE SET note = ?2, created_at = ?3",
+    u.id, note, Date.now());
+  notify(c, `${u.username} asked to write`, [`${u.username} asked to write for the site:`, "", excerpt(note, 1000)]);
+  return json({ ok: true });
+}
+
+/* ───────── the community pages ───────── */
+const COMMUNITY_SELECT = `SELECT cm.slug, cm.title, cm.subtitle, cm.summary, cm.categories, cm.words, cm.published_at, cm.updated_at,
+  u.id, u.username, u.avatar, u.role, p.updated_at AS picture_at
+  FROM community cm JOIN users u ON u.id = cm.user_id LEFT JOIN pictures p ON p.user_id = u.id`;
+const communityOut = (r) => ({
+  slug: r.slug, title: r.title, subtitle: r.subtitle, summary: r.summary, categories: parseJSON(r.categories, []),
+  words: r.words, published: r.published_at, updated: r.updated_at, author: publicUser(r),
+});
+
+async function communityList(c) {
+  const n = Math.min(200, Math.max(1, Number(c.url.searchParams.get("limit")) || 100));
+  const rows = await all(c.env, `${COMMUNITY_SELECT} WHERE u.banned = 0 ORDER BY cm.published_at DESC LIMIT ?1`, n);
+  return json({ articles: rows.map(communityOut) });
+}
+
+async function communityArticle(c) {
+  const r = await one(c.env, `${COMMUNITY_SELECT.replace("SELECT cm.slug,", "SELECT cm.html, cm.slug,")} WHERE cm.slug = ?1 AND u.banned = 0`, c.params[0]);
+  if (!r) throw new HttpError(404, "That article doesn't exist.");
+  return json({ article: { ...communityOut(r), html: r.html } });
+}
+
+async function person(c) {
+  const u = await one(c.env,
+    "SELECT u.id, u.username, u.avatar, u.role, u.banned, u.created_at, p.updated_at AS picture_at FROM users u LEFT JOIN pictures p ON p.user_id = u.id WHERE u.username = ?1",
+    c.params[0]);
+  if (!u || u.banned) throw new HttpError(404, "There's no one here by that name.");
+  const rows = await all(c.env, `${COMMUNITY_SELECT} WHERE cm.user_id = ?1 ORDER BY cm.published_at DESC`, u.id);
+  const comments = await one(c.env, "SELECT COUNT(*) AS n FROM comments WHERE user_id = ?1 AND status = 'approved'", u.id);
+  return json({ person: { ...publicUser(u), joined: u.created_at, comments: comments.n }, articles: rows.map(communityOut) });
+}
+
+/* ───────── reviewing (Silver) ───────── */
+async function adminSubmission(c) {
+  need(c, true);
+  const w = await one(c.env, "SELECT * FROM writings WHERE id = ?1", Number(c.params[0]));
+  if (!w) throw new HttpError(404, "That piece doesn't exist.");
+  const author = await currentUserById(c.env, w.user_id);
+  const live = await one(c.env, "SELECT * FROM community WHERE writing_id = ?1", w.id);
+  return json({
+    writing: writingOut(w, live), author: publicUser(author),
+    liveCopy: live ? { title: live.title, subtitle: live.subtitle, summary: live.summary, html: live.html } : null,
+  });
+}
+
+async function freeCommunitySlug(env, title) {
+  const base = slugify(title) || "article";
+  for (let n = 1; n < 200; n++) {
+    const cand = n === 1 ? base : `${base}-${n}`;
+    if (!(await one(env, "SELECT 1 AS x FROM community WHERE slug = ?1", cand))) return cand;
+  }
+  throw new HttpError(400, "Couldn't find a free address for that title.");
+}
+
+async function adminReview(c) {
+  need(c, true);
+  const w = await one(c.env, "SELECT * FROM writings WHERE id = ?1", Number(c.params[0]));
+  if (!w || w.kind !== "community") throw new HttpError(404, "That piece doesn't exist.");
+  if (w.state !== "submitted") throw new HttpError(409, "That isn't waiting for review any more (it may have been withdrawn).");
+  const now = Date.now();
+  if (c.body.action === "approve") {
+    const live = await one(c.env, "SELECT slug FROM community WHERE writing_id = ?1", w.id);
+    const slug = live ? live.slug : await freeCommunitySlug(c.env, w.title);
+    await c.env.DB.batch([
+      live
+        ? c.env.DB.prepare(`UPDATE community SET title = ?1, subtitle = ?2, summary = ?3, categories = ?4, html = ?5, words = ?6, updated_at = ?7 WHERE writing_id = ?8`)
+          .bind(w.title, w.subtitle, w.summary, w.categories, w.html, w.words, now, w.id)
+        : c.env.DB.prepare(`INSERT INTO community (slug, writing_id, user_id, title, subtitle, summary, categories, html, words, published_at, updated_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)`)
+          .bind(slug, w.id, w.user_id, w.title, w.subtitle, w.summary, w.categories, w.html, w.words, now),
+      c.env.DB.prepare("UPDATE writings SET state = 'draft', note = NULL, slug = ?1 WHERE id = ?2").bind(slug, w.id),
+    ]);
+    await adminMessage(c.env, w.user_id, live
+      ? `I've approved your changes to “${w.title}”. They're live now: ${c.url.origin}/community/${slug}`
+      : `“${w.title}” is published! Here it is: ${c.url.origin}/community/${slug}`);
+    return json({ ok: true, slug });
+  }
+  if (c.body.action === "return") {
+    const note = typeof c.body.note === "string" ? c.body.note.trim().slice(0, 2000) : "";
+    await run(c.env, "UPDATE writings SET state = 'draft', note = ?1 WHERE id = ?2", note || null, w.id);
+    await adminMessage(c.env, w.user_id, `I've sent “${w.title || "your article"}” back to you${note ? ` with a note:\n\n${note}` : "."}\n\nYou can change it and send it again from ${c.url.origin}/write`);
+    return json({ ok: true });
+  }
+  throw new HttpError(400, "Approve or send back.");
+}
+
+async function adminWriterRequest(c) {
+  need(c, true);
+  const id = Number(c.params[0]);
+  const r = await one(c.env, "SELECT user_id FROM writer_requests WHERE user_id = ?1", id);
+  if (!r) throw new HttpError(404, "That request is gone.");
+  if (c.body.action === "approve") {
+    await c.env.DB.batch([
+      c.env.DB.prepare("UPDATE users SET role = 'writer' WHERE id = ?1 AND role = 'user'").bind(id),
+      c.env.DB.prepare("DELETE FROM writer_requests WHERE user_id = ?1").bind(id),
+    ]);
+    await adminMessage(c.env, id, `You can write for the site now! Start here: ${c.url.origin}/write\n\nI read every article before it goes up.`);
+    return json({ ok: true });
+  }
+  if (c.body.action === "reject") {
+    const note = typeof c.body.note === "string" ? c.body.note.trim().slice(0, 1000) : "";
+    await run(c.env, "DELETE FROM writer_requests WHERE user_id = ?1", id);
+    await adminMessage(c.env, id, `Thanks for offering to write for the site. I'm not adding you as a writer right now${note ? `:\n\n${note}` : "."}`);
+    return json({ ok: true });
+  }
+  throw new HttpError(400, "Approve or turn down.");
+}
+
+/* ───────── publishing Silver's articles to the repo ───────── */
+function ghReady(env) {
+  if (!env.GITHUB_TOKEN || !env.GITHUB_REPO) throw new HttpError(503, "Publishing to the site isn't set up yet: the Worker needs a GITHUB_TOKEN secret.");
+}
+function ghExplain(status) {
+  if (status === 401) return "GitHub rejected the site's token (expired or revoked). Make a new one and update the GITHUB_TOKEN secret.";
+  if (status === 403) return "GitHub refused. The token needs “Contents: Read and write” on this repo (or GitHub's rate limit was hit).";
+  if (status === 404) return "GitHub couldn't find that. Check GITHUB_REPO and that the token can see the repo.";
+  if (status === 409 || status === 422) return "GitHub reported a conflict (something changed at the same time). Try again.";
+  return `GitHub returned an error (${status}).`;
+}
+async function gh(env, path, { method = "GET", body, raw = false } = {}) {
+  let res;
+  try {
+    res = await fetch(`https://api.github.com/repos/${env.GITHUB_REPO}${path}`, {
+      method,
+      headers: {
+        Accept: raw ? "application/vnd.github.raw+json" : "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+        "User-Agent": "accordingtoknowledge.com",
+        ...(body ? { "Content-Type": "application/json" } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch { throw new HttpError(502, "Couldn't reach GitHub. Try again in a moment."); }
+  if (!res.ok) { const e = new HttpError(res.status === 404 ? 404 : 502, ghExplain(res.status)); e.gh = res.status; throw e; }
+  if (raw) return res.text();
+  return res.status === 204 ? null : res.json();
+}
+const ghPath = (p) => "/contents/" + p.split("/").map(encodeURIComponent).join("/");
+const ghBranch = (env) => env.GITHUB_BRANCH || "main";
+function toB64(str) {
+  const bytes = enc.encode(str);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+const fromB64 = (b) => new TextDecoder().decode(Uint8Array.from(atob(b.replace(/\s/g, "")), (ch) => ch.charCodeAt(0)));
+async function ghGet(env, path) {
+  const where = `${ghPath(path)}?ref=${encodeURIComponent(ghBranch(env))}`;
+  try {
+    const j = await gh(env, where);
+    if (j.encoding === "base64" && j.content) return { sha: j.sha, text: fromB64(j.content) };
+    return { sha: j.sha, text: await gh(env, where, { raw: true }) };   // big files come without inline content
+  } catch (e) { if (e.gh === 404) return null; throw e; }
+}
+const ghPut = (env, path, textBody, message, sha) =>
+  gh(env, ghPath(path), { method: "PUT", body: { message, content: toB64(textBody), branch: ghBranch(env), ...(sha ? { sha } : {}) } });
+const ghDelete = (env, path, sha, message) => gh(env, ghPath(path), { method: "DELETE", body: { message, sha, branch: ghBranch(env) } });
+// read-modify-write of a JSON list, retrying if something else committed in between
+async function ghUpdateList(env, path, mutate, message) {
+  for (let attempt = 0; ; attempt++) {
+    const f = await ghGet(env, path);
+    const list = f ? parseJSON(f.text, null) : [];
+    if (!Array.isArray(list)) throw new HttpError(500, `${path} in the repo isn't valid JSON, so nothing was changed. Fix it in the repo first.`);
+    const next = mutate(list).sort((a, b) => new Date(b.published) - new Date(a.published));
+    try { await ghPut(env, path, JSON.stringify(next, null, 2) + "\n", message, f && f.sha); return next; }
+    catch (e) { if ((e.gh === 409 || e.gh === 422) && attempt < 2) continue; throw e; }
+  }
+}
+
+// the same files, in the same shape, as the editor on silverfishstone.com writes
+async function publishOfficial(c, w) {
+  const env = c.env;
+  ghReady(env);
+  const title = w.title.trim();
+  if (!title) throw new HttpError(400, "Give it a title first.");
+  if (!w.words) throw new HttpError(400, "There's nothing written yet.");
+  let slug = w.slug;
+  if (!slug) {
+    const idx = await ghGet(env, "articles/index.json");
+    const list = parseJSON(idx ? idx.text : "[]", []);
+    const base = slugify(title) || "article";
+    for (let n = 1; n < 50 && !slug; n++) {
+      const cand = n === 1 ? base : `${base}-${n}`;
+      if (cand === "index" || cand === "series" || list.some((a) => a.slug === cand)) continue;
+      if (!(await ghGet(env, `articles/${cand}.json`))) slug = cand;
+    }
+    if (!slug) throw new HttpError(400, "Couldn't find a free web address for this title. Try a different title.");
+  }
+  const path = `articles/${slug}.json`;
+  const existing = await ghGet(env, path);
+  const old = existing ? parseJSON(existing.text, {}) : {};
+  // changed on the site (from silverfishstone.com/write, say) since this draft started?
+  const siteAt = Date.parse(old.updated || ""), baseAt = Date.parse(w.base || "");
+  if (existing && !c.body.force && !isNaN(siteAt) && !isNaN(baseAt) && siteAt > baseAt + 1000) {
+    throw new HttpError(409, "This article changed on the site since this draft was started.", {
+      conflict: { updated: old.updated, words: old.words || 0, title: old.title || title } });
+  }
+  const now = new Date().toISOString();
+  const meta = { slug, title, summary: w.summary.trim(), published: old.published || now, updated: now, words: w.words };
+  if (w.subtitle.trim()) meta.subtitle = w.subtitle.trim();
+  meta.categories = parseJSON(w.categories, []);
+  const source = old.source || w.source;
+  const doc = { ...meta, ...(source ? { source } : {}), html: w.html, delta: parseJSON(w.delta, { ops: [] }) };
+  const verb = existing ? "Update" : "Publish";
+  await ghPut(env, path, JSON.stringify(doc), `${verb} article: ${title}`, existing && existing.sha);
+  await ghUpdateList(env, "articles/index.json", (l) => {
+    if (w.pinned) l.forEach((a) => { if (a.slug !== slug) delete a.pinned; });   // only one pinned
+    const entry = { ...meta, ...(w.pinned ? { pinned: true } : {}) };
+    const i = l.findIndex((a) => a.slug === slug);
+    if (i >= 0) l[i] = entry; else l.push(entry);
+    return l;
+  }, `${verb} article index: ${title}`);
+  await run(env, "UPDATE writings SET slug = ?1, state = 'draft', base = ?2, updated_at = ?3 WHERE id = ?4", slug, now, Date.now(), w.id);
+  articleCache = null;
+  return { ok: true, slug, verb };
+}
+
+// the published article: from the repo when the site can reach it (freshest), else the site's own files
+async function publishedDoc(c, slug) {
+  if (c.env.GITHUB_TOKEN && c.env.GITHUB_REPO) {
+    const f = await ghGet(c.env, `articles/${slug}.json`);
+    return f && parseJSON(f.text, null);
+  }
+  const res = await c.env.ASSETS.fetch(new Request(new URL(`/articles/${slug}.json`, c.url)));
+  return res.ok ? res.json() : null;
+}
+// what the site's list says about one article right now (its "updated" time and length)
+async function siteVersion(env, slug) {
+  if (!env.GITHUB_TOKEN || !env.GITHUB_REPO) return null;
+  const idx = await ghGet(env, "articles/index.json");
+  const e = parseJSON(idx ? idx.text : "[]", []).find((a) => a.slug === slug);
+  return e ? { updated: e.updated || e.published, words: e.words || 0, title: e.title } : null;
+}
+
+async function unpublishOfficial(c, w) {
+  const env = c.env;
+  ghReady(env);
+  const path = `articles/${w.slug}.json`;
+  const f = await ghGet(env, path);
+  if (f) await ghDelete(env, path, f.sha, `Unpublish article: ${w.title}`);
+  await ghUpdateList(env, "articles/index.json", (l) => l.filter((a) => a.slug !== w.slug), `Unpublish article index: ${w.title}`);
+  await run(env, "UPDATE writings SET slug = NULL, updated_at = ?1 WHERE id = ?2", Date.now(), w.id);
+  articleCache = null;
 }

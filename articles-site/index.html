@@ -59,6 +59,13 @@
           <div class="article-list" id="article-list" aria-live="polite"></div>
         </section>
 
+        <section class="list-wrap" id="home-community" aria-labelledby="home-community-h" hidden>
+          <div class="ink-rule" data-rule="11"></div>
+          <h2 class="section-h" id="home-community-h">From the community</h2>
+          <div class="article-list" id="home-community-list"></div>
+          <p class="center"><a class="text-link" href="community" data-link>All community articles →</a></p>
+        </section>
+
         <div class="ink-rule" data-rule="3"></div>
 
         <section class="rules" id="rules" aria-labelledby="rules-h">
@@ -72,7 +79,7 @@
         <a class="back" href="" data-link>← All articles</a>
         <article class="doc" id="doc" aria-live="polite"></article>
         <div class="ink-rule" data-rule="4"></div>
-        <div id="article-extras"></div>
+        <div id="article-extras" class="article-extras"></div>
         <a class="back" href="" data-link>← All articles</a>
       </section>
 
@@ -101,6 +108,52 @@
         <div id="admin-box"></div>
       </section>
 
+      <!-- WRITING (writing.js fills these in) -->
+      <section class="view write-page" data-view="write" hidden><div id="write-box"></div></section>
+      <section class="view" data-view="community" hidden>
+        <h1 class="page-h">Community</h1>
+        <p class="lead center">Articles by the site's community writers. I read each one before it's published, but the views are the writers' own.</p>
+        <div class="article-list" id="community-list"></div>
+        <p class="center"><a class="text-link" href="write" data-link>Write for the site →</a></p>
+      </section>
+      <section class="view" data-view="community-article" hidden>
+        <a class="back" href="community" data-link>← Community</a>
+        <article class="doc" id="c-doc" aria-live="polite"></article>
+        <div class="ink-rule" data-rule="10"></div>
+        <div id="community-extras" class="article-extras"></div>
+        <a class="back" href="community" data-link>← Community</a>
+      </section>
+      <section class="view narrow" data-view="people" hidden><div id="person-box"></div></section>
+
+      <!-- WRITING GUIDELINES -->
+      <section class="view narrow prose" data-view="writing-terms" hidden>
+        <h1 class="page-h">Writing for the site</h1>
+        <p>Community writers publish articles in the <a class="text-link" href="community" data-link>Community</a> section. Here's how it works, and what I ask of you.</p>
+        <h2>How it works</h2>
+        <ul>
+          <li>Ask to write from the <a class="text-link" href="write" data-link>Write</a> page. I'll reply in your messages.</li>
+          <li>Once you're a writer, your drafts save on the site as you type. When one's ready, send it to me.</li>
+          <li>I read every article before it's published. I'll publish it, or send it back with a note about what to change.</li>
+          <li>Changes to a published article go through me the same way. The published version stays up in the meantime.</li>
+          <li>For now, articles are text only: headings, quotes, lists and links, but no pictures.</li>
+        </ul>
+        <h2>What I ask</h2>
+        <ul>
+          <li><b>It's your own writing.</b> Quoting others is fine when you say who you're quoting. Copying isn't.</li>
+          <li><b>The Nine Rules apply.</b> Disagree as much as you like, but write about ideas, not people. No insults, harassment or hate.</li>
+          <li><b>Nothing that's meant to sell, spam or mislead,</b> and no personal details about anyone else.</li>
+          <li><b>Be honest about facts.</b> Say where a claim comes from when it matters.</li>
+        </ul>
+        <h2>Your rights, and mine</h2>
+        <ul>
+          <li>You keep the rights to what you write. By publishing it here, you let According To Knowledge show it on this site, with your username, for as long as it's up.</li>
+          <li>You can unpublish or delete your articles at any time.</li>
+          <li>I can decline an article, ask for changes, or take one down later, and I can remove someone as a writer.</li>
+          <li>Articles show the writer's views, not necessarily mine.</li>
+        </ul>
+        <p>Questions? <a class="text-link" href="messages" data-link>Send me a message</a>.</p>
+      </section>
+
       <!-- PRIVACY -->
       <section class="view narrow prose" data-view="privacy" hidden>
         <h1 class="page-h">Privacy</h1>
@@ -114,12 +167,13 @@
           <li><b>Your recovery code</b>, also only in hashed form.</li>
           <li><b>Your comments</b>, and <b>your messages to me</b> along with my replies. Messages are private between you and me.</li>
           <li><b>Your own picture</b>, if you send one for approval.</li>
+          <li><b>Your writing</b>, if you write for the site: drafts are private to you and me; published articles are public, with your username.</li>
           <li><b>A sign-in cookie</b> on each device you sign in on, so you stay signed in. It's only used for that.</li>
           <li>To stop people guessing passwords or flooding the site, a count of recent tries is kept for about an hour. Your IP address is only ever stored scrambled, for that count.</li>
         </ul>
         <p>No email address, real name or other personal details are asked for or kept.</p>
         <h2>Removing it</h2>
-        <p>You can delete your account at any time from your account page. That removes your account, comments, messages and picture for good. You can also delete any of your comments on their own.</p>
+        <p>You can delete your account at any time from your account page. That removes your account, comments, messages, picture and writing for good. You can also delete any of your comments on their own.</p>
         <h2>Age</h2>
         <p>Accounts are for people aged 13 and over.</p>
         <h2>Questions</h2>
@@ -135,13 +189,14 @@
 
     <footer class="foot">
       <div class="ink-rule" data-rule="6"></div>
-      <p>© <span id="year"></span> According To Knowledge · <a class="text-link" id="foot-personal" href="https://silverfishstone.com">silverfishstone.com</a> · <a class="text-link" href="privacy" data-link>Privacy</a></p>
+      <p>© <span id="year"></span> According To Knowledge · <a class="text-link" id="foot-personal" href="https://silverfishstone.com">silverfishstone.com</a> · <a class="text-link" href="community" data-link>Community</a> · <a class="text-link" href="write" data-link>Write</a> · <a class="text-link" href="privacy" data-link>Privacy</a></p>
     </footer>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
   <script src="config.js"></script>
   <script src="community.js"></script>
+  <script src="writing.js"></script>
   <script src="site.js"></script>
 </body>
 </html>

@@ -10,7 +10,7 @@ import sys
 
 SITE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(SITE)
-SHARED = ("/articles/", "/story-content.css")
+SHARED = ("/articles/", "/story-content.css", "/shared/")
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):

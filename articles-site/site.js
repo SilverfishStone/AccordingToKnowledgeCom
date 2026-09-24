@@ -4,6 +4,8 @@
      /article/<slug>   one article, with share buttons and comments
      /contact          about me and my links
      /login /account /messages /admin /privacy   accounts and the rest (community.js)
+     /write /write/<id> /community /community/<slug> /people/<name>   writing (writing.js)
+     /writing-terms   the guidelines for community writers
    The articles are the same files the personal site publishes: articles/index.json and
    articles/<slug>.json (copied in when Cloudflare builds the site; see build.sh). */
 (() => {
@@ -136,6 +138,7 @@
     catSelect.innerHTML = `<option value="">Latest</option>` + cats.map(([s, c]) => `<option value="${esc(s)}">${esc(c)}</option>`).join("");
     catSelect.value = cats.some(([s]) => s === wanted) ? wanted : "";
     renderList();
+    writing.home();
   }
 
   /* ───────── an article ───────── */
@@ -186,10 +189,16 @@
   function route() {
     const parts = location.pathname.replace(/^\/+|\/+$/g, "").split("/");
     const [a = "", b = ""] = parts;
+    if (a !== "write") writing.leave();   // leaving the editor saves it
     if (!a) { showView("home"); showHome(); }
     else if (a === "article" && b && parts.length === 2) { showView("article"); showArticle(b); }
     else if (a === "contact" && parts.length === 1) { showView("contact"); setTitle("Contact", "Silver's links: personal site, email, Substack and X."); }
     else if (community.views.includes(a) && parts.length === 1) { showView(a); setTitle(community.title(a), ATK.description); community.show(a); }
+    else if (a === "write" && parts.length <= 2) { showView("write"); writing.write(b); }
+    else if (a === "community" && parts.length === 1) { showView("community"); writing.list(); }
+    else if (a === "community" && b && parts.length === 2) { showView("community-article"); writing.read(b); }
+    else if (a === "people" && b && parts.length === 2) { showView("people"); writing.person(decodeURIComponent(b)); }
+    else if (a === "writing-terms" && parts.length === 1) { showView("writing-terms"); setTitle("Writing for the site", "Guidelines for According To Knowledge's community writers."); }
     else showMissing();
   }
 
@@ -221,6 +230,7 @@
   });
   addEventListener("popstate", () => route());
   community.go = go;
+  writing.site = { go, setTitle, inkRule };
   addEventListener("hashchange", () => { if (followOldHash() === "moved") go(location.href, false); });
 
   route();

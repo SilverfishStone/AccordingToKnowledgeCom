@@ -49,6 +49,27 @@
     el.className = "form-note " + (message ? kind : "");
   }
 
+  /* ───────── community writing is shown through a strict filter ─────────
+     Only what the community editor can make gets through: text formatting, headings, lists,
+     quotes, links and scene breaks. No pictures, styles or anything else. */
+  const COMMUNITY_HTML = {
+    ALLOWED_TAGS: ["p", "br", "h1", "h2", "h3", "strong", "em", "u", "s", "blockquote", "ol", "ul", "li", "a", "span", "hr"],
+    ALLOWED_ATTR: ["href", "class", "data-list", "contenteditable"],
+    ALLOWED_URI_REGEXP: /^(?:https?:|mailto:)/i,
+  };
+  function cleanCommunity(html) {
+    if (!window.DOMPurify) return "";
+    const frag = DOMPurify.sanitize(String(html || ""), { ...COMMUNITY_HTML, RETURN_DOM_FRAGMENT: true });
+    frag.querySelectorAll("[class]").forEach((el) => {   // only the editor's own classes
+      const keep = el.className.split(/\s+/).filter((c) => /^ql-[a-z0-9-]+$/.test(c)).join(" ");
+      if (keep) el.className = keep; else el.removeAttribute("class");
+    });
+    frag.querySelectorAll("a").forEach((a) => { a.target = "_blank"; a.rel = "noopener nofollow ugc"; });
+    const box = document.createElement("div");
+    box.appendChild(frag);
+    return box.innerHTML;
+  }
+
   /* ───────── who's signed in ───────── */
   let state = { user: null, unread: 0 };
   let meLoad = null;
@@ -68,7 +89,7 @@
     return "assets/avatars/" + (a ? a.file : "default.svg");
   };
   const avatarImg = (u, size = 40) => `<img class="avatar" src="${esc(avatarSrc(u))}" alt="" width="${size}" height="${size}" loading="lazy" />`;
-  const nameTag = (u) => `<span class="who">${esc(u.username)}</span>${u.role === "admin" ? ' <span class="author-tag">Author</span>' : ""}`;
+  const nameTag = (u) => `<a class="who" href="people/${encodeURIComponent(u.username)}" data-link>${esc(u.username)}</a>${u.role === "admin" ? ' <span class="author-tag">Author</span>' : u.role === "writer" ? ' <span class="author-tag writer-tag">Writer</span>' : ""}`;
 
   function renderNav() {
     const nav = $("#account-nav");
@@ -78,9 +99,10 @@
       nav.innerHTML = state.offline ? "" : `<a class="nav-link" href="login?next=${encodeURIComponent(here())}" data-link>Sign in</a>`;
       return;
     }
-    const pending = state.pending ? (state.pending.comments || 0) + (state.pending.pictures || 0) : 0;
+    const pending = state.pending ? (state.pending.comments || 0) + (state.pending.pictures || 0) + (state.pending.writing || 0) : 0;
     nav.innerHTML = `
       ${u.role === "admin" ? `<a class="nav-link" href="admin" data-link>Admin${pending || state.unread ? ` <span class="dot">${pending + state.unread}</span>` : ""}</a>` : ""}
+      ${u.role === "admin" || u.role === "writer" ? `<a class="nav-link" href="write" data-link>Write</a>` : ""}
       ${u.role !== "admin" ? `<a class="nav-link" href="messages" data-link aria-label="Messages${state.unread ? `, ${state.unread} new` : ""}">Messages${state.unread ? ` <span class="dot">${state.unread}</span>` : ""}</a>` : ""}
       <a class="nav-me" href="account" data-link title="Your account">${avatarImg(u, 30)}<span>${esc(u.username)}</span></a>`;
   }
@@ -252,7 +274,9 @@
     await avatarsLoaded;
     box.innerHTML = `
       <header class="me-head">${avatarImg(u, 72)}<div><h1>${esc(u.username)}</h1>
-        ${u.role === "admin" ? `<a class="text-link" href="admin" data-link>Open the admin page</a>` : `<a class="text-link" href="messages" data-link>Messages with Silver${state.unread ? ` (${state.unread} new)` : ""}</a>`}</div></header>
+        <p class="me-links">${u.role === "admin" ? `<a class="text-link" href="admin" data-link>Admin page</a>` : `<a class="text-link" href="messages" data-link>Messages with Silver${state.unread ? ` (${state.unread} new)` : ""}</a>`}
+          · <a class="text-link" href="write" data-link>${u.role === "admin" || u.role === "writer" ? "Your writing" : "Write for the site"}</a>
+          · <a class="text-link" href="people/${encodeURIComponent(u.username)}" data-link>Your public page</a></p></div></header>
 
       <section class="card-sec">
         <h2>Picture</h2>
@@ -473,11 +497,32 @@
         <button class="btn ghost small-btn" type="button" id="test-email">Send a test email</button>
       </section>
 
+      <section class="card-sec" id="review">
+        <h2>Articles to review <span class="count">${d.submissions.length}</span></h2>
+        ${d.submissions.length ? d.submissions.map((w) => `
+          <article class="held-item" data-submission="${w.id}">
+            <header>${avatarImg(w.user, 32)} ${nameTag(w.user)} sent <b>${esc(w.title)}</b>${w.update ? ' <span class="author-tag held-tag">Changes to a published article</span>' : ""}
+              <span class="meta">${esc(when(w.submitted))}</span></header>
+            <div class="row"><button class="btn ghost small-btn" type="button" data-act="review">Read it</button></div>
+            <div class="review-panel"></div>
+          </article>`).join("") : `<p class="small">Nothing to review.</p>`}
+      </section>
+
+      <section class="card-sec" id="writer-requests">
+        <h2>Requests to write <span class="count">${d.writerRequests.length}</span></h2>
+        ${d.writerRequests.length ? d.writerRequests.map((r) => `
+          <article class="held-item" data-writer-request="${r.user.id}">
+            <header>${avatarImg(r.user, 32)} ${nameTag(r.user)} <span class="meta">${esc(when(r.created))}</span></header>
+            <div class="comment-body">${paragraphs(r.note)}</div>
+            <div class="row"><button class="btn" type="button" data-act="approve">Make them a writer</button><button class="btn ghost" type="button" data-act="reject">Turn down</button></div>
+          </article>`).join("") : `<p class="small">No one is waiting.</p>`}
+      </section>
+
       <section class="card-sec" id="held">
         <h2>Held comments <span class="count">${d.comments.length}</span></h2>
         ${d.comments.length ? d.comments.map((c) => `
           <article class="held-item" data-comment="${c.id}">
-            <header>${avatarImg(c.user, 32)} ${nameTag(c.user)} on <a class="text-link" href="article/${esc(c.article.slug)}#comments" data-link>${esc(c.article.title)}</a> <span class="meta">${esc(when(c.created))}</span></header>
+            <header>${avatarImg(c.user, 32)} ${nameTag(c.user)} on <a class="text-link" href="${esc(c.article.path.slice(1))}#comments" data-link>${esc(c.article.title)}</a> <span class="meta">${esc(when(c.created))}</span></header>
             <div class="comment-body">${paragraphs(c.body)}</div>
             <div class="row"><button class="btn" type="button" data-act="approve">Approve</button><button class="btn ghost" type="button" data-act="reject">Delete</button></div>
           </article>`).join("") : `<p class="small">Nothing waiting. Comments only wait here when they use a word from your list below.</p>`}
@@ -546,7 +591,27 @@
     if (!b) return;
     const box = $("#admin-box");
     const comment = b.closest("[data-comment]"), pic = b.closest("[data-picture]"), user = b.closest("[data-user]");
+    const sub = b.closest("[data-submission]"), wreq = b.closest("[data-writer-request]");
     try {
+      if (sub && b.dataset.act === "review") { await openReview(sub); return; }
+      if (sub && (b.dataset.act === "approve" || b.dataset.act === "return")) {
+        const note = sub.querySelector("textarea") ? sub.querySelector("textarea").value : "";
+        if (b.dataset.act === "return" && !confirm("Send it back to the writer? They'll get your note as a message.")) return;
+        const r = await api(`admin/submissions/${sub.dataset.submission}`, { action: b.dataset.act, note });
+        sub.innerHTML = b.dataset.act === "approve"
+          ? `<p class="form-note ok">Published: <a class="text-link" href="community/${esc(r.slug)}" data-link>see it</a>. The writer got a message.</p>`
+          : `<p class="form-note ok">Sent back. The writer got a message${note.trim() ? " with your note" : ""}.</p>`;
+        loadMe(true);
+        return;
+      }
+      if (wreq && b.dataset.act) {
+        const note = b.dataset.act === "reject" ? prompt("Turn down this request? Add a note for them if you like (it's sent as a message).", "") : "";
+        if (note === null) return;
+        await api(`admin/writer-requests/${wreq.dataset.writerRequest}`, { action: b.dataset.act, note });
+        wreq.innerHTML = `<p class="form-note ok">${b.dataset.act === "approve" ? "They're a writer now, and got a message saying so." : "Turned down. They got a message."}</p>`;
+        loadMe(true);
+        return;
+      }
       if (comment && b.dataset.act) {
         await api(`admin/comments/${comment.dataset.comment}`, { action: b.dataset.act });
         comment.remove(); loadMe(true);
@@ -558,7 +623,7 @@
         b.querySelector(".dot")?.remove();
       } else if (user && b.dataset.act) {
         const act = b.dataset.act, name = user.dataset.name;
-        const ask = { delete: `Delete ${name}'s account, comments and messages for good?`, ban: `Suspend ${name}? They'll be signed out and can't sign in, and their held comments are removed.`, picture: `Take down ${name}'s own picture?`, recovery: `Make a new recovery code for ${name}? Their old one stops working. Give them the new one in a message.` }[act];
+        const ask = { delete: `Delete ${name}'s account, comments and messages for good?`, ban: `Suspend ${name}? They'll be signed out and can't sign in, and their held comments are removed.`, picture: `Take down ${name}'s own picture?`, recovery: `Make a new recovery code for ${name}? Their old one stops working. Give them the new one in a message.`, unwriter: `Remove ${name} as a writer? Their published articles stay up; they just can't write new ones.` }[act];
         if (ask && !confirm(ask)) return;
         const r = await api(`admin/users/${user.dataset.user}`, { action: act });
         if (r.recoveryCode) {
@@ -568,6 +633,29 @@
         listUsers($("#user-search", box).q.value);
       }
     } catch (err) { alert(err.message); }
+  }
+
+  // one submitted article, as readers would see it, with approve / send back
+  async function openReview(item) {
+    const panel = item.querySelector(".review-panel");
+    panel.innerHTML = `<p class="note">Loading…</p>`;
+    const d = await api(`admin/submissions/${item.dataset.submission}`);
+    const w = d.writing;
+    panel.innerHTML = `
+      <div class="review-doc">
+        <h1 class="doc-title">${esc(w.title || "Untitled")}</h1>
+        ${w.subtitle ? `<p class="doc-sub">${esc(w.subtitle)}</p>` : ""}
+        ${w.summary ? `<p class="review-summary"><b>Summary:</b> ${esc(w.summary)}</p>` : ""}
+        <p class="meta">${w.words.toLocaleString()} words${w.categories.length ? " · " + esc(w.categories.join(", ")) : ""}</p>
+        <div class="story-body ql-snow"><div class="ql-editor">${cleanCommunity(w.html)}</div></div>
+        ${d.liveCopy ? `<details class="review-live"><summary>What's published now</summary>
+          <h2>${esc(d.liveCopy.title)}</h2><div class="story-body ql-snow"><div class="ql-editor">${cleanCommunity(d.liveCopy.html)}</div></div></details>` : ""}
+      </div>
+      <label class="review-note">A note for the writer (only sent if you send it back)
+        <textarea rows="3" maxlength="2000" placeholder="What to change…"></textarea></label>
+      <div class="row"><button class="btn" type="button" data-act="approve">${d.liveCopy ? "Approve the changes" : "Approve and publish"}</button>
+        <button class="btn ghost" type="button" data-act="return">Send back</button></div>`;
+    item.querySelector("[data-act=review]").remove();
   }
 
   async function openThread(id) {
@@ -612,6 +700,7 @@
             <span class="meta">joined ${esc(new Date(u.created).toLocaleDateString())} · ${u.comments} comment${u.comments === 1 ? "" : "s"}</span></div>
           ${u.role === "admin" ? "" : `<div class="row">
             <button class="btn ghost small-btn" type="button" data-act="recovery">New recovery code</button>
+            <button class="btn ghost small-btn" type="button" data-act="${u.role === "writer" ? "unwriter" : "writer"}">${u.role === "writer" ? "Remove as writer" : "Make writer"}</button>
             ${u.avatar === "custom" ? `<button class="btn ghost small-btn" type="button" data-act="picture">Remove picture</button>` : ""}
             <button class="btn ghost small-btn" type="button" data-act="${u.banned ? "unban" : "ban"}">${u.banned ? "Unsuspend" : "Suspend"}</button>
             <button class="btn danger small-btn" type="button" data-act="delete">Delete</button></div>`}
@@ -639,9 +728,12 @@
   }
 
   let articleToken = 0;
-  async function article(slug, doc) {
-    const host = $("#article-extras"), mine = ++articleToken;
-    const url = `${location.origin}/article/${slug}`;
+  // key: what comments are filed under ("<slug>" for Silver's articles, "c:<slug>" for community
+  // ones); path: the article's address; host: where to draw it
+  async function article(slug, doc, { key = slug, path = `/article/${slug}`, host: hostSel = "#article-extras" } = {}) {
+    const host = $(hostSel), mine = ++articleToken;
+    document.querySelectorAll(".article-extras").forEach((el) => { if (el !== host) el.innerHTML = ""; });   // one set of comments at a time
+    const url = `${location.origin}${path}`;
     host.innerHTML = `${shareBar(url, doc.title || "")}
       <section class="comments" id="comments" aria-labelledby="comments-h">
         <h2 id="comments-h">Comments</h2>
@@ -656,21 +748,21 @@
     });
     host.querySelector("[data-share]")?.addEventListener("click", () => navigator.share({ title: doc.title, url }).catch(() => {}));
 
-    const [st, data] = await Promise.all([loadMe(), api("comments?slug=" + encodeURIComponent(slug)).catch((err) => ({ error: err }))]);
+    const [st, data] = await Promise.all([loadMe(), api("comments?slug=" + encodeURIComponent(key)).catch((err) => ({ error: err }))]);
     await avatarsLoaded;
     if (mine !== articleToken) return;
-    const list = $("#comment-list"), formHost = $("#comment-form");
+    const list = $("#comment-list", host), formHost = $("#comment-form", host);
     if (data.error) {
       list.innerHTML = `<p class="note">${data.error.status === 503 ? "Comments aren't switched on yet." : "Comments couldn't be loaded right now."}</p>`;
       return;
     }
     const render = (comments) => {
-      $("#comments-h").textContent = `Comments${comments.filter((c) => c.status === "approved").length ? ` (${comments.filter((c) => c.status === "approved").length})` : ""}`;
+      $("#comments-h", host).textContent = `Comments${comments.filter((c) => c.status === "approved").length ? ` (${comments.filter((c) => c.status === "approved").length})` : ""}`;
       list.innerHTML = comments.length ? comments.map((c) => commentHtml(c, st.user)).join("") : `<p class="note">No comments yet.</p>`;
     };
     let comments = data.comments;
     render(comments);
-    if (location.hash === "#comments") $("#comments").scrollIntoView({ block: "start" });
+    if (location.hash === "#comments") $("#comments", host).scrollIntoView({ block: "start" });
 
     list.addEventListener("click", async (e) => {
       const b = e.target.closest("button[data-act]"), el = e.target.closest("[data-comment]");
@@ -690,8 +782,8 @@
     });
 
     if (!st.user) {
-      formHost.innerHTML = `<p class="center sign-to-comment"><a class="btn" href="login?next=${encodeURIComponent(`/article/${slug}#comments`)}" data-link>Sign in to comment</a>
-        <span class="small">or <a class="text-link" href="login?tab=create&next=${encodeURIComponent(`/article/${slug}#comments`)}" data-link>make an account</a>. Just a username and password.</span></p>`;
+      formHost.innerHTML = `<p class="center sign-to-comment"><a class="btn" href="login?next=${encodeURIComponent(`${path}#comments`)}" data-link>Sign in to comment</a>
+        <span class="small">or <a class="text-link" href="login?tab=create&next=${encodeURIComponent(`${path}#comments`)}" data-link>make an account</a>. Just a username and password.</span></p>`;
       return;
     }
     formHost.innerHTML = `
@@ -702,13 +794,13 @@
         <p class="form-note"></p>
         <button class="btn" type="submit">Post comment</button>
       </form>`;
-    const form = $("#comment-compose");
+    const form = $("#comment-compose", host);
     form.addEventListener("submit", (e) => {
       e.preventDefault();
       const note = form.querySelector(".form-note");
       busy(form.querySelector("button"), "Posting…", async () => {
         try {
-          const r = await api("comments", { slug, body: form.body.value });
+          const r = await api("comments", { slug: key, body: form.body.value });
           comments = [...comments, r.comment];
           render(comments);
           form.reset();
@@ -742,6 +834,8 @@
     show: (v) => VIEWS[v](),
     article,
     refresh: () => loadMe(true),
+    // for writing.js
+    lib: { api, esc, when, paragraphs, avatarImg, nameTag, say, busy, loadMe, cleanCommunity, state: () => state },
   };
   loadMe();
 })();

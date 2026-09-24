@@ -34,6 +34,10 @@
     // and makes that account the admin
     "ADMIN_USERNAME": "Silver",
     "ALERT_TO": "authorsoon@gmail.com",
-    "ALERT_FROM": "alerts@accordingtoknowledge.com"
+    "ALERT_FROM": "alerts@accordingtoknowledge.com",
+    // where Silver's articles are published (the Worker also needs a GITHUB_TOKEN secret: a
+    // fine-grained token with Contents: Read and write on this repo only)
+    "GITHUB_REPO": "SilverfishStone/AccordingToKnowledgeCom",
+    "GITHUB_BRANCH": "main"
   }
 }

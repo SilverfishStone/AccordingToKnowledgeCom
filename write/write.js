@@ -287,97 +287,15 @@
   }
 
   /* ───────── editor setup ───────── */
-  if (!window.Quill) {
+  if (!window.Quill || !window.ATKEditor) {
     gErr.textContent = "The editor library didn't load (blocked or offline). Reload the page.";
     gErr.hidden = false;
     return;
   }
 
-  const Font = Quill.import("formats/font");
-  // no font class = Calibri, the site's reading font
-  Font.whitelist = ["calibri-light", "times", "cambria", "serif", "sans", "palatino", "garamond", "monospace", "cursive"];
-  Quill.register(Font, true);
-  const Size = Quill.import("attributors/style/size");
-  Size.whitelist = ["12px", "14px", "16px", "18px", "20px", "22px", "24px", "28px", "36px", "48px", "64px"];
-  Quill.register(Size, true);
-  const BlockEmbed = Quill.import("blots/block/embed");
-  class Divider extends BlockEmbed {}
-  Divider.blotName = "divider"; Divider.tagName = "hr";
-  Quill.register(Divider);
-  // quote styles: a class on a quote line (no class = the usual quote with a bar down the left).
-  // Styled in story-content.css so the site shows them the same way.
-  const Parchment = Quill.import("parchment");
-  const QuoteStyle = new Parchment.ClassAttributor("quote", "ql-quote", {
-    scope: Parchment.Scope.BLOCK, whitelist: ["center", "pull", "indent"],
-  });
-  Quill.register(QuoteStyle, true);
-
-  let quill;   // assigned just below; handlers only run after that
-  quill = new Quill("#editor", {
-    theme: "snow",
-    placeholder: "Once upon a time…",
-    modules: {
-      toolbar: {
-        container: "#toolbar",
-        handlers: {
-          undo() { quill.history.undo(); },
-          redo() { quill.history.redo(); },
-          // turning a quote off also drops its style, so the style doesn't linger on a plain paragraph
-          blockquote(on) {
-            const r = quill.getSelection(true);
-            quill.formatLine(r.index, r.length, on ? { blockquote: true } : { blockquote: false, quote: false }, "user");
-          },
-          // picking a style makes the line a quote too
-          quote(style) {
-            const r = quill.getSelection(true);
-            quill.formatLine(r.index, r.length, { blockquote: true, quote: style || false }, "user");
-          },
-          divider() {
-            const r = quill.getSelection(true);
-            quill.insertEmbed(r.index, "divider", true, "user");
-            quill.setSelection(r.index + 1, 0, "silent");
-          },
-          image() {
-            const url = (prompt("Image web address (https://…)") || "").trim();
-            if (!url) return;
-            if (!/^https?:\/\//i.test(url)) { toast("Use a full http:// or https:// address.", "err"); return; }
-            const r = quill.getSelection(true);
-            quill.insertEmbed(r.index, "image", url, "user");
-            quill.setSelection(r.index + 1, 0, "silent");
-          },
-        },
-      },
-      history: { delay: 800, maxStack: 300, userOnly: true },
-    },
-  });
-
-  // Ctrl+E centers the current paragraph (press again to undo), like Word
-  quill.keyboard.addBinding({ key: "e", shortKey: true }, (range) => {
-    quill.format("align", quill.getFormat(range).align === "center" ? false : "center", "user");
-    return false;
-  });
-
-  // custom (any-color) pickers: remember the selection, since the native dialog steals focus
-  let lastRange = null;
-  quill.on("selection-change", (range) => { if (range) lastRange = range; });
-  // the quote-style picker only means something inside a quote
-  const quotePicker = document.querySelector("#toolbar .ql-picker.ql-quote");
-  quill.on("editor-change", () => {
-    const r = quill.getSelection();
-    if (quotePicker && r) quotePicker.classList.toggle("not-quote", !quill.getFormat(r).blockquote);
-  });
-  function wireColor(inputSel, format) {
-    const input = $(inputSel);
-    input.addEventListener("input", () => { input.parentElement.style.setProperty("--c", input.value); });
-    input.addEventListener("change", () => {
-      if (!lastRange) { toast("Click into the text first.", "err"); return; }
-      quill.setSelection(lastRange.index, lastRange.length, "silent");
-      quill.format(format, input.value, "user");
-      quill.focus();
-    });
-  }
-  wireColor("#c-text", "color");
-  wireColor("#c-bg", "background");
+  // the toolbar, formats and quote styles are shared with accordingtoknowledge.com/write
+  const editor = ATKEditor.create({ editor: "#editor", toolbar: "#toolbar", preset: "full", placeholder: "Once upon a time…", toast });
+  const quill = editor.quill;
 
   /* ───────── drafts ───────── */
   const titleEl = $("#title"), subtitleEl = $("#subtitle"), summaryEl = $("#summary");
@@ -393,6 +311,7 @@
 
   const normalize = (d) => ({
     kind: "story", subtitle: "", series: "", pendingSeries: false, seriesTitle: "", seriesSummary: "", chapter: null, categories: [], pinned: false, extra: {},
+    base: null,   // the published version this draft started from (its "updated" time)
     ...d,
   });
   for (const id of Object.keys(drafts)) drafts[id] = normalize(drafts[id]);
@@ -598,7 +517,7 @@
     summaryEl.value = cur.summary || "";
     quill.setContents(cur.delta && cur.delta.ops ? cur.delta : { ops: [] }, "silent");
     quill.history.clear();
-    lastRange = null;
+    editor.forgetSelection();
     setPreview(false);
     savedAt = drafts[cur.id] ? new Date(cur.updated) : null;
     store.setJSON(K.cur, cur.id);
@@ -616,6 +535,7 @@
     leaveCurrent();
     cur = drafts[id];
     loadIntoUI();
+    checkSync();
   }
   function newOne(kind) {
     leaveCurrent();
@@ -653,7 +573,7 @@
       const delta = mapDelta(s.delta && s.delta.ops ? s.delta : quill.clipboard.convert({ html: mapHtml(String(s.html || ""), toEditorUrl) }), toEditorUrl);
       const d = normalize({
         ...newDraft(kind), title: s.title || "", subtitle: s.subtitle || "", summary: s.summary || "", delta,
-        slug: s.slug || slug, published: s.published || null,
+        slug: s.slug || slug, published: s.published || null, base: s.updated || s.published || null,
         series: s.series || "", chapter: s.chapter || null,
         categories: Array.isArray(s.categories) ? s.categories : [],
         pinned: !!(remote[kind].find((a) => a.slug === slug) || {}).pinned,
@@ -783,6 +703,19 @@
     const title = titleEl.value.trim();
     const verb = cur.slug ? "Update" : "Publish";
 
+    // don't quietly overwrite changes made on the site since this draft was started
+    if (cur.slug) {
+      try {
+        const fresh = (await readList(indexPath(kind))).find((s) => s.slug === cur.slug);
+        const entry = fresh && newerOnSite(cur, fresh);
+        if (entry) {
+          const choice = await askSync(entry, true);
+          if (choice === "load") { await loadSiteVersion(); return; }
+          if (choice !== "force") return;
+        }
+      } catch (err) { toast(listProblem(err), "err"); return; }
+    }
+
     const clash = kind === "story" && cur.series && remote.story.find((s) => s.series === cur.series && Number(s.chapter) === cur.chapter && s.slug !== cur.slug);
     const where = kind === "story" && cur.series ? ` as chapter ${cur.chapter} of “${(seriesList.find((s) => s.slug === cur.series) || { title: cur.seriesTitle }).title}”` : "";
     if (!confirm(`${verb} “${title}”${where} on the public site?${clash ? `\n\nHeads up: “${clash.title}” is already chapter ${cur.chapter} of this series.` : ""}`)) return;
@@ -826,7 +759,7 @@
         return l;
       }, `${verb} ${label.toLowerCase()} index: ${title}`, byNewest);
 
-      cur.slug = slug; cur.published = published; cur.changed = false; cur.pendingSeries = false;
+      cur.slug = slug; cur.published = published; cur.base = now; cur.changed = false; cur.pendingSeries = false;
       saveLocal({ quiet: true });
       toast(`${verb === "Publish" ? "Published" : "Updated"}. GitHub Pages usually shows it on the site within a minute or two.`, "ok");
     } catch (err) {
@@ -919,7 +852,86 @@ body{max-width:720px;margin:40px auto;padding:0 20px;font:18px/1.75 Georgia,seri
     renderGalleryChips();
     renderWnList(); renderWnChoices();
     renderStatus();
+    checkSync();
   }
+
+  /* ───────── keeping in step with the site ─────────
+     A draft remembers which published version it started from (`base`: that version's
+     "updated" time). If the site has a newer one, the article was changed somewhere else (on
+     accordingtoknowledge.com/write, or on another device), so ask before carrying on. */
+  const syncDialog = $("#sync-dialog");
+  const asked = new Set();   // "draft id|site version" already answered this session
+  const siteEntry = (d) => (d && d.slug ? (remote[d.kind] || []).find((s) => s.slug === d.slug) : null);
+  function newerOnSite(d, entry = siteEntry(d)) {
+    if (!entry || !entry.updated) return null;
+    const site = Date.parse(entry.updated);
+    if (isNaN(site)) return null;
+    // drafts from before this existed don't know their base: then a site change after the draft's last edit counts
+    const base = d.base ? Date.parse(d.base) : d.updated;
+    return site > base + 1000 ? entry : null;
+  }
+  function askSync(entry, publishing = false) {
+    const label = KINDS[cur.kind].label.toLowerCase();
+    const when = new Date(entry.updated);
+    $("#sy-h").textContent = publishing ? `This ${label} changed on the site` : "There's a newer version on the site";
+    $("#sy-text").textContent = `“${entry.title}” was updated on the site on ${fmtDate(entry.updated)} at ${fmtTime(when)}`
+      + (entry.words ? ` (${Number(entry.words).toLocaleString()} words)` : "")
+      + `, after this draft was started here (${countWords().toLocaleString()} words). It was probably edited on accordingtoknowledge.com or on another device.`;
+    $("#sy-keep").hidden = publishing;
+    $("#sy-force").hidden = !publishing;
+    $("#sy-help").textContent = publishing
+      ? "Publishing yours replaces the changes made on the site. Loading the site's version keeps your draft as a separate copy in the list."
+      : "Loading keeps your draft as a separate copy in the list, so nothing is lost.";
+    return new Promise((resolve) => {
+      syncDialog.addEventListener("close", () => resolve(syncDialog.returnValue || "cancel"), { once: true });
+      syncDialog.returnValue = "";
+      syncDialog.showModal();
+    });
+  }
+  // replace the open draft with what's published, keeping what was here as a copy
+  async function loadSiteVersion() {
+    const kind = cur.kind, slug = cur.slug;
+    setBusy(true, "Loading the site's version…");
+    try {
+      saveLocal({ quiet: true });
+      const f = await getFile(filePath(kind, slug));
+      if (!f) throw new Error("That file is missing from the site.");
+      const s = JSON.parse(f.text);
+      if (hasContent()) {
+        const copy = normalize({
+          ...JSON.parse(JSON.stringify(cur)), id: uid(), slug: null, published: null, base: null, pinned: false,
+          title: (cur.title || "Untitled") + " (my earlier draft)", updated: Date.now(), changed: true,
+        });
+        drafts[copy.id] = copy;
+      }
+      const delta = mapDelta(s.delta && s.delta.ops ? s.delta : quill.clipboard.convert({ html: mapHtml(String(s.html || ""), toEditorUrl) }), toEditorUrl);
+      Object.assign(cur, {
+        title: s.title || "", subtitle: s.subtitle || "", summary: s.summary || "", delta,
+        published: s.published || cur.published, base: s.updated || null,
+        series: s.series || cur.series, chapter: s.chapter || cur.chapter,
+        categories: Array.isArray(s.categories) ? s.categories : cur.categories,
+        extra: s.source ? { source: s.source } : {}, changed: false, updated: Date.now(),
+      });
+      persist();
+      loadIntoUI();
+      toast("Loaded the site's version. Your earlier draft is in the list as a copy.", "ok");
+    } catch (err) {
+      toast(listProblem(err), "err");
+    } finally { setBusy(false); }
+  }
+  // when a draft opens or the lists refresh: is the site ahead of this draft?
+  async function checkSync() {
+    if (!cur || !cur.slug || busy || mode !== "write" || syncDialog.open) return;
+    const entry = newerOnSite(cur);
+    if (!entry) return;
+    const key = cur.id + "|" + entry.updated;
+    if (asked.has(key)) return;
+    asked.add(key);
+    const choice = await askSync(entry);
+    if (choice === "load") await loadSiteVersion();
+    else if (choice === "keep") { cur.base = entry.updated; persist(); }
+  }
+
 
   /* ═════════ gallery ═════════ */
   const MAX_EDGE = 2400, THUMB_EDGE = 640, MAX_BYTES = 25 * 1024 * 1024;
