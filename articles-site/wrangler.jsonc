@@ -23,11 +23,11 @@
     { "binding": "DB", "database_name": "atk", "database_id": "8f0066ad-490f-497c-b6f0-470f9ede894c" }
   ],
 
-  // Email alerts to Silver (needs Email Routing switched on for accordingtoknowledge.com, with
-  // the address below verified there).
-  // "send_email": [
-  //   { "name": "EMAIL", "destination_address": "authorsoon@gmail.com" }
-  // ],
+  // email alerts to Silver (Email Routing is on for accordingtoknowledge.com, and this address
+  // is verified there; alerts can only go to verified addresses)
+  "send_email": [
+    { "name": "EMAIL", "destination_address": "authorsoon@gmail.com" }
+  ],
 
   "vars": {
     // signing up with this username needs ADMIN_CODE (a secret set in the Cloudflare dashboard)
