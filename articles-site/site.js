@@ -1,8 +1,9 @@
 /* According To Knowledge: the articles site.
-   One page with three views, picked from the address:
+   One page with several views, picked from the address:
      /                 home: the latest (or pinned) article, every article, the rules
-     /article/<slug>   one article
+     /article/<slug>   one article, with share buttons and comments
      /contact          about me and my links
+     /login /account /messages /admin /privacy   accounts and the rest (community.js)
    The articles are the same files the personal site publishes: articles/index.json and
    articles/<slug>.json (copied in when Cloudflare builds the site; see build.sh). */
 (() => {
@@ -22,6 +23,8 @@
   /* ───────── old links ─────────
      accordingtoknowledge.com used to be the personal site, with #hash addresses. Article links
      come here; everything else (stories, gallery, the secret page…) goes to the personal site. */
+  // #articles and #rules are places on the home page, not old links
+  const HOME_ANCHORS = new Set(["#articles", "#rules", "#comments"]);
   function fromOldHash(hash) {
     const [a = "", b = "", c = ""] = hash.replace(/^#\/?/, "").split("/");
     if (!a || a === "home" || a === "about" || a === "goals") return "/";
@@ -33,7 +36,7 @@
   // "moved" when an old #link was rewritten to its new address here, "leaving" when it belongs
   // to the personal site, false when the address isn't an old link
   function followOldHash() {
-    if (location.hash.length <= 1 || location.pathname !== "/" || location.search || location.hash === "#articles") return false;
+    if (location.hash.length <= 1 || location.pathname !== "/" || location.search || HOME_ANCHORS.has(location.hash)) return false;
     const to = fromOldHash(location.hash);
     if (to) { history.replaceState(null, "", to); return "moved"; }
     location.replace(ATK.personalSite.replace(/\/$/, "") + "/" + location.hash);
@@ -142,6 +145,7 @@
     const note = (t) => `<p class="note">${esc(t)}</p>`;
     if (!SLUG_RE.test(slug)) { showMissing(); return; }
     box.innerHTML = note("Loading…");
+    $("#article-extras").innerHTML = "";
     try {
       const doc = await getJSON(`articles/${slug}.json`);
       if (mine !== docToken) return;
@@ -157,6 +161,7 @@
       inkRule($(".ink-rule", box));
       $(".ql-editor", box).innerHTML = DOMPurify.sanitize(String(doc.html || ""));
       setTitle(doc.title || "Untitled", doc.summary || ATK.description);
+      community.article(slug, doc);
     } catch {
       if (mine !== docToken) return;
       showMissing();
@@ -184,6 +189,7 @@
     if (!a) { showView("home"); showHome(); }
     else if (a === "article" && b && parts.length === 2) { showView("article"); showArticle(b); }
     else if (a === "contact" && parts.length === 1) { showView("contact"); setTitle("Contact", "Silver's links: personal site, email, Substack and X."); }
+    else if (community.views.includes(a) && parts.length === 1) { showView(a); setTitle(community.title(a), ATK.description); community.show(a); }
     else showMissing();
   }
 
@@ -204,7 +210,7 @@
     const u = new URL(a.href, location.href);
     if (u.origin !== location.origin) return;
     // an old-style #link inside an older article
-    if (u.pathname === "/" && u.hash.length > 1 && u.hash !== "#articles") {
+    if (u.pathname === "/" && u.hash.length > 1 && !HOME_ANCHORS.has(u.hash)) {
       const to = fromOldHash(u.hash);
       e.preventDefault();
       if (to) go(to); else window.open(ATK.personalSite.replace(/\/$/, "") + "/" + u.hash, "_blank", "noopener");
@@ -214,8 +220,9 @@
     go(u.href);
   });
   addEventListener("popstate", () => route());
+  community.go = go;
   addEventListener("hashchange", () => { if (followOldHash() === "moved") go(location.href, false); });
 
   route();
-  if (location.hash === "#articles") setTimeout(() => $("#articles")?.scrollIntoView({ block: "start" }), 300);
+  if (HOME_ANCHORS.has(location.hash) && location.hash !== "#comments") setTimeout(() => $(location.hash)?.scrollIntoView({ block: "start" }), 300);
 })();

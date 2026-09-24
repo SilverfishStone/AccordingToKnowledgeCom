@@ -9,6 +9,12 @@ const ATK = {
   name: "According To Knowledge",
   description: "Articles by Silver on religion, belief and discourse.",
 
+  /* Cloudflare Turnstile (the "are you human" check) on the sign-up form. Leave it empty to
+     go without. To switch it on, make a widget in Cloudflare (Turnstile → Add widget, for
+     accordingtoknowledge.com), paste its site key here, and add its secret key to the Worker
+     as a secret named TURNSTILE_SECRET. */
+  turnstileSiteKey: "",
+
   /* The personal site, linked from the contact page. Old links to
      accordingtoknowledge.com/#stories, #gallery and so on are sent there. */
   personalSite: "https://silverfishstone.com",

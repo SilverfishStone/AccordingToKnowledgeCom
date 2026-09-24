@@ -1,0 +1,67 @@
+[
+  {
+    "id": "default",
+    "name": "Default",
+    "file": "default.svg"
+  },
+  {
+    "id": "quill",
+    "name": "Quill",
+    "file": "quill.svg"
+  },
+  {
+    "id": "book",
+    "name": "Book",
+    "file": "book.svg"
+  },
+  {
+    "id": "candle",
+    "name": "Candle",
+    "file": "candle.svg"
+  },
+  {
+    "id": "scroll",
+    "name": "Scroll",
+    "file": "scroll.svg"
+  },
+  {
+    "id": "key",
+    "name": "Key",
+    "file": "key.svg"
+  },
+  {
+    "id": "lantern",
+    "name": "Lantern",
+    "file": "lantern.svg"
+  },
+  {
+    "id": "compass",
+    "name": "Compass",
+    "file": "compass.svg"
+  },
+  {
+    "id": "star",
+    "name": "Star",
+    "file": "star.svg"
+  },
+  {
+    "id": "moon",
+    "name": "Moon",
+    "file": "moon.svg"
+  },
+  {
+    "id": "leaf",
+    "name": "Leaf",
+    "file": "leaf.svg"
+  },
+  {
+    "id": "hourglass",
+    "name": "Hourglass",
+    "file": "hourglass.svg"
+  },
+  {
+    "id": "anchor",
+    "name": "Anchor",
+    "file": "anchor.svg"
+  }
+]

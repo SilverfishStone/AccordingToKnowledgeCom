@@ -340,6 +340,14 @@
       inner.innerHTML = DOMPurify.sanitize(String(doc.html || ""));
       body.appendChild(inner); parts.push(body);
 
+      // comments live on the articles site (it has the accounts)
+      if (kind === "article") {
+        const p = document.createElement("p"); p.className = "doc-source";
+        const a = document.createElement("a"); a.className = "text-link"; a.target = "_blank"; a.rel = "noopener";
+        a.href = `https://accordingtoknowledge.com/article/${encodeURIComponent(slug)}#comments`;
+        a.textContent = "Comments and discussion on accordingtoknowledge.com ↗";
+        p.appendChild(a); parts.push(p);
+      }
       if (kind === "article" && doc.source && /^https:\/\//.test(doc.source)) {
         const p = document.createElement("p"); p.className = "doc-source";
         const a = document.createElement("a"); a.className = "text-link"; a.href = doc.source; a.target = "_blank"; a.rel = "noopener"; a.textContent = "Originally published on Substack ↗";

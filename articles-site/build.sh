@@ -11,9 +11,11 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 rm -rf dist
-mkdir -p dist/assets
-cp index.html site.css site.js config.js dist/
+mkdir -p dist/assets/avatars
+cp index.html site.css site.js community.js config.js dist/
 cp assets/*.png dist/assets/
+cp assets/avatars/*.svg assets/avatars/*.png assets/avatars/index.json dist/assets/avatars/ 2>/dev/null || true
+test -f dist/assets/avatars/index.json   # the avatar list must be there
 cp -r ../articles dist/articles
 cp ../story-content.css dist/
 echo "Built dist/ with $(ls dist/articles/*.json | wc -l) article files."
