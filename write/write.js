@@ -643,6 +643,7 @@
     $("#editor").hidden = on;
     $("#preview").hidden = !on;
     if (on) $("#preview .ql-editor").innerHTML = DOMPurify.sanitize(quill.root.innerHTML);
+    if (on) window.ATKEmbeds?.hydrate($("#preview .ql-editor"));
   }
   $("#btn-preview").addEventListener("click", () => setPreview(!previewOn));
   $("#btn-focus").addEventListener("click", () => {

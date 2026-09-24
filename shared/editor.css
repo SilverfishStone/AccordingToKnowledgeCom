@@ -51,3 +51,22 @@
 .custom-color span { font-weight: 800; font-size: 15px; pointer-events: none; border-bottom: 3px solid var(--c, var(--editor-accent, #8ab4ff)); line-height: 1; padding: 0 2px; }
 .custom-color.hl span { border: 0; color: var(--c, #ffd54a); }
 .custom-color input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; border: 0; padding: 0; }
+
+/* the "place an interactive" dialog (its own colours, so it looks the same on both sites) */
+.ql-snow .ql-interactive svg { width: 18px; height: 18px; }
+.atk-embed-dialog { width: min(440px, calc(100vw - 32px)); padding: 0; border: 1px solid rgba(70, 45, 10, .35); border-radius: 12px;
+  background: #f6e7bd; color: #1f160a; font: 15px/1.45 "Open Sans", "Segoe UI", system-ui, sans-serif; box-shadow: 0 18px 50px rgba(0, 0, 0, .35); }
+.atk-embed-dialog::backdrop { background: rgba(20, 14, 5, .55); }
+.atk-embed-dialog form { display: flex; flex-direction: column; gap: 12px; padding: 22px; }
+.atk-embed-dialog h2 { margin: 0; font-size: 20px; }
+.atk-embed-dialog p { margin: 0; }
+.atk-embed-dialog label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; color: #6e5628; }
+.atk-embed-dialog label span { display: flex; align-items: center; gap: 8px; font-weight: 400; color: #3b2c14; }
+.atk-embed-dialog select, .atk-embed-dialog input { font: inherit; font-size: 15px; color: #1f160a; background: #fffaf0; border: 1px solid rgba(70, 45, 10, .35); border-radius: 6px; padding: 6px 8px; }
+.atk-embed-dialog input[type=number] { width: 110px; }
+.atk-embed-about, .atk-embed-note { font-size: 13.5px; color: #3b2c14; }
+.atk-embed-about:empty { display: none; }
+.atk-embed-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+.atk-embed-actions .left { margin-right: auto; color: #7b2d12; }
+.atk-embed-actions button { font: inherit; font-weight: 600; padding: 7px 16px; border-radius: 8px; border: 1px solid rgba(70, 45, 10, .35); background: #fffaf0; color: #1f160a; cursor: pointer; }
+.atk-embed-actions button.primary { background: #7b2d12; border-color: #7b2d12; color: #fdf3dc; }

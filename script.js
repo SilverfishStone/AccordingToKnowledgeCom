@@ -357,6 +357,7 @@
       const body = document.createElement("div"); body.className = "story-body ql-snow";
       const inner = document.createElement("div"); inner.className = "ql-editor";
       inner.innerHTML = DOMPurify.sanitize(String(doc.html || ""));
+      window.ATKEmbeds?.hydrate(inner);
       body.appendChild(inner); parts.push(body);
 
       // comments live on the articles site (it has the accounts)

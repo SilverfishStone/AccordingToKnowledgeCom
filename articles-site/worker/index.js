@@ -790,7 +790,7 @@ async function adminUser(c) {
    - "community": approved writers' articles. Submitting sends a draft to Silver; approving
      copies it into `community`, which is what readers see. Edits to a published article wait
      for approval the same way, while the published copy stays up. */
-const W = { title: 150, subtitle: 200, summary: 400, category: 40, categories: 5, html: 400000, delta: 900000, perUser: 100 };
+const W = { title: 150, subtitle: 200, summary: 400, category: 40, categories: 5, html: 800000, delta: 950000, perUser: 100 };
 const slugify = (t) => String(t).toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "")
   .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60).replace(/-+$/, "");
 const parseJSON = (s, fallback) => { try { return JSON.parse(s); } catch { return fallback; } };
@@ -832,9 +832,9 @@ function writingFields(b) {
   }
   cats.splice(W.categories);
   const html = typeof b.html === "string" ? b.html : "";
-  if (html.length > W.html) throw new HttpError(400, "That's too long to save here (the limit is roughly 50,000 words).");
+  if (html.length > W.html) throw new HttpError(400, "That's too long to save here (the limit is roughly 50,000 words, less with interactives).");
   const delta = b.delta && typeof b.delta === "object" ? JSON.stringify(b.delta) : '{"ops":[]}';
-  if (delta.length > W.delta) throw new HttpError(400, "That's too long to save here (the limit is roughly 50,000 words).");
+  if (delta.length > W.delta) throw new HttpError(400, "That's too long to save here (the limit is roughly 50,000 words, less with interactives).");
   return {
     title: str(b.title, W.title, "The title"), subtitle: str(b.subtitle, W.subtitle, "The subtitle"),
     summary: str(b.summary, W.summary, "The summary"), categories: JSON.stringify(cats),

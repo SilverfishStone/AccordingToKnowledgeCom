@@ -12,6 +12,11 @@
      ed.quill                      // the Quill editor itself
      ed.words()  ed.hasBody()  ed.html()  ed.forgetSelection()
 
+   The full preset can also place interactives: a standalone .html file (a map, a chart…)
+   uploaded like a picture. In the text each one is
+   <div class="atk-embed" data-doc="(the file, base64)" data-height="600" data-title="…">; the
+   sites turn that into the live page with shared/embeds.js.
+
    The fonts, sizes and quote styles below must match story-content.css. */
 (() => {
   "use strict";
@@ -40,6 +45,23 @@
     class Divider extends BlockEmbed {}
     Divider.blotName = "divider"; Divider.tagName = "hr";
     Quill.register(Divider);
+    // an interactive: stored as a marker, shown as a labelled box while writing
+    class Interactive extends BlockEmbed {
+      static create(value) {
+        const node = super.create();
+        const v = cleanEmbed(value) || { doc: "", height: 600, title: "Interactive" };
+        node.setAttribute("contenteditable", "false");
+        node.setAttribute("data-doc", v.doc);
+        node.setAttribute("data-height", String(v.height));
+        node.setAttribute("data-title", v.title);
+        return node;
+      }
+      static value(node) {
+        return { doc: node.getAttribute("data-doc") || "", height: +node.getAttribute("data-height") || 600, title: node.getAttribute("data-title") || "" };
+      }
+    }
+    Interactive.blotName = "interactive"; Interactive.tagName = "DIV"; Interactive.className = "atk-embed";
+    Quill.register(Interactive);
     // quote styles: a class on a quote line (no class = the usual quote with a bar down the left)
     const Parchment = Quill.import("parchment");
     Quill.register(new Parchment.ClassAttributor("quote", "ql-quote", {
@@ -50,6 +72,7 @@
   const ICON_UNDO = '<svg viewBox="0 0 18 18"><polygon class="ql-fill ql-stroke" points="6 10 4 12 2 10 6 10"/><path class="ql-stroke" d="M8.09,13.91A4.6,4.6,0,0,0,9,14,5,5,0,1,0,4,9"/></svg>';
   const ICON_REDO = '<svg viewBox="0 0 18 18"><polygon class="ql-fill ql-stroke" points="12 10 14 12 16 10 12 10"/><path class="ql-stroke" d="M9.91,13.91A4.6,4.6,0,0,1,9,14a5,5,0,1,1,5-5"/></svg>';
   const ICON_BREAK = '<svg viewBox="0 0 18 18"><line class="ql-stroke" x1="3" x2="15" y1="9" y2="9"/><line class="ql-stroke" x1="3" x2="5" y1="4" y2="4"/><line class="ql-stroke" x1="13" x2="15" y1="14" y2="14"/></svg>';
+  const ICON_EMBED = '<svg viewBox="0 0 18 18"><rect class="ql-stroke" x="2.5" y="3.5" width="13" height="11" rx="1.5"/><circle class="ql-stroke" cx="7" cy="9.5" r="2.4"/><circle class="ql-stroke" cx="11.4" cy="8" r="1.6"/></svg>';
   const opt = (value, label, selected) => `<option${value ? ` value="${value}"` : ""}${selected ? " selected" : ""}>${label}</option>`;
 
   function toolbarHTML(preset) {
@@ -96,7 +119,8 @@
         <select class="ql-quote" title="Quote style">${QUOTES.map(([v, l]) => opt(v, l, !v)).join("")}</select>
         ${full ? `<button type="button" class="ql-code-block" title="Code block"></button>` : ""}
         <button type="button" class="ql-link" title="Link (Ctrl+K)"></button>
-        ${full ? `<button type="button" class="ql-image" title="Image from a web address"></button>` : ""}
+        ${full ? `<button type="button" class="ql-image" title="Image from a web address"></button>
+        <button type="button" class="ql-interactive" title="Interactive: upload an .html file (a map or chart readers can explore)">${ICON_EMBED}</button>` : ""}
         <button type="button" class="ql-divider" title="Scene break">${ICON_BREAK}</button>
         <button type="button" class="ql-clean" title="Clear formatting"></button>
       </span>`;
@@ -104,6 +128,82 @@
 
   // what each preset allows in the text, so pasted text can't bring in anything the toolbar can't make
   const COMMUNITY_FORMATS = ["header", "bold", "italic", "underline", "strike", "align", "list", "indent", "blockquote", "quote", "link", "divider"];
+
+  /* ───────── interactives ───────── */
+  // An interactive is a whole .html page (a map, a chart…) uploaded from the computer and kept
+  // inside the article itself, like a picture, as base64 so it passes through the sanitiser
+  // untouched. shared/embeds.js shows it to readers in a sealed-off frame.
+  const MAX_EMBED = 500000;   // characters of HTML (a whole article must stay under the site's size limit)
+  const B64 = /^[A-Za-z0-9+/]+={0,2}$/;
+  function toB64(text) {
+    const bytes = new TextEncoder().encode(text);
+    let bin = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  }
+  function cleanEmbed(v) {
+    if (!v || !B64.test(String(v.doc || "")) || v.doc.length > MAX_EMBED * 1.4) return null;
+    return { doc: String(v.doc), height: Math.min(1200, Math.max(280, Math.round(+v.height) || 600)), title: String(v.title || "Interactive").slice(0, 140) };
+  }
+  const escHTML = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+  // asks for an .html file; resolves to { doc, title } or null
+  function chooseFile(toast) {
+    return new Promise((resolve) => {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".html,.htm,text/html";
+      input.addEventListener("change", async () => {
+        const file = input.files && input.files[0];
+        if (!file) { resolve(null); return; }
+        if (!/\.html?$/i.test(file.name)) { toast("Choose an .html file.", "err"); resolve(null); return; }
+        const text = await file.text();
+        if (text.length > MAX_EMBED) { toast(`That file is too big (the limit is ${Math.round(MAX_EMBED / 1e6 * 10) / 10} MB).`, "err"); resolve(null); return; }
+        const named = (new DOMParser().parseFromString(text, "text/html").title || "").trim();
+        resolve({ doc: toB64(text), title: named || file.name.replace(/\.html?$/i, "") });
+      }, { once: true });
+      input.addEventListener("cancel", () => resolve(null), { once: true });
+      input.click();
+    });
+  }
+
+  // the settings of one interactive: resolves to the new value, "remove", or null (no change)
+  async function editInteractive(current, toast) {
+    const dlg = document.createElement("dialog");
+    dlg.className = "atk-embed-dialog";
+    dlg.innerHTML = `
+      <form method="dialog">
+        <h2>Interactive</h2>
+        <label>Caption<input name="title" maxlength="140" /></label>
+        <label>Height on the page<span><input name="height" type="number" min="280" max="1200" step="20" /> pixels</span></label>
+        <p class="atk-embed-note">Readers can use it right in the article, or open it full screen.</p>
+        <div class="atk-embed-actions">
+          <button value="remove" type="submit" class="left">Remove</button>
+          <button value="replace" type="submit">Replace file…</button>
+          <button value="cancel" type="submit">Cancel</button>
+          <button value="ok" type="submit" class="primary">Save</button>
+        </div>
+      </form>`;
+    document.body.appendChild(dlg);
+    const f = dlg.querySelector("form");
+    f.title.value = current.title;
+    f.height.value = current.height;
+    const answer = await new Promise((resolve) => {
+      const ac = new AbortController();
+      const finish = (v) => { ac.abort(); if (dlg.open) dlg.close(); resolve(v); };
+      dlg.querySelectorAll("button[value]").forEach((b) => b.addEventListener("click", (e) => { e.preventDefault(); finish(b.value); }, { signal: ac.signal }));
+      dlg.addEventListener("cancel", (e) => { e.preventDefault(); finish("cancel"); }, { signal: ac.signal });   // Esc
+      dlg.showModal();
+    });
+    const edited = { ...current, title: f.title.value.trim() || current.title, height: f.height.value };
+    dlg.remove();
+    if (answer === "remove") return "remove";
+    if (answer === "replace") {
+      const file = await chooseFile(toast);
+      return file ? cleanEmbed({ ...edited, doc: file.doc }) : null;
+    }
+    return answer === "ok" ? cleanEmbed(edited) : null;
+  }
 
   function create({ editor, toolbar, preset = "full", placeholder = "Start writing…", toast = () => {} }) {
     register();
@@ -135,6 +235,15 @@
               const r = quill.getSelection(true);
               quill.insertEmbed(r.index, "divider", true, "user");
               quill.setSelection(r.index + 1, 0, "silent");
+            },
+            async interactive() {
+              const r = quill.getSelection(true);
+              const file = await chooseFile(toast);
+              const value = file && cleanEmbed({ ...file, height: 600 });
+              if (!value) return;
+              quill.insertEmbed(r.index, "interactive", value, "user");
+              quill.setSelection(r.index + 1, 0, "silent");
+              toast("Interactive added. Click it to change its caption or height; Preview shows it working.");
             },
             image() {
               const url = (prompt("Image web address (https://…)") || "").trim();
@@ -174,6 +283,19 @@
         quill.format(input.dataset.color, input.value, "user");
         quill.focus();
       });
+    });
+
+    // click an interactive in the text to change it
+    quill.root.addEventListener("click", async (e) => {
+      const node = e.target.closest && e.target.closest(".atk-embed");
+      if (!node || !quill.root.contains(node) || !quill.isEnabled()) return;
+      const blot = Quill.find(node);
+      if (!blot || blot.statics.blotName !== "interactive") return;
+      const value = await editInteractive(blot.statics.value(node), toast);
+      if (!value) return;
+      const at = quill.getIndex(blot);
+      quill.updateContents({ ops: value === "remove" ? [{ retain: at }, { delete: 1 }]
+        : [{ retain: at }, { delete: 1 }, { insert: { interactive: value } }] }, "user");
     });
 
     const words = () => { const t = quill.getText().trim(); return t ? t.split(/\s+/).length : 0; };

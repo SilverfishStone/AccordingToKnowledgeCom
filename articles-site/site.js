@@ -163,6 +163,7 @@
         <div class="story-body ql-snow"><div class="ql-editor"></div></div>`;
       inkRule($(".ink-rule", box));
       $(".ql-editor", box).innerHTML = DOMPurify.sanitize(String(doc.html || ""));
+      window.ATKEmbeds?.hydrate($(".ql-editor", box));
       setTitle(doc.title || "Untitled", doc.summary || ATK.description);
       community.article(slug, doc, {
         info: { subtitle: doc.subtitle, author: "Silver", date: doc.published, html: DOMPurify.sanitize(String(doc.html || "")) },

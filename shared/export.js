@@ -36,7 +36,34 @@
   })));
 
   // the article's body as a document to walk through
-  const parse = (html) => new DOMParser().parseFromString(`<body>${String(html || "")}</body>`, "text/html").body;
+  // Interactives (shared/embeds.js): the offline web page keeps them working in a sealed-off
+  // frame; a Word file can't run one, so it gets a line saying where to find it.
+  function parse(html, { live = false, url = "" } = {}) {
+    const body = new DOMParser().parseFromString(`<body>${String(html || "")}</body>`, "text/html").body;
+    const d = body.ownerDocument;
+    body.querySelectorAll("div.atk-embed").forEach((node) => {
+      const title = node.getAttribute("data-title") || "Interactive";
+      let doc = "";
+      try { doc = new TextDecoder().decode(Uint8Array.from(atob(node.getAttribute("data-doc") || ""), (c) => c.charCodeAt(0))); } catch { }
+      if (live && doc) {
+        const f = d.createElement("iframe");
+        f.setAttribute("sandbox", "allow-scripts allow-popups allow-popups-to-escape-sandbox");
+        f.setAttribute("allowfullscreen", "");
+        f.setAttribute("title", title);
+        f.setAttribute("srcdoc", doc);
+        f.setAttribute("style", `width:100%;height:${Math.min(1200, Math.max(280, +node.getAttribute("data-height") || 600))}px;border:1px solid #ccc;border-radius:8px`);
+        node.replaceWith(f);
+        return;
+      }
+      const p = d.createElement("p");
+      const em = d.createElement("em");
+      em.textContent = `[Interactive: ${title}.${url ? " Explore it in the online article: " : " Open the online article to explore it."}]`;
+      p.append(em);
+      if (url) { const a = d.createElement("a"); a.href = url; a.textContent = url.replace(/^https?:\/\//, ""); p.append(a); }
+      node.replaceWith(p);
+    });
+    return body;
+  }
 
   // every picture, fetched once: { bytes, ext, width, height, dataUrl }. Word only takes PNG, JPEG
   // and GIF, so anything else is redrawn as PNG. A picture that can't be fetched is left out.
@@ -107,13 +134,13 @@ ${[1, 2, 3, 4, 5, 6, 7, 8].map((n) => `.body .ql-indent-${n} { padding-left: ${n
 @media print { body { background: #fff; } article { padding-top: 0; } }`;
 
   async function asHtml(a) {
-    const body = parse(a.html);
+    const body = parse(a.html, { live: true });
     const images = await fetchImages(body);
     body.querySelectorAll("img[src]").forEach((img) => {
       const pic = images.get(img.getAttribute("src"));
       if (pic) img.setAttribute("src", pic.dataUrl); else img.remove();
     });
-    body.querySelectorAll("script, style, iframe").forEach((el) => el.remove());
+    body.querySelectorAll("script, style, iframe:not([srcdoc][sandbox])").forEach((el) => el.remove());
     const page = `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${h(a.title || "Article")}</title><style>${PAGE_CSS}</style></head>
@@ -345,7 +372,7 @@ ${a.subtitle ? `<p class="subtitle">${h(a.subtitle)}</p>` : ""}
 
   async function asDocx(a) {
     await loadZip();
-    const body = parse(a.html);
+    const body = parse(a.html, { url: a.url });
     const images = await fetchImages(body);
     return buildDocx(a, body, images);
   }

@@ -81,6 +81,29 @@
   content: "\2726  \2726  \2726"; color: #71767b; letter-spacing: .5em; font-size: 14px;
 }
 
+/* interactives (shared/editor.js places them, shared/embeds.js makes them live). While writing,
+   and anywhere the live version can't be shown, the marker is a labelled box. */
+.story-body .ql-editor .atk-embed {
+  display: grid; place-items: center; min-height: 120px; margin: 0 0 1em; padding: 18px;
+  border: 2px dashed var(--story-line, rgba(128, 128, 128, .5)); border-radius: 10px;
+  background: rgba(128, 128, 128, .08); text-align: center; font-size: 15px; cursor: pointer; user-select: none;
+}
+.story-body .ql-editor .atk-embed::before { content: "\25CE  Interactive: " attr(data-title); font-weight: 700; }
+.story-body .ql-editor .atk-embed::after { content: "Readers see it live here. Click to change it."; display: block; margin-top: 4px; font-size: 13px; opacity: .7; }
+.story-body .ql-editor figure.atk-interactive { margin: 0 0 1.2em; }
+.story-body .ql-editor figure.atk-interactive iframe {
+  display: block; width: 100%; border: 1px solid var(--story-line, rgba(128, 128, 128, .5)); border-radius: 10px; background: #e9cb77;
+}
+.story-body .ql-editor figure.atk-interactive figcaption {
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 14px; margin-top: 6px; font-size: 14px; opacity: .85;
+}
+.story-body .ql-editor figure.atk-interactive .atk-full {
+  font: inherit; color: inherit; background: none; border: 1px solid currentColor; border-radius: 999px;
+  padding: 1px 10px; cursor: pointer; white-space: nowrap; opacity: .85;
+}
+.story-body .ql-editor figure.atk-interactive .atk-full:hover { opacity: 1; }
+.story-body .ql-editor figure.atk-interactive iframe:fullscreen { height: 100% !important; border: 0; border-radius: 0; }
+
 /* fonts (names must match the whitelist in write/write.js; no class = Calibri) */
 .ql-font-calibri-light { font-family: "Calibri Light", Calibri, Carlito, "Segoe UI", sans-serif; }
 .ql-font-times     { font-family: "Times New Roman", Tinos, "Liberation Serif", Times, serif; }

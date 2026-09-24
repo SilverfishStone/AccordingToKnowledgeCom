@@ -270,6 +270,7 @@
       pv.setAttribute("aria-pressed", String(on)); pv.textContent = on ? "Back to editing" : "Preview";
       $("#w-toolbar", box).hidden = on; $("#w-editor", box).hidden = on; $("#w-preview", box).hidden = !on;
       if (on) $("#w-preview .ql-editor", box).innerHTML = official ? DOMPurify.sanitize(ed.html()) : cleanCommunity(ed.html());
+      if (on && official) window.ATKEmbeds?.hydrate($("#w-preview .ql-editor", box));
     });
 
     $("#w-main", box)?.addEventListener("click", (e) => busy(e.target, official ? "Publishing…" : "Sending…", async () => {
