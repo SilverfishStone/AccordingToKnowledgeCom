@@ -461,7 +461,18 @@
     let d, words;
     try { [d, words] = await Promise.all([api("admin/overview"), api("admin/words")]); }
     catch (err) { box.innerHTML = `<p class="note">${esc(err.message)}</p>`; return; }
+    const em = d.email || {}, last = em.last;
     box.innerHTML = `
+      <section class="card-sec" id="email">
+        <h2>Email alerts</h2>
+        <p class="form-note ${!em.setUp || (last && !last.ok) ? "err" : "ok"}" id="email-status">${!em.setUp
+          ? "Not set up: the site has no email binding."
+          : !last ? "Set up. No alert has been sent yet."
+          : last.ok ? `Working. Last alert sent ${esc(when(last.at))} (“${esc(last.subject || "")}”).`
+          : `The last alert failed (${esc(when(last.at))}): ${esc(last.error)}`}</p>
+        <button class="btn ghost small-btn" type="button" id="test-email">Send a test email</button>
+      </section>
+
       <section class="card-sec" id="held">
         <h2>Held comments <span class="count">${d.comments.length}</span></h2>
         ${d.comments.length ? d.comments.map((c) => `
@@ -507,6 +518,13 @@
       </section>`;
 
     box.addEventListener("click", adminClick);
+    $("#test-email", box).addEventListener("click", (e) => busy(e.target, "Sending…", async () => {
+      const note = $("#email-status", box);
+      try {
+        const r = await api("admin/test-email", {});
+        say(note, r.ok ? "Test sent. Check your inbox (and spam) in a minute." : `Sending failed: ${r.status.error}`, r.ok ? "ok" : "err");
+      } catch (err) { say(note, err.message); }
+    }));
     $("#words-form", box).addEventListener("submit", (e) => {
       e.preventDefault();
       const f = e.target, note = f.querySelector(".form-note");

@@ -67,6 +67,7 @@ const ROUTES = [
   ["GET", /^\/api\/messages$/, myMessages],
   ["POST", /^\/api\/messages$/, sendMessage],
   ["GET", /^\/api\/admin\/overview$/, adminOverview],
+  ["POST", /^\/api\/admin\/test-email$/, adminTestEmail],
   ["POST", /^\/api\/admin\/comments\/(\d+)$/, adminComment],
   ["POST", /^\/api\/admin\/pictures\/(\d+)$/, adminPicture],
   ["GET", /^\/api\/admin\/messages\/(\d+)$/, adminThread],
@@ -297,11 +298,12 @@ async function setRecovery(env, userId) {
 }
 
 /* ───────── email to Silver ───────── */
-function notify(c, subject, lines) {
-  const env = c.env;
-  if (!env.EMAIL || !env.ALERT_TO) return;
+// Sends one alert. Tries the classic way first (a raw message through Email Routing), then
+// Cloudflare's newer message format, and records how it went in meta so /admin can show it.
+async function sendAlert(env, origin, subject, lines) {
+  if (!env.EMAIL || !env.ALERT_TO) throw Object.assign(new Error("Email alerts aren't set up (no EMAIL binding)."), { code: "NOT_SET_UP" });
   const from = env.ALERT_FROM || "alerts@accordingtoknowledge.com";
-  const body = [...lines, "", `Review it: ${c.url.origin}/admin`].join("\n");
+  const text = [...lines, "", `Review it: ${origin}/admin`].join("\n");
   const b64 = (s) => { let out = ""; for (const b of enc.encode(s)) out += String.fromCharCode(b); return btoa(out); };
   const raw = [
     `From: According To Knowledge <${from}>`,
@@ -313,9 +315,27 @@ function notify(c, subject, lines) {
     "Content-Type: text/plain; charset=utf-8",
     "Content-Transfer-Encoding: base64",
     "",
-    b64(body).replace(/.{76}/g, "$&\r\n"),
+    b64(text).replace(/.{76}/g, "$&\r\n"),
   ].join("\r\n");
-  c.ctx.waitUntil(env.EMAIL.send(new EmailMessage(from, env.ALERT_TO, raw)).catch((e) => console.error("alert email failed:", e)));
+  const errors = [];
+  try {
+    await env.EMAIL.send(new EmailMessage(from, env.ALERT_TO, raw));
+    return "classic";
+  } catch (e) { errors.push(`classic: ${e && (e.code ? e.code + " " : "") + e.message}`); }
+  try {
+    await env.EMAIL.send({ from: { email: from, name: "According To Knowledge" }, to: env.ALERT_TO, subject, text });
+    return "new";
+  } catch (e) { errors.push(`new: ${e && (e.code ? e.code + " " : "") + e.message}`); }
+  throw new Error(errors.join(" | "));
+}
+async function recordEmail(env, status) {
+  await run(env, "INSERT INTO meta (key, value) VALUES ('email_status', ?1) ON CONFLICT (key) DO UPDATE SET value = ?1", JSON.stringify(status)).catch(() => {});
+}
+function notify(c, subject, lines) {
+  if (!c.env.EMAIL || !c.env.ALERT_TO) return;
+  c.ctx.waitUntil(sendAlert(c.env, c.url.origin, subject, lines)
+    .then((how) => recordEmail(c.env, { ok: true, at: Date.now(), how, subject }))
+    .catch((e) => { console.error("alert email failed:", e); return recordEmail(c.env, { ok: false, at: Date.now(), error: String(e.message || e), subject }); }));
 }
 const excerpt = (s, n = 400) => (s.length > n ? s.slice(0, n) + "…" : s);
 
@@ -564,11 +584,30 @@ async function adminOverview(c) {
        (SELECT body FROM messages WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) AS preview
      FROM messages m JOIN users u ON u.id = m.user_id LEFT JOIN pictures pic ON pic.user_id = u.id
      GROUP BY u.id ORDER BY last DESC LIMIT 200`);
+  const emailRow = await one(c.env, "SELECT value FROM meta WHERE key = 'email_status'");
+  let email = null;
+  try { email = emailRow ? JSON.parse(emailRow.value) : null; } catch { }
   return json({
+    email: { setUp: !!(c.env.EMAIL && c.env.ALERT_TO), last: email },
     comments: comments.map((r) => ({ ...commentRow(r, null), article: { slug: r.slug, title: (arts.get(r.slug) || {}).title || r.slug } })),
     pictures: pictures.map((p) => ({ user: { id: p.user_id, username: p.username }, url: `/api/picture/${p.user_id}?pending=1&v=${p.updated_at}` })),
     threads: threads.map((t) => ({ user: publicUser(t), last: t.last, unread: t.unread, preview: excerpt(t.preview || "", 140) })),
   });
+}
+
+async function adminTestEmail(c) {
+  need(c, true);
+  await limit(c, "test-email", 5, 3600, "admin");
+  try {
+    const how = await sendAlert(c.env, c.url.origin, "Test alert from According To Knowledge", ["This is a test. If you can read it, email alerts work."]);
+    const status = { ok: true, at: Date.now(), how, subject: "Test alert" };
+    await recordEmail(c.env, status);
+    return json({ ok: true, status });
+  } catch (e) {
+    const status = { ok: false, at: Date.now(), error: String(e.message || e), subject: "Test alert" };
+    await recordEmail(c.env, status);
+    return json({ ok: false, status });
+  }
 }
 
 async function adminComment(c) {
