@@ -195,6 +195,7 @@ body.focus .bar:hover, body.focus .bar:focus-within { opacity: 1; }
 .meta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .meta-label { flex: none; min-width: 5.2em; font: 700 11px/1 "Cascadia Mono", Consolas, monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
 .meta-hint { font-size: 12px; color: var(--dim); }
+.thumb-preview { width: 152px; height: 80px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line, rgba(128, 128, 128, .4)); }
 .meta-panel select, .meta-panel input[type=text], .meta-panel input[type=number] {
   height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: #000; color: var(--text); font-size: 14px;
 }

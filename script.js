@@ -60,6 +60,8 @@
   };
   const readTime = (words) => (words ? Math.max(1, Math.round(words / 220)) + " min read" : "");
   const metaLine = (s) => [fmtDate(s.published), readTime(s.words)].filter(Boolean).join(" · ");
+  // an article's thumbnail (published into articles/thumbs/ by the editor), if it has one
+  const thumbOf = (a) => (/^articles\/thumbs\/[a-z0-9-]+\.jpg$/.test(a.thumbnail || "") ? a.thumbnail : "");
 
   /* series: derived from each story's `series` + `chapter`, titled from stories/series.json */
   function buildSeries(stories, meta) {
@@ -205,7 +207,8 @@
       if (catSlug && !cat) { list.innerHTML = note("No articles in that category."); return; }
       const shown = cat ? articles.filter((a) => a.categories.some((n) => slugify(n) === cat.slug)) : articles;
       if (!shown.length) { list.innerHTML = note("No articles yet. They'll appear here as I publish them."); return; }
-      list.innerHTML = shown.map((a) => `<a class="entry" href="#article/${esc(a.slug)}">
+      list.innerHTML = shown.map((a) => `<a class="entry${thumbOf(a) ? " has-thumb" : ""}" href="#article/${esc(a.slug)}">
+        ${thumbOf(a) ? `<img class="entry-thumb" src="${esc(thumbOf(a))}" alt="" loading="lazy" />` : ""}
         ${a.pinned ? '<span class="entry-kicker">Pinned</span>' : ""}
         <h2>${esc(a.title)}</h2>
         ${a.subtitle ? `<span class="entry-sub">${esc(a.subtitle)}</span>` : ""}
@@ -591,6 +594,8 @@
       $("#pinned-sub").textContent = a.subtitle || "";
       $("#pinned-tags").innerHTML = a.categories.map((c) => `<span class="tag">${esc(c)}</span>`).join("");
       $("#pinned-summary").textContent = a.summary || "";
+      $("#pinned-thumb").hidden = !thumbOf(a);
+      if (thumbOf(a)) $("#pinned-thumb").src = thumbOf(a);
     }
 
     // the pinned story (or the latest one)

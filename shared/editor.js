@@ -308,5 +308,22 @@
     };
   }
 
-  window.ATKEditor = { create, toolbarHTML, FONTS, SIZES, QUOTES, COMMUNITY_FORMATS };
+  /* ───────── article thumbnails ─────────
+     Any picture, cropped from the middle to 1200 x 630 (the shape link previews on Twitter/X,
+     Discord and the like use) and saved as a JPEG. Published into articles/thumbs/. */
+  const THUMB_PATH = /^articles\/thumbs\/[a-z0-9-]+\.jpg$/;
+  async function makeThumbnail(file) {
+    if (!file || !/^image\//.test(file.type)) throw new Error("Choose a picture (JPEG, PNG, WebP or GIF).");
+    const bmp = await createImageBitmap(file).catch(() => { throw new Error("That picture couldn't be read."); });
+    const W = 1200, H = 630, scale = Math.max(W / bmp.width, H / bmp.height);
+    const c = document.createElement("canvas");
+    c.width = W; c.height = H;
+    const g = c.getContext("2d");
+    g.fillStyle = "#e9cb77"; g.fillRect(0, 0, W, H);   // (under any transparent parts)
+    g.imageSmoothingQuality = "high";
+    g.drawImage(bmp, (W - bmp.width * scale) / 2, (H - bmp.height * scale) / 2, bmp.width * scale, bmp.height * scale);
+    return c.toDataURL("image/jpeg", 0.85);
+  }
+
+  window.ATKEditor = { create, toolbarHTML, FONTS, SIZES, QUOTES, COMMUNITY_FORMATS, makeThumbnail, THUMB_PATH };
 })();

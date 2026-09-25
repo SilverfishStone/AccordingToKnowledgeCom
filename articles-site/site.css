@@ -406,3 +406,21 @@ button.item { width: 100%; border: 0; background: none; color: inherit; font: in
 .w-row + .w-row { border-top: 1px dashed var(--line); }
 .w-row .item { padding-right: 70px; border-top: 0 !important; }
 .w-row .w-del { position: absolute; right: 12px; top: 16px; }
+
+/* the editor's thumbnail picker (Silver's articles) */
+.w-thumb { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 10px 0 14px; }
+.w-thumb-label { font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
+.w-thumb-img { width: 152px; aspect-ratio: 1200 / 630; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+.w-thumb-actions { display: inline-flex; gap: 8px; }
+.w-card { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; }
+.w-card b { font-size: 13px; }
+
+/* article thumbnails in the lists (1200 x 630 pictures from the editor) */
+.featured-thumb { display: block; width: 100%; aspect-ratio: 1200 / 630; object-fit: cover; border-radius: 10px; margin-bottom: 10px; border: 1px solid var(--line); }
+.item.has-thumb { display: grid; grid-template-columns: minmax(0, 1fr) 176px; column-gap: 18px; align-items: start; }
+.item.has-thumb > * { grid-column: 1; }
+.item.has-thumb > .item-thumb { grid-column: 2; grid-row: 1 / span 6; width: 176px; aspect-ratio: 1200 / 630; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+@media (max-width: 560px) {
+  .item.has-thumb { display: flex; flex-direction: column; }
+  .item.has-thumb > .item-thumb { width: 100%; order: -1; margin-bottom: 8px; }
+}

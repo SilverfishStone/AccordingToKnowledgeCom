@@ -1,6 +1,6 @@
 /* Writing on the articles site: the editor, community articles, and people's pages.
    site.js owns the addresses and calls in here:
-     writing.write(id)        /write (your desk) and /write/<id> (the editor)
+     writing.write(id)        /write (your desk) and /write/<id>-<title> (the editor; the number is what counts)
      writing.list()           /community
      writing.read(slug)       /community/<slug>
      writing.person(name)     /people/<username>
@@ -68,10 +68,19 @@
   /* ───────── /write: the desk ───────── */
   let open = null;   // the editor that's open, so leaving can save it
 
+  // an editor's address: the draft's number, then its title (/write/12-what-i-believe), so links say
+  // what they are. Only the number is read back, so renaming never breaks an old link.
+  const nameSlug = (t) => String(t || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60).replace(/-+$/, "");
+  const editorPath = (id, title) => `/write/${id}${nameSlug(title) ? "-" + nameSlug(title) : ""}`;
+
   async function write(id) {
     const box = $("#write-box");
     leave();
-    if (id) return editorPage(box, id);
+    if (id) {
+      const n = String(id).match(/^(\d+)(?:-|$)/);
+      return editorPage(box, n ? n[1] : id);
+    }
     const { api, esc, when, loadMe, say, busy, paragraphs } = L();
     box.innerHTML = `<p class="note">Loading…</p>`;
     const st = await loadMe(true);
@@ -123,7 +132,7 @@
     const item = (w) => {
       const [text, cls] = label(w);
       return `<div class="w-row" data-id="${w.id}" data-title="${esc(w.title || "Untitled")}" data-kind="${w.kind}" data-published="${w.published ? 1 : ""}">
-        <a class="item w-item" href="write/${w.id}" data-link>
+        <a class="item w-item" href="${editorPath(w.id, w.title).slice(1)}" data-link>
           <span class="item-title">${esc(w.title || "Untitled")}</span>
           <span class="meta"><span class="state ${cls}">${text}</span> · edited ${esc(when(w.updated))}</span></a>
         <button class="link-btn danger-link w-del" type="button" aria-label="Delete ${esc(w.title || "Untitled")}">Delete</button></div>`;
@@ -178,6 +187,11 @@
     const admin = st.user.role === "admin", official = w.kind === "official";
     const locked = w.state === "submitted" && !admin;
     setTitle(w.title || "Untitled", "");
+    // show the title in the address (and turn an old /write/12 link into /write/12-the-title)
+    const nameAddress = () => {
+      const want = editorPath(w.id, f.title.value);
+      if (location.pathname !== want) history.replaceState(history.state, "", want + location.search + location.hash);
+    };
     box.innerHTML = `
       <div class="w-bar">
         <a class="back" href="write" data-link>← Your writing</a>
@@ -199,6 +213,20 @@
         <datalist id="w-cat-list"></datalist>
         ${official ? `<label class="check"><input type="checkbox" id="w-pin" /> Pin to the home page</label>` : ""}
       </div>
+      ${official ? `<div class="w-thumb">
+        <span class="w-thumb-label">Thumbnail</span>
+        <img class="w-thumb-img" id="w-thumb-img" alt="" hidden />
+        <span class="w-thumb-actions">
+          <button class="btn ghost small-btn" type="button" id="w-thumb-btn">Choose picture…</button>
+          <button class="btn ghost small-btn" type="button" id="w-thumb-remove" hidden>Remove</button>
+          <input type="file" id="w-thumb-file" accept="image/*" hidden />
+        </span>
+        <span class="small">Shown in article lists on both sites; cropped to 1200 × 630.</span>
+        <span class="w-card"><b>Link preview</b>
+          <label class="check"><input type="radio" name="w-card" value="thumbnail" /> The thumbnail</label>
+          <label class="check"><input type="radio" name="w-card" value="banner" /> The site banner</label>
+        </span>
+      </div>` : ""}
       <div id="w-toolbar"></div>
       <div id="w-editor" class="story-body"></div>
       <div id="w-preview" class="story-body ql-snow" hidden><div class="ql-editor"></div></div>
@@ -241,6 +269,7 @@
       title: f.title.value, subtitle: f.subtitle.value, summary: f.summary.value,
       categories: f.cats.value.split(",").map((s) => s.trim()).filter(Boolean),
       html: ed.html(), delta: q.getContents(), words: ed.words(), pinned: f.pin ? f.pin.checked : false,
+      ...(official ? { thumbnail: thumb, card } : {}),
     });
     let dirty = false, timer = null, saving = null;
     async function save() {
@@ -256,7 +285,38 @@
     const changed = () => { if (locked) return; dirty = true; note("Unsaved changes…", "warn"); clearTimeout(timer); timer = setTimeout(save, 1500); foot(); };
     q.on("text-change", (_d, _o, source) => { if (source === "user") changed(); });
     [f.title, f.subtitle, f.summary, f.cats].forEach((el) => el.addEventListener("input", changed));
+    f.title.addEventListener("input", nameAddress);
+    nameAddress();
     if (f.pin) f.pin.addEventListener("change", changed);
+
+    // the thumbnail ("" / a new picture as a data: URL / its path on the site) and the link-preview choice
+    let thumb = w.thumbnail || "", card = w.card || "";
+    const cardNow = () => (thumb ? card || "thumbnail" : "banner");
+    function renderThumb() {
+      if (!official) return;
+      const img = $("#w-thumb-img", box);
+      img.hidden = !thumb;
+      if (thumb) img.src = thumb;
+      $("#w-thumb-btn", box).textContent = thumb ? "Change…" : "Choose picture…";
+      $("#w-thumb-remove", box).hidden = !thumb;
+      box.querySelectorAll('input[name="w-card"]').forEach((r) => {
+        r.checked = r.value === cardNow();
+        r.disabled = locked || (r.value === "thumbnail" && !thumb);
+      });
+    }
+    if (official) {
+      $("#w-thumb-btn", box).addEventListener("click", () => $("#w-thumb-file", box).click());
+      $("#w-thumb-file", box).addEventListener("change", async (e) => {
+        const file = e.target.files && e.target.files[0];
+        e.target.value = "";
+        if (!file) return;
+        try { thumb = await ATKEditor.makeThumbnail(file); if (!card) card = "thumbnail"; renderThumb(); changed(); }
+        catch (err) { note(err.message, "err"); }
+      });
+      $("#w-thumb-remove", box).addEventListener("click", () => { thumb = ""; renderThumb(); changed(); });
+      box.querySelectorAll('input[name="w-card"]').forEach((r) => r.addEventListener("change", () => { if (r.checked) { card = r.value; changed(); } }));
+      renderThumb();
+    }
     note(locked ? "Waiting for review" : w.updated ? `Saved ${when(w.updated)}` : "");
     open = { save, isDirty: () => dirty, send: () => {   // when the tab closes: one last save that outlives the page
       if (!dirty) return;
@@ -293,6 +353,7 @@
             r = await api(`writing/${w.id}/publish`, { force: true });
           }
           note(`${r.verb === "Publish" ? "Published" : "Updated"}. Both sites show it within a couple of minutes.`, "ok");
+          if (typeof r.thumbnail === "string") { thumb = r.thumbnail; renderThumb(); }   // now a file on the site, not a new picture
           if (!w.published) setTimeout(() => editorPage(box, w.id), 1200);
         } else {
           await api(`writing/${w.id}/submit`, {});

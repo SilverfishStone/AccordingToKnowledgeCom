@@ -156,6 +156,20 @@
                 <input id="new-cat" type="text" maxlength="60" placeholder="New category, then Enter" autocomplete="off" />
                 <button class="bar-btn" id="btn-add-cat" type="button">Add</button>
               </div>
+              <div class="meta-row">
+                <span class="meta-label">Thumbnail</span>
+                <img class="thumb-preview" id="thumb-img" alt="" hidden />
+                <button class="bar-btn" id="btn-thumb" type="button">Choose picture…</button>
+                <button class="bar-btn" id="btn-thumb-remove" type="button" hidden>Remove</button>
+                <input type="file" id="thumb-file" accept="image/*" hidden />
+                <span class="meta-hint">Shown in article lists; cropped to 1200 × 630.</span>
+              </div>
+              <div class="meta-row">
+                <span class="meta-label">Link preview</span>
+                <label class="pin"><input type="radio" name="card" value="thumbnail" /> The thumbnail</label>
+                <label class="pin"><input type="radio" name="card" value="banner" /> The site banner</label>
+                <span class="meta-hint">What Twitter/X, Discord and the like show for a link to it.</span>
+              </div>
             </div>
 
             <div class="meta-row" id="pin-row">

@@ -93,12 +93,15 @@
   /* ───────── home ───────── */
   const catSelect = $("#category");
   let articles = [];
+  // an article's thumbnail (published into articles/thumbs/ by either editor), if it has one
+  const thumbOf = (a) => (/^articles\/thumbs\/[a-z0-9-]+\.jpg$/.test(a.thumbnail || "") ? a.thumbnail : "");
 
   function renderList() {
     const want = catSelect.value;
     const shown = want ? articles.filter((a) => a.categories.some((c) => slugify(c) === want)) : articles;
     $("#article-list").innerHTML = shown.length ? shown.map((a) => `
-      <a class="item" href="article/${esc(a.slug)}" data-link>
+      <a class="item${thumbOf(a) ? " has-thumb" : ""}" href="article/${esc(a.slug)}" data-link>
+        ${thumbOf(a) ? `<img class="item-thumb" src="${esc(thumbOf(a))}" alt="" loading="lazy" />` : ""}
         <span class="item-title">${esc(a.title || "Untitled")}</span>
         ${a.subtitle ? `<span class="item-sub">${esc(a.subtitle)}</span>` : ""}
         <span class="meta">${esc(metaLine(a))}${a.categories.length ? " · " + esc(a.categories.join(", ")) : ""}</span>
@@ -130,6 +133,8 @@
       $("#featured-sub").textContent = f.subtitle || "";
       $("#featured-summary").textContent = f.summary || "";
       $("#featured-meta").textContent = metaLine(f);
+      $("#featured-thumb").hidden = !thumbOf(f);
+      if (thumbOf(f)) $("#featured-thumb").src = thumbOf(f);
     }
     // "Latest" (everything, newest first) or one category
     const cats = [...new Map(articles.flatMap((a) => a.categories).map((c) => [slugify(c), c])).entries()]

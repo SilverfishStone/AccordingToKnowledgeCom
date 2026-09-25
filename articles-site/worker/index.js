@@ -36,7 +36,13 @@ class HttpError extends Error {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
+    if (!url.pathname.startsWith("/api/")) {
+      if (request.method === "GET" || request.method === "HEAD") {
+        const m = url.pathname.match(/^\/(article|community)\/([a-z0-9-]+)\/?$/);
+        if (m) return withPreview(request, env, url, m[1], m[2]).catch(() => env.ASSETS.fetch(request));
+      }
+      return env.ASSETS.fetch(request);
+    }
     try {
       if (!env.DB) throw new HttpError(503, "Accounts aren't switched on yet.");
       await ensureSchema(env);
@@ -162,6 +168,12 @@ const MIGRATIONS = [
     // for Silver's articles: the published version ("updated" time) a draft started from, so an
     // edit made meanwhile on silverfishstone.com/write isn't quietly overwritten
     `ALTER TABLE writings ADD COLUMN base TEXT`,
+  ],
+  [
+    // an article's thumbnail ("" / a new picture as a data: URL / its path in the repo) and which
+    // picture link previews use ("thumbnail" or "banner")
+    `ALTER TABLE writings ADD COLUMN thumbnail TEXT`,
+    `ALTER TABLE writings ADD COLUMN card TEXT`,
   ],
 ];
 let schemaReady = null;
@@ -813,6 +825,7 @@ function writingOut(w, live) {
     id: w.id, kind: w.kind, slug: w.slug, title: w.title, subtitle: w.subtitle, summary: w.summary,
     categories: parseJSON(w.categories, []), html: w.html, delta: parseJSON(w.delta, { ops: [] }), words: w.words,
     pinned: !!w.pinned, state: w.state, note: w.note, created: w.created_at, updated: w.updated_at, submitted: w.submitted_at, base: w.base || null,
+    thumbnail: w.thumbnail || "", card: w.card || "",
     published: w.kind === "official" ? !!w.slug : !!live,
     live: live ? { slug: live.slug, published: live.published_at, updated: live.updated_at } : null,
   };
@@ -835,7 +848,12 @@ function writingFields(b) {
   if (html.length > W.html) throw new HttpError(400, "That's too long to save here (the limit is roughly 50,000 words, less with interactives).");
   const delta = b.delta && typeof b.delta === "object" ? JSON.stringify(b.delta) : '{"ops":[]}';
   if (delta.length > W.delta) throw new HttpError(400, "That's too long to save here (the limit is roughly 50,000 words, less with interactives).");
+  // the thumbnail: nothing, the one already published (a path), or a new JPEG from the editor
+  let thumbnail = typeof b.thumbnail === "string" ? b.thumbnail : "";
+  if (thumbnail && !THUMB_PATH.test(thumbnail) && !/^data:image\/jpeg;base64,[A-Za-z0-9+/]+=*$/.test(thumbnail)) thumbnail = "";
+  if (thumbnail.length > 700000) throw new HttpError(400, "That thumbnail is too big. Try a smaller picture.");
   return {
+    thumbnail, card: b.card === "banner" || b.card === "thumbnail" ? b.card : "",
     title: str(b.title, W.title, "The title"), subtitle: str(b.subtitle, W.subtitle, "The subtitle"),
     summary: str(b.summary, W.summary, "The summary"), categories: JSON.stringify(cats),
     html, delta, words: Math.max(0, Math.min(1e6, Math.floor(Number(b.words) || 0))), pinned: b.pinned ? 1 : 0,
@@ -886,11 +904,12 @@ async function importOfficial(c) {
   if (!doc) throw new HttpError(404, "That article's file is missing from the site.");
   const now = Date.now();
   const row = await one(c.env,
-    `INSERT INTO writings (user_id, kind, slug, title, subtitle, summary, categories, html, delta, words, pinned, source, created_at, updated_at, base)
-     VALUES (?1, 'official', ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12, ?13) RETURNING id`,
+    `INSERT INTO writings (user_id, kind, slug, title, subtitle, summary, categories, html, delta, words, pinned, source, created_at, updated_at, base, thumbnail, card)
+     VALUES (?1, 'official', ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12, ?13, ?14, ?15) RETURNING id`,
     u.id, slug, doc.title || "", doc.subtitle || "", doc.summary || "", JSON.stringify(Array.isArray(doc.categories) ? doc.categories : []),
     String(doc.html || ""), JSON.stringify(doc.delta && doc.delta.ops ? doc.delta : { ops: [] }), Number(doc.words) || 0, pinned ? 1 : 0,
-    doc.source || null, now, doc.updated || doc.published || null);
+    doc.source || null, now, doc.updated || doc.published || null,
+    THUMB_PATH.test(doc.thumbnail || "") ? doc.thumbnail : "", doc.card || "");
   return json({ id: row.id });
 }
 
@@ -911,8 +930,10 @@ async function saveWriting(c) {
   const f = writingFields(c.body);
   const now = Date.now();
   await run(c.env,
-    `UPDATE writings SET title = ?1, subtitle = ?2, summary = ?3, categories = ?4, html = ?5, delta = ?6, words = ?7, pinned = ?8, updated_at = ?9
-     WHERE id = ?10`, f.title, f.subtitle, f.summary, f.categories, f.html, f.delta, f.words, w.kind === "official" ? f.pinned : 0, now, w.id);
+    `UPDATE writings SET title = ?1, subtitle = ?2, summary = ?3, categories = ?4, html = ?5, delta = ?6, words = ?7, pinned = ?8, updated_at = ?9,
+       thumbnail = ?11, card = ?12
+     WHERE id = ?10`, f.title, f.subtitle, f.summary, f.categories, f.html, f.delta, f.words, w.kind === "official" ? f.pinned : 0, now, w.id,
+    w.kind === "official" ? f.thumbnail : null, w.kind === "official" ? f.card : null);
   return json({ updated: now });
 }
 
@@ -971,10 +992,12 @@ async function writingAction(c) {
       await c.env.DB.batch([
         c.env.DB.prepare(`INSERT INTO writings (user_id, kind, title, subtitle, summary, categories, html, delta, words, created_at, updated_at)
           SELECT user_id, 'official', title || ' (my earlier draft)', subtitle, summary, categories, html, delta, words, ?1, ?1 FROM writings WHERE id = ?2`).bind(now, w.id),
-        c.env.DB.prepare(`UPDATE writings SET title = ?1, subtitle = ?2, summary = ?3, categories = ?4, html = ?5, delta = ?6, words = ?7, source = ?8, base = ?9, updated_at = ?10 WHERE id = ?11`)
+        c.env.DB.prepare(`UPDATE writings SET title = ?1, subtitle = ?2, summary = ?3, categories = ?4, html = ?5, delta = ?6, words = ?7, source = ?8, base = ?9, updated_at = ?10,
+          thumbnail = ?12, card = ?13 WHERE id = ?11`)
           .bind(doc.title || "", doc.subtitle || "", doc.summary || "", JSON.stringify(Array.isArray(doc.categories) ? doc.categories : []),
             String(doc.html || ""), JSON.stringify(doc.delta && doc.delta.ops ? doc.delta : { ops: [] }), Number(doc.words) || 0,
-            doc.source || null, doc.updated || doc.published || null, now, w.id),
+            doc.source || null, doc.updated || doc.published || null, now, w.id,
+            THUMB_PATH.test(doc.thumbnail || "") ? doc.thumbnail : "", doc.card || ""),
       ]);
       return json({ ok: true });
     }
@@ -1138,6 +1161,55 @@ async function adminWriterRequest(c) {
   throw new HttpError(400, "Approve or turn down.");
 }
 
+/* ───────── link previews (Twitter/X, Discord, iMessage, Facebook…) ─────────
+   Previewers don't run the site's scripts, so for /article/<slug> and /community/<slug> the page
+   is sent with that article's own title, description and picture already in its <head>. */
+const THUMB_PATH = /^articles\/thumbs\/[a-z0-9-]+\.jpg$/;
+const SITE_NAME = "According To Knowledge";
+
+async function previewFor(env, url, kind, slug) {
+  if (kind === "article") {
+    const res = await env.ASSETS.fetch(new Request(new URL(`/articles/${slug}.json`, url)));
+    if (!res.ok) return null;
+    const d = await res.json();
+    const thumb = THUMB_PATH.test(d.thumbnail || "") && d.card !== "banner" ? d.thumbnail : "";
+    return { title: d.title || "Untitled", description: d.summary || d.subtitle || "", image: thumb, published: d.published, type: "article" };
+  }
+  if (!env.DB) return null;
+  await ensureSchema(env);
+  const r = await one(env, `SELECT cm.title, cm.subtitle, cm.summary, cm.published_at, u.username FROM community cm JOIN users u ON u.id = cm.user_id
+    WHERE cm.slug = ?1 AND u.banned = 0`, slug);
+  if (!r) return null;
+  return { title: r.title || "Untitled", description: r.summary || r.subtitle || `A community article by ${r.username}.`, image: "",
+    published: new Date(r.published_at).toISOString(), author: r.username, type: "article" };
+}
+
+async function withPreview(request, env, url, kind, slug) {
+  const page = await env.ASSETS.fetch(request);
+  const p = await previewFor(env, url, kind, slug);
+  if (!p || !(page.headers.get("content-type") || "").includes("text/html")) return page;
+  const image = new URL(p.image || "/assets/card.png", url.origin).href;
+  const pageUrl = `${url.origin}/${kind}/${slug}`;
+  const description = p.description.replace(/\s+/g, " ").trim().slice(0, 300);
+  const tags = {
+    "og:type": "article", "og:site_name": SITE_NAME, "og:title": p.title, "og:description": description, "og:url": pageUrl,
+    "og:image": image, "og:image:width": "1200", "og:image:height": "630", "og:image:alt": p.image ? p.title : SITE_NAME,
+    "twitter:card": "summary_large_image", "twitter:title": p.title, "twitter:description": description, "twitter:image": image,
+    ...(p.published ? { "article:published_time": p.published } : {}),
+  };
+  const attr = (s) => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  const head = Object.entries(tags).map(([k, v]) => `<meta ${k.startsWith("og:") || k.startsWith("article:") ? "property" : "name"}="${k}" content="${attr(v)}" />`).join("\n  ")
+    + `\n  <link rel="canonical" href="${attr(pageUrl)}" />`;
+  const drop = (el) => el.remove();
+  return new HTMLRewriter()
+    .on("title", { element(el) { el.setInnerContent(`${p.title} · ${SITE_NAME}`); } })
+    .on('meta[name="description"]', { element(el) { el.setAttribute("content", description || SITE_NAME); } })
+    .on('meta[property^="og:"]', { element: drop })
+    .on('meta[name^="twitter:"]', { element: drop })
+    .on("head", { element(el) { el.append(head, { html: true }); } })
+    .transform(page);
+}
+
 /* ───────── publishing Silver's articles to the repo ───────── */
 function ghReady(env) {
   if (!env.GITHUB_TOKEN || !env.GITHUB_REPO) throw new HttpError(503, "Publishing to the site isn't set up yet: the Worker needs a GITHUB_TOKEN secret.");
@@ -1187,6 +1259,12 @@ async function ghGet(env, path) {
 }
 const ghPut = (env, path, textBody, message, sha) =>
   gh(env, ghPath(path), { method: "PUT", body: { message, content: toB64(textBody), branch: ghBranch(env), ...(sha ? { sha } : {}) } });
+const ghPutB64 = (env, path, b64, message, sha) =>
+  gh(env, ghPath(path), { method: "PUT", body: { message, content: b64, branch: ghBranch(env), ...(sha ? { sha } : {}) } });
+async function ghRemove(env, path, message) {   // (no error if it's already gone)
+  const f = await gh(env, `${ghPath(path)}?ref=${encodeURIComponent(ghBranch(env))}`).catch((e) => { if (e.gh === 404) return null; throw e; });
+  if (f && f.sha) await ghDelete(env, path, f.sha, message);
+}
 const ghDelete = (env, path, sha, message) => gh(env, ghPath(path), { method: "DELETE", body: { message, sha, branch: ghBranch(env) } });
 // read-modify-write of a JSON list, retrying if something else committed in between
 async function ghUpdateList(env, path, mutate, message) {
@@ -1232,6 +1310,14 @@ async function publishOfficial(c, w) {
   const meta = { slug, title, summary: w.summary.trim(), published: old.published || now, updated: now, words: w.words };
   if (w.subtitle.trim()) meta.subtitle = w.subtitle.trim();
   meta.categories = parseJSON(w.categories, []);
+  let thumb = w.thumbnail || "";
+  if (thumb.startsWith("data:")) {
+    const p = `articles/thumbs/${slug}-${Date.now().toString(36)}.jpg`;
+    await ghPutB64(env, p, thumb.split(",")[1], `${existing ? "Update" : "Publish"} article thumbnail: ${title}`);
+    thumb = p;
+  }
+  if (!THUMB_PATH.test(thumb)) thumb = "";
+  if (thumb) { meta.thumbnail = thumb; meta.card = w.card === "banner" ? "banner" : "thumbnail"; }
   const source = old.source || w.source;
   const doc = { ...meta, ...(source ? { source } : {}), html: w.html, delta: parseJSON(w.delta, { ops: [] }) };
   const verb = existing ? "Update" : "Publish";
@@ -1243,9 +1329,10 @@ async function publishOfficial(c, w) {
     if (i >= 0) l[i] = entry; else l.push(entry);
     return l;
   }, `${verb} article index: ${title}`);
-  await run(env, "UPDATE writings SET slug = ?1, state = 'draft', base = ?2, updated_at = ?3 WHERE id = ?4", slug, now, Date.now(), w.id);
+  if (THUMB_PATH.test(old.thumbnail || "") && old.thumbnail !== thumb) await ghRemove(env, old.thumbnail, `Remove old article thumbnail: ${title}`).catch(() => {});
+  await run(env, "UPDATE writings SET slug = ?1, state = 'draft', base = ?2, updated_at = ?3, thumbnail = ?5 WHERE id = ?4", slug, now, Date.now(), w.id, thumb);
   articleCache = null;
-  return { ok: true, slug, verb };
+  return { ok: true, slug, verb, thumbnail: thumb };
 }
 
 // the published article: from the repo when the site can reach it (freshest), else the site's own files
@@ -1268,7 +1355,9 @@ async function siteVersion(env, slug) {
 async function removeFromRepo(env, slug, title, verb = "Delete") {
   const path = `articles/${slug}.json`;
   const f = await ghGet(env, path);
+  const thumb = f ? (parseJSON(f.text, {}) || {}).thumbnail : "";
   if (f) await ghDelete(env, path, f.sha, `${verb} article: ${title}`);
+  if (THUMB_PATH.test(thumb || "")) await ghRemove(env, thumb, `${verb} article thumbnail: ${title}`).catch(() => {});
   await ghUpdateList(env, "articles/index.json", (l) => l.filter((a) => a.slug !== slug), `${verb} article index: ${title}`);
 }
 
@@ -1276,6 +1365,8 @@ async function unpublishOfficial(c, w) {
   const env = c.env;
   ghReady(env);
   await removeFromRepo(env, w.slug, w.title, "Unpublish");
-  await run(env, "UPDATE writings SET slug = NULL, updated_at = ?1 WHERE id = ?2", Date.now(), w.id);
+  // its thumbnail file went with it; a draft that pointed at it starts without one
+  await run(env, "UPDATE writings SET slug = NULL, updated_at = ?1, thumbnail = CASE WHEN thumbnail LIKE 'articles/%' THEN '' ELSE thumbnail END WHERE id = ?2",
+    Date.now(), w.id);
   articleCache = null;
 }

@@ -311,6 +311,7 @@
 
   const normalize = (d) => ({
     kind: "story", subtitle: "", series: "", pendingSeries: false, seriesTitle: "", seriesSummary: "", chapter: null, categories: [], pinned: false, extra: {},
+    thumbnail: "", card: "",   // an article's thumbnail ("" / a new picture as a data: URL / its path on the site) and link-preview choice
     base: null,   // the published version this draft started from (its "updated" time)
     ...d,
   });
@@ -391,6 +392,34 @@
   const knownCategories = () => uniqueNames([SITE_CFG.categories || [], ...remote.article.map((a) => a.categories || []), cur ? cur.categories : []]);
   const has = (list, name) => list.some((x) => x.toLowerCase() === name.toLowerCase());
 
+  /* the article's thumbnail and which picture link previews use */
+  function cardOf(d) { return d.thumbnail ? d.card || "thumbnail" : "banner"; }
+  function renderThumb() {
+    if (!cur) return;
+    const img = $("#thumb-img"), t = cur.thumbnail || "";
+    img.hidden = !t;
+    if (t) img.src = t.startsWith("data:") ? t : "../" + t;
+    $("#btn-thumb").textContent = t ? "Change…" : "Choose picture…";
+    $("#btn-thumb-remove").hidden = !t;
+    $$('input[name="card"]').forEach((r) => {
+      r.checked = r.value === cardOf(cur);
+      r.disabled = r.value === "thumbnail" && !t;
+    });
+  }
+  $("#btn-thumb").addEventListener("click", () => $("#thumb-file").click());
+  $("#thumb-file").addEventListener("change", async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file || !cur) return;
+    try {
+      cur.thumbnail = await ATKEditor.makeThumbnail(file);
+      if (!cur.card) cur.card = "thumbnail";
+      renderThumb(); onEdit();
+    } catch (err) { toast(err.message, "err"); }
+  });
+  $("#btn-thumb-remove").addEventListener("click", () => { if (!cur) return; cur.thumbnail = ""; renderThumb(); onEdit(); });
+  $$('input[name="card"]').forEach((r) => r.addEventListener("change", () => { if (cur && r.checked) { cur.card = r.value; onEdit(); } }));
+
   function renderMeta() {
     if (!cur) return;
     const isArticle = cur.kind === "article";
@@ -398,6 +427,7 @@
     $("#kind-hint").textContent = cur.slug ? "Already published, so its type is fixed." : "";
     $("#story-meta").hidden = isArticle;
     $("#article-meta").hidden = !isArticle;
+    renderThumb();
     quill.root.setAttribute("data-placeholder", isArticle ? "Start writing…" : "Once upon a time…");
 
     // series
@@ -578,6 +608,7 @@
         categories: Array.isArray(s.categories) ? s.categories : [],
         pinned: !!(remote[kind].find((a) => a.slug === slug) || {}).pinned,
         extra: s.source ? { source: s.source } : {},
+        thumbnail: ATKEditor.THUMB_PATH.test(s.thumbnail || "") ? s.thumbnail : "", card: s.card || "",
       });
       drafts[d.id] = d; persist();
       cur = d;
@@ -743,6 +774,15 @@
       const meta = { slug, title, summary, published, updated: now, words };
       const sub = subtitleEl.value.trim();
       if (sub) meta.subtitle = sub;
+      const oldThumb = (list.find((s) => s.slug === slug) || {}).thumbnail || "";
+      let thumb = kind === "article" ? cur.thumbnail || "" : "";
+      if (thumb.startsWith("data:")) {
+        const path = `articles/thumbs/${slug}-${Date.now().toString(36)}.jpg`;
+        await putB64(path, thumb.split(",")[1], `${verb} article thumbnail: ${title}`);
+        thumb = path;
+      }
+      if (thumb && ATKEditor.THUMB_PATH.test(thumb)) { meta.thumbnail = thumb; meta.card = cardOf(cur); }
+      else thumb = "";
       if (kind === "story") { if (cur.series) { meta.series = cur.series; meta.chapter = cur.chapter; } }
       else meta.categories = cur.categories.slice();
       if (cur.pinned) meta.pinned = true;
@@ -760,8 +800,14 @@
         return l;
       }, `${verb} ${label.toLowerCase()} index: ${title}`, byNewest);
 
+      if (oldThumb && oldThumb !== thumb && ATKEditor.THUMB_PATH.test(oldThumb)) {
+        const sha = await getSha(oldThumb).catch(() => null);
+        if (sha) await deleteFile(oldThumb, sha, `Remove old article thumbnail: ${title}`).catch(() => {});
+      }
+      if (kind === "article") cur.thumbnail = thumb;
       cur.slug = slug; cur.published = published; cur.base = now; cur.changed = false; cur.pendingSeries = false;
       saveLocal({ quiet: true });
+      renderThumb();
       toast(`${verb === "Publish" ? "Published" : "Updated"}. GitHub Pages usually shows it on the site within a minute or two.`, "ok");
     } catch (err) {
       toast(listProblem(err) + " Your draft is still saved here.", "err");
@@ -781,6 +827,12 @@
       const kind = cur.kind, slug = cur.slug, label = KINDS[kind].label.toLowerCase();
       const f = await getFile(filePath(kind, slug));
       if (f) await deleteFile(filePath(kind, slug), f.sha, `Unpublish ${label}: ${cur.title}`);
+      const thumb = (remote[kind].find((s) => s.slug === slug) || {}).thumbnail || "";
+      if (ATKEditor.THUMB_PATH.test(thumb)) {
+        const sha = await getSha(thumb).catch(() => null);
+        if (sha) await deleteFile(thumb, sha, `Unpublish ${label} thumbnail: ${cur.title}`).catch(() => {});
+        if (cur.thumbnail === thumb) cur.thumbnail = "";   // the file's gone; choose it again to republish with one
+      }
       remote[kind] = await updateList(indexPath(kind), (l) => l.filter((s) => s.slug !== slug), `Unpublish ${label} index: ${cur.title}`, byNewest);
       cur.slug = null; cur.published = null; cur.changed = false;
       saveLocal({ quiet: true });
@@ -915,6 +967,7 @@
         series: s.series || cur.series, chapter: s.chapter || cur.chapter,
         categories: Array.isArray(s.categories) ? s.categories : cur.categories,
         extra: s.source ? { source: s.source } : {}, changed: false, updated: Date.now(),
+        thumbnail: ATKEditor.THUMB_PATH.test(s.thumbnail || "") ? s.thumbnail : "", card: s.card || "",
       });
       persist();
       loadIntoUI();
