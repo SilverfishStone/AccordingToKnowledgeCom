@@ -1,0 +1,13 @@
+# accordingtoknowledge.com: everything may be read. Cloudflare adds its own AI-crawler rules above
+# this. Without this file, the site's "any address is the home page" rule answered /robots.txt
+# with the home page, which then got glued onto Cloudflare's rules.
+User-agent: *
+Allow: /
+
+# link previews on X/Twitter, Discord, Facebook, Slack, LinkedIn, iMessage
+User-agent: Twitterbot
+User-agent: Discordbot
+User-agent: facebookexternalhit
+User-agent: Slackbot-LinkExpanding
+User-agent: LinkedInBot
+Allow: /

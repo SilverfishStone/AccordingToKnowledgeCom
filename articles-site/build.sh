@@ -12,7 +12,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 rm -rf dist
 mkdir -p dist/assets/avatars
-cp index.html site.css site.js community.js writing.js config.js dist/
+cp index.html site.css site.js community.js writing.js config.js robots.txt dist/
 cp assets/*.png dist/assets/
 cp assets/avatars/*.svg assets/avatars/*.png assets/avatars/index.json dist/assets/avatars/ 2>/dev/null || true
 test -f dist/assets/avatars/index.json   # the avatar list must be there
