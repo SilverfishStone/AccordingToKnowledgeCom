@@ -226,6 +226,8 @@
     const a = e.target.closest("a[href]");
     if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || a.target === "_blank") return;
     const u = new URL(a.href, location.href);
+    // downloads (the article's Word and web-page files are blob: links, which count as this site) are left to the browser
+    if (a.hasAttribute("download") || u.protocol === "blob:") return;
     if (u.origin !== location.origin) return;
     // an old-style #link inside an older article
     if (u.pathname === "/" && u.hash.length > 1 && !HOME_ANCHORS.has(u.hash)) {

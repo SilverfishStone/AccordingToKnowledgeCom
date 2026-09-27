@@ -804,7 +804,6 @@
     host.innerHTML = `${shareBar(url, doc.title || "")}
       <section class="comments" id="comments" aria-labelledby="comments-h">
         <h2 id="comments-h">Comments</h2>
-        <p class="small center">Please keep to the <a class="text-link" href="#rules" data-link>Nine Rules</a>.</p>
         <div id="comment-list"><p class="note">Loading comments…</p></div>
         <div id="comment-form"></div>
       </section>`;
