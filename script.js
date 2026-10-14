@@ -88,19 +88,6 @@
   const storyKicker = (s, series) => (s.series && series.get(s.series) ? `${series.get(s.series).title} · ${chapterLabel(s)}` : "");
   const lastPublished = (x) => Math.max(...x.chapters.map((c) => new Date(c.published).getTime()));
 
-  /* categories: derived from the articles' `categories` */
-  function buildCategories(articles) {
-    const map = new Map();
-    for (const a of articles) for (const name of a.categories) {
-      const slug = slugify(name);
-      if (!slug) continue;
-      if (!map.has(slug)) map.set(slug, { slug, name, count: 0 });
-      map.get(slug).count++;
-    }
-    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
-  }
-  const catLink = (c) => `#articles/category/${encodeURIComponent(c.slug)}`;
-
   /* ───────── reader libs (loaded the first time something is opened) ───────── */
   const QUILL_CSS = "https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css";
   const PURIFY_JS = "https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js";
@@ -193,36 +180,6 @@
   search.addEventListener("input", renderHighlights);
 
   /* ───────── views ───────── */
-  async function showArticles(catSlug) {
-    const list = $("#article-list"), filters = $("#article-filters");
-    try {
-      const articles = await loadArticles();
-      const cats = buildCategories(articles);
-      const cat = catSlug ? cats.find((c) => c.slug === catSlug) : null;
-      filters.hidden = cats.length === 0;
-      filters.innerHTML = cats.length
-        ? `<a class="chip${cat ? "" : " active"}" href="#articles">All <small>${articles.length}</small></a>` +
-          cats.map((c) => `<a class="chip${cat && cat.slug === c.slug ? " active" : ""}" href="${catLink(c)}">${esc(c.name)} <small>${c.count}</small></a>`).join("")
-        : "";
-      if (catSlug && !cat) { list.innerHTML = note("No articles in that category."); return; }
-      const shown = cat ? articles.filter((a) => a.categories.some((n) => slugify(n) === cat.slug)) : articles;
-      if (!shown.length) { list.innerHTML = note("No articles yet. They'll appear here as I publish them."); return; }
-      list.innerHTML = shown.map((a) => `<a class="entry${thumbOf(a) ? " has-thumb" : ""}" href="#article/${esc(a.slug)}">
-        ${thumbOf(a) ? `<img class="entry-thumb" src="${esc(thumbOf(a))}" alt="" loading="lazy" />` : ""}
-        ${a.pinned ? '<span class="entry-kicker">Pinned</span>' : ""}
-        <h2>${esc(a.title)}</h2>
-        ${a.subtitle ? `<span class="entry-sub">${esc(a.subtitle)}</span>` : ""}
-        <span class="entry-meta">${esc(metaLine(a))}</span>
-        ${a.categories.length ? `<span class="tags">${a.categories.map((c) => `<span class="tag">${esc(c)}</span>`).join("")}</span>` : ""}
-        ${a.summary ? `<p>${esc(a.summary)}</p>` : ""}
-        <span class="more">Read article →</span>
-      </a>`).join("");
-    } catch {
-      filters.hidden = true;
-      list.innerHTML = note("Couldn't load the articles right now. Try again in a moment.");
-    }
-  }
-
   async function showStories() {
     const box = $("#stories-box");
     try {
@@ -352,7 +309,8 @@
         const tags = document.createElement("div"); tags.className = "tags doc-tags";
         for (const name of doc.categories) {
           const a = document.createElement("a"); a.className = "tag"; a.textContent = name;
-          a.href = `#articles/category/${encodeURIComponent(slugify(name))}`;
+          a.href = `https://accordingtoknowledge.com/?category=${encodeURIComponent(slugify(name))}#articles`;
+          a.target = "_blank"; a.rel = "noopener";
           tags.appendChild(a);
         }
         parts.push(tags);
@@ -624,7 +582,7 @@
     } else $("#home-gallery-cap").textContent = "Art and photography";
   }
 
-  /* ───────── secret page: the game only loads while that page is open ─────────
+  /* ───────── games page: the game only loads while that page is open ─────────
      Leaving the page blanks the frame, which unloads the game (it saves as it goes). */
   function setGameFrame(on) {
     const f = $("#game-satellite");
@@ -661,8 +619,8 @@
   const keys = $$(".key");
   if (SITE.whyNotTab) $("#key-whynot").hidden = false;
   const notFound = $("#not-found");
-  const TAB = { home: "home", articles: "articles", article: "articles", stories: "stories", story: "stories", series: "stories", gallery: "gallery", image: "gallery", contact: "contact", "why-not": "why-not" };
-  const TITLE = { home: "Home", articles: "Articles", stories: "Stories", gallery: "Gallery", contact: "Contact", article: "Article", story: "Story", series: "Series", image: "Image", "why-not": "Why am I not…", secret: "Shh…" };
+  const TAB = { home: "home", games: "games", stories: "stories", story: "stories", series: "stories", gallery: "gallery", image: "gallery", contact: "contact", "why-not": "why-not" };
+  const TITLE = { home: "Home", games: "Games", stories: "Stories", gallery: "Gallery", contact: "Contact", article: "Article", story: "Story", series: "Series", image: "Image", "why-not": "Why am I not…", secret: "Shh…" };
 
   function route() {
     const raw = location.hash.replace(/^#\/?/, "");
@@ -674,11 +632,15 @@
     if (!raw && window.__ATK_404__) view = "";
     else if (!raw || (["home", "about", "goals"].includes(a) && !b)) view = "home";
     else if (a === "secret" && !b) view = "secret";
-    else if (a === "articles" && !b) view = "articles";
+    else if (a === "games" && !b) view = "games";
+    else if (a === "articles") {
+      // the article list lives on accordingtoknowledge.com now; old links to it go there
+      location.replace("https://accordingtoknowledge.com/" + (b === "category" && c ? "?category=" + c + "#articles" : ""));
+      return;
+    }
     else if (a === "gallery" && !b) view = "gallery";
     else if (a === "gallery" && (b === "category" || b === "tag") && c) { view = "gallery"; arg = b; arg2 = decodeURIComponent(c); }
     else if (a === "image" && b) { view = "image"; arg = b; }
-    else if (a === "articles" && b === "category") { view = "articles"; arg = decodeURIComponent(c); }
     else if (a === "article" && b) { view = "article"; arg = b; }
     else if (a === "stories" && !b) view = "stories";
     else if (a === "story" && b) { view = "story"; arg = b; }
@@ -694,8 +656,8 @@
       on ? k.setAttribute("aria-current", "page") : k.removeAttribute("aria-current");
     });
 
-    // reading a story or article (or playing on the secret page): two panels, so it gets the room
-    const reading = view === "article" || view === "story" || view === "secret";
+    // reading a story or article (or playing a game): two panels, so it gets the room
+    const reading = view === "article" || view === "story" || view === "games" || view === "secret";
     document.body.classList.toggle("reading", reading);
     document.body.classList.toggle("hide-left", reading && SITE.readingHides !== "right");
     document.body.classList.toggle("hide-right", reading && SITE.readingHides === "right");
@@ -704,12 +666,11 @@
     if (view === "gallery") showGallery(arg, arg2);
     if (view === "why-not") showWhyNot(arg);
     if (view === "image") showImage(arg);
-    if (view === "articles") showArticles(arg);
     if (view === "stories") showStories();
     if (view === "series") showSeries(arg);
     if (view === "article") renderDoc("article", arg);
     if (view === "story") renderDoc("story", arg);
-    setGameFrame(view === "secret");
+    setGameFrame(view === "games");
     markLatest();
 
     document.title = (TITLE[view] || "Not found") + " · " + SITE.name;

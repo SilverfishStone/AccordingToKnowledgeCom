@@ -499,7 +499,9 @@
         <div><h1>${esc(p.username)}</h1>
           <p class="meta">${tag ? `<span class="author-tag${p.role === "writer" ? " writer-tag" : ""}">${tag}</span> · ` : ""}joined ${esc(day(p.joined))} · ${p.comments} comment${p.comments === 1 ? "" : "s"}</p></div></header>
       ${p.role === "admin" ? `<p class="center"><a class="text-link" href="" data-link>Silver's articles are on the home page →</a></p>` : ""}
-      ${d.articles.length ? `<div class="ink-rule" data-rule="9"></div><h2 class="section-h">Articles</h2><div class="article-list">${d.articles.map(itemHtml).join("")}</div>` : ""}`;
+      ${d.articles.length ? `<div class="ink-rule" data-rule="9"></div><h2 class="section-h">Articles</h2><div class="article-list">${d.articles.map(itemHtml).join("")}</div>` : ""}
+      ${(d.quizzes || []).length ? `<div class="ink-rule" data-rule="12"></div><h2 class="section-h">Quiz results</h2><div class="article-list">${d.quizzes.map((q) => `
+        <a class="item" href="quiz/${esc(q.slug)}/${encodeURIComponent(p.username)}" data-link><span class="item-title">${esc(q.title)}</span><span class="meta">Shared ${esc(day(q.taken))}</span></a>`).join("")}</div>` : ""}`;
     box.querySelectorAll(".ink-rule").forEach(writing.site.inkRule);
   }
 

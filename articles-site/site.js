@@ -5,6 +5,8 @@
      /contact          about me and my links
      /login /account /messages /admin /privacy   accounts and the rest (community.js)
      /write /write/<id> /community /community/<slug> /people/<name>   writing (writing.js)
+     /quizzes /quiz/<slug> /quiz/<slug>/<name>   quizzes and their results (quiz.js)
+     /quiz-maker /quiz-maker/<slug>   making them (quiz-maker.js, Silver only)
      /writing-terms   the guidelines for community writers
    The articles are the same files the personal site publishes: articles/index.json and
    articles/<slug>.json (copied in when Cloudflare builds the site; see build.sh). */
@@ -207,6 +209,9 @@
     else if (a === "community" && parts.length === 1) { showView("community"); writing.list(); }
     else if (a === "community" && b && parts.length === 2) { showView("community-article"); writing.read(b); }
     else if (a === "people" && b && parts.length === 2) { showView("people"); writing.person(decodeURIComponent(b)); }
+    else if (a === "quizzes" && parts.length === 1) { showView("quizzes"); quiz.list(); }
+    else if (a === "quiz" && b && parts.length <= 3) { showView("quiz"); quiz.play(b, parts[2] ? decodeURIComponent(parts[2]) : ""); }
+    else if (a === "quiz-maker" && parts.length <= 2) { showView("quiz-maker"); quizMaker.show(b); }
     else if (a === "writing-terms" && parts.length === 1) { showView("writing-terms"); setTitle("Writing for the site", "Guidelines for According To Knowledge's community writers."); }
     else showMissing();
   }
@@ -242,6 +247,7 @@
   addEventListener("popstate", () => route());
   community.go = go;
   writing.site = { go, setTitle, inkRule };
+  quiz.site = quizMaker.site = { go, setTitle, inkRule };
   addEventListener("hashchange", () => { if (followOldHash() === "moved") go(location.href, false); });
 
   route();

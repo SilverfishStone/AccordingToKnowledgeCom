@@ -289,7 +289,7 @@ a.pager-btn:active { transform: translateY(3px); box-shadow: inset 0 2px 6px rgb
 .link-button { padding: 0; border: 0; background: none; font: inherit; cursor: pointer; }
 .link-button:disabled { opacity: .6; cursor: progress; }
 
-/* the Articles page's pointer to accordingtoknowledge.com */
+/* the Games page's pointer to the quizzes on accordingtoknowledge.com */
 .atk-callout {
   display: grid; gap: 4px; margin: -10px 0 24px; padding: 14px 18px; border: 1px solid var(--line); border-left: 3px solid #e0bf65;
   border-radius: 12px; background: linear-gradient(90deg, rgba(224, 191, 101, .1), transparent 70%); transition: background .15s;

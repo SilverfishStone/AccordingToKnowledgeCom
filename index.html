@@ -25,7 +25,7 @@
 
       <nav class="keys" aria-label="Site sections">
         <a class="key" href="#home" data-tab="home"><i class="led" aria-hidden="true"></i><span>Home</span></a>
-        <a class="key" href="#articles" data-tab="articles"><i class="led" aria-hidden="true"></i><span>Articles</span></a>
+        <a class="key" href="#games" data-tab="games"><i class="led" aria-hidden="true"></i><span>Games</span></a>
         <a class="key" href="#stories" data-tab="stories"><i class="led" aria-hidden="true"></i><span>Stories</span></a>
         <a class="key" href="#gallery" data-tab="gallery"><i class="led" aria-hidden="true"></i><span>Gallery</span></a>
         <a class="key" href="#contact" data-tab="contact"><i class="led" aria-hidden="true"></i><span>Contact</span></a>
@@ -63,7 +63,7 @@
 
         <div class="home-block" id="home-pinned" hidden>
           <p class="eyebrow">Pinned article</p>
-          <a class="featured" id="pinned-link" href="#articles">
+          <a class="featured" id="pinned-link" href="#home">
             <img class="featured-thumb" id="pinned-thumb" alt="" hidden />
             <span class="featured-title" id="pinned-title"></span>
             <span class="entry-sub" id="pinned-sub"></span>
@@ -98,21 +98,30 @@
         </a>
       </section>
 
-      <!-- ARTICLES (list) -->
-      <section class="view page" data-view="articles" aria-labelledby="h-articles">
-        <h1 class="page-title" id="h-articles">Articles</h1>
-        <p class="page-sub">Longer writing, newest first.</p>
-        <a class="atk-callout" href="https://accordingtoknowledge.com" target="_blank" rel="noopener">
-          <strong>According To Knowledge ↗</strong>
-          <span>These articles have their own home at accordingtoknowledge.com, with comments, community writers and more.</span>
+      <!-- GAMES -->
+      <section class="view page" data-view="games" aria-labelledby="h-games" hidden>
+        <h1 class="page-title" id="h-games">Games</h1>
+        <p class="page-sub">A few things to play while you're here. More are coming.</p>
+        <a class="atk-callout" href="https://accordingtoknowledge.com/quizzes" target="_blank" rel="noopener">
+          <strong>Quizzes ↗</strong>
+          <span>Where Do You Stand? and other quizzes, on accordingtoknowledge.com. Sign in there (no email needed) to keep your results.</span>
         </a>
-        <nav class="filters" id="article-filters" aria-label="Filter by category"></nav>
-        <div id="article-list" aria-live="polite"></div>
+
+        <article class="activity" aria-labelledby="h-satellite">
+          <div class="activity-head">
+            <h2 id="h-satellite">Satellite Courier</h2>
+            <span class="tag">Game</span>
+          </div>
+          <p class="activity-sub">Run data bounties across 100 sectors, spend your credits on upgrades and paint jobs, and don't run out of fuel.</p>
+          <!-- src is set when this page is opened and cleared when you leave, so the game only runs while it's on screen -->
+          <iframe class="game-frame" id="game-satellite" title="Satellite Courier" data-src="games/satellite/index.html?v=__BUILD__" allow="fullscreen" allowfullscreen></iframe>
+          <p class="activity-note">Click the game first so it can hear your keyboard. Progress is saved in this browser.</p>
+        </article>
       </section>
 
       <!-- ARTICLE (reader) -->
       <section class="view" data-view="article" aria-label="Article" hidden>
-        <div class="reader-bar"><a class="back-link" href="#articles">← All articles</a></div>
+        <div class="reader-bar"><a class="back-link" href="https://accordingtoknowledge.com">← All articles (accordingtoknowledge.com)</a></div>
         <article class="story" id="article-box" aria-live="polite"></article>
       </section>
 
@@ -198,25 +207,14 @@
       <!-- SECRET (no link anywhere; reached by clicking the 404 ghost) -->
       <section class="view page secret" data-view="secret" aria-labelledby="h-secret" hidden>
         <h1 class="page-title" id="h-secret">You found the ghost's hideout</h1>
-        <p class="page-sub">A few things to do while you're here. More are coming.</p>
-
-        <article class="activity" aria-labelledby="h-satellite">
-          <div class="activity-head">
-            <h2 id="h-satellite">Satellite Courier</h2>
-            <span class="tag">Game</span>
-          </div>
-          <p class="activity-sub">Run data bounties across 100 sectors, spend your credits on upgrades and paint jobs, and don't run out of fuel.</p>
-          <!-- src is set when this page is opened and cleared when you leave, so the game only runs while it's on screen -->
-          <iframe class="game-frame" id="game-satellite" title="Satellite Courier" data-src="games/satellite/index.html?v=__BUILD__" allow="fullscreen" allowfullscreen></iframe>
-          <p class="activity-note">Click the game first so it can hear your keyboard. Progress is saved in this browser.</p>
-        </article>
+        <p class="page-sub">Nothing here yet.</p>
       </section>
 
       <div class="not-found" id="not-found" hidden>
         <a class="err-ghost-link" href="#secret" title="…follow the ghost?">
           <img class="err-ghost" src="assets/ghost-guitar.gif" alt="A ghost playing guitar. It looks like it wants you to follow it." width="150" height="135">
         </a>
-        <p>That page doesn't exist. <a class="text-link" href="#articles">Back to articles</a></p>
+        <p>That page doesn't exist. <a class="text-link" href="#home">Back home</a></p>
       </div>
     </main>
 

@@ -15,6 +15,7 @@
      new one from /admin.
    - Sign-in is a random token in an HttpOnly cookie; only its hash is stored. */
 import { EmailMessage } from "cloudflare:email";
+import QUIZ_SEED from "./quiz-seed.js";
 
 const SESSION_DAYS = 60;
 const COOKIE = "atk_session";
@@ -38,7 +39,7 @@ export default {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/api/")) {
       if (request.method === "GET" || request.method === "HEAD") {
-        const m = url.pathname.match(/^\/(article|community)\/([a-z0-9-]+)\/?$/);
+        const m = url.pathname.match(/^\/(article|community|quiz)\/([a-z0-9-]+)\/?$/);
         if (m) return withPreview(request, env, url, m[1], m[2]).catch(() => env.ASSETS.fetch(request));
       }
       return env.ASSETS.fetch(request);
@@ -95,6 +96,18 @@ const ROUTES = [
   ["GET", /^\/api\/community$/, communityList],
   ["GET", /^\/api\/community\/([a-z0-9-]+)$/, communityArticle],
   ["GET", /^\/api\/people\/([A-Za-z0-9_.-]+)$/, person],
+  // quizzes
+  ["GET", /^\/api\/quizzes$/, quizList],
+  ["GET", /^\/api\/quizzes\/([a-z0-9-]+)$/, quizGet],
+  ["GET", /^\/api\/quizzes\/([a-z0-9-]+)\/mine$/, quizMine],
+  ["POST", /^\/api\/quizzes\/([a-z0-9-]+)\/result$/, quizSave],
+  ["POST", /^\/api\/quizzes\/([a-z0-9-]+)\/share$/, quizShare],
+  ["POST", /^\/api\/quizzes\/([a-z0-9-]+)\/forget$/, quizForget],
+  ["GET", /^\/api\/quizzes\/([a-z0-9-]+)\/shared\/([A-Za-z0-9_.-]+)$/, quizShared],
+  ["GET", /^\/api\/quiz-image\/(\d+)$/, quizImage],
+  ["POST", /^\/api\/admin\/quizzes$/, adminQuizSave],
+  ["POST", /^\/api\/admin\/quizzes\/([a-z0-9-]+)\/delete$/, adminQuizDelete],
+  ["POST", /^\/api\/admin\/quiz-images$/, adminQuizImage],
   ["GET", /^\/api\/admin\/submissions\/(\d+)$/, adminSubmission],
   ["POST", /^\/api\/admin\/submissions\/(\d+)$/, adminReview],
   ["POST", /^\/api\/admin\/writer-requests\/(\d+)$/, adminWriterRequest],
@@ -175,6 +188,17 @@ const MIGRATIONS = [
     `ALTER TABLE writings ADD COLUMN thumbnail TEXT`,
     `ALTER TABLE writings ADD COLUMN card TEXT`,
   ],
+  [
+    // quizzes (one JSON document each), people's saved answers, and the pictures used in a quiz's result lists
+    `CREATE TABLE quizzes (
+      slug TEXT PRIMARY KEY, title TEXT NOT NULL, summary TEXT NOT NULL DEFAULT '', questions INTEGER NOT NULL DEFAULT 0,
+      published INTEGER NOT NULL DEFAULT 0, data TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
+    `CREATE TABLE quiz_results (
+      user_id INTEGER NOT NULL, slug TEXT NOT NULL, answers TEXT NOT NULL, shared INTEGER NOT NULL DEFAULT 0, taken_at INTEGER NOT NULL,
+      PRIMARY KEY (user_id, slug))`,
+    `CREATE INDEX quiz_results_shared ON quiz_results (user_id, shared, taken_at)`,
+    `CREATE TABLE quiz_images (id INTEGER PRIMARY KEY, data TEXT NOT NULL, created_at INTEGER NOT NULL)`,
+  ],
 ];
 let schemaReady = null;
 function ensureSchema(env) {
@@ -189,6 +213,7 @@ function ensureSchema(env) {
         db.prepare("INSERT INTO meta (key, value) VALUES ('schema', ?1) ON CONFLICT (key) DO UPDATE SET value = ?1").bind(String(i + 1)),
       ]);
     }
+    await seedQuizzes(env).catch((e) => console.error("quiz seed failed:", e && e.message));   // the site works without it
   })().catch((e) => { schemaReady = null; throw e; }));
 }
 const one = (env, sql, ...args) => env.DB.prepare(sql).bind(...args).first();
@@ -548,6 +573,7 @@ async function removeUser(env, id) {
     env.DB.prepare("DELETE FROM writings WHERE user_id = ?1").bind(id),
     env.DB.prepare("DELETE FROM community WHERE user_id = ?1").bind(id),
     env.DB.prepare("DELETE FROM writer_requests WHERE user_id = ?1").bind(id),
+    env.DB.prepare("DELETE FROM quiz_results WHERE user_id = ?1").bind(id),
     env.DB.prepare("DELETE FROM users WHERE id = ?1").bind(id),
   ]);
 }
@@ -1082,7 +1108,231 @@ async function person(c) {
   if (!u || u.banned) throw new HttpError(404, "There's no one here by that name.");
   const rows = await all(c.env, `${COMMUNITY_SELECT} WHERE cm.user_id = ?1 ORDER BY cm.published_at DESC`, u.id);
   const comments = await one(c.env, "SELECT COUNT(*) AS n FROM comments WHERE user_id = ?1 AND status = 'approved'", u.id);
-  return json({ person: { ...publicUser(u), joined: u.created_at, comments: comments.n }, articles: rows.map(communityOut) });
+  // quiz results they chose to share (the answers themselves aren't sent here; the quiz page asks for those)
+  const quizzes = await all(c.env,
+    `SELECT r.slug, q.title, r.taken_at FROM quiz_results r JOIN quizzes q ON q.slug = r.slug
+     WHERE r.user_id = ?1 AND r.shared = 1 AND q.published = 1 ORDER BY r.taken_at DESC`, u.id);
+  return json({ person: { ...publicUser(u), joined: u.created_at, comments: comments.n }, articles: rows.map(communityOut),
+    quizzes: quizzes.map((r) => ({ slug: r.slug, title: r.title, taken: r.taken_at })) });
+}
+
+/* ───────── quizzes ─────────
+   A quiz is one JSON document (see quiz-core.js for what it means), made in the quiz maker
+   (/quiz-maker, Silver only) and kept in the quizzes table. People's saved results are only
+   their answers (one digit per question); everything shown from them is worked out again in the
+   browser from the quiz, so nobody can put their own text on the site through a result. */
+const QZ = {
+  title: 120, summary: 300, eyebrow: 80, intro: 2000, sections: 12, poles: 8, label: 80, question: 400, perSection: 60,
+  total: 300, options: 9, option: 400, groups: 4, items: 150, name: 80, blurb: 500, image: 300, json: 600000, picture: 120000,
+};
+const QUIZ_SLUG = /^[a-z0-9][a-z0-9-]{0,59}$/;
+const SECTION_ID = /^[a-z0-9]{1,16}$/;
+
+function qs(v, name, max, min = 0) {
+  const s = typeof v === "string" ? v.replace(/\r\n?/g, "\n").trim() : "";
+  if (s.length < min) throw new HttpError(400, `${name} can't be empty.`);
+  if (s.length > max) throw new HttpError(400, `${name} is too long (${s.length} of ${max} characters).`);
+  return s;
+}
+const unit = (v) => { const n = Number(v); return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0; };
+const arr = (v, name, max, min = 0) => {
+  if (!Array.isArray(v) || v.length < min) throw new HttpError(400, `${name}: add at least ${min}.`);
+  if (v.length > max) throw new HttpError(400, `${name}: at most ${max} are allowed.`);
+  return v;
+};
+
+// Checks a quiz and returns a clean copy: only the fields the site uses, all within limits.
+function cleanQuiz(raw) {
+  if (!raw || typeof raw !== "object") throw new HttpError(400, "That quiz couldn't be read.");
+  const ids = new Set();
+  let questions = 0;
+  const sections = arr(raw.sections, "Sections", QZ.sections, 1).map((s, si) => {
+    if (!s || typeof s !== "object") throw new HttpError(400, `Section ${si + 1} couldn't be read.`);
+    const where = `Section ${si + 1}`;
+    let id = typeof s.id === "string" && SECTION_ID.test(s.id) ? s.id : "s" + (si + 1);
+    while (ids.has(id)) id += "x";
+    ids.add(id);
+    const poles = arr(s.poles, `${where}: poles`, QZ.poles, 2).map((p, i) => qs(p, `${where}: pole ${i + 1}'s name`, QZ.label, 1));
+    const poly = poles.length >= 3;
+    const out = { id, title: qs(s.title, `${where}: title`, QZ.question, 1), short: qs(s.short, `${where}: short name`, QZ.label), poles };
+    if (!out.short) out.short = out.title.slice(0, QZ.label);
+    if (!poly) out.mid = qs(s.mid, `${where}: middle label`, QZ.label);
+    out.questions = arr(s.questions, `${where}: questions`, QZ.perSection, 1).map((q, qi) => {
+      const at = `${where}, question ${qi + 1}`;
+      if (!q || typeof q !== "object") throw new HttpError(400, `${at} couldn't be read.`);
+      questions++;
+      return {
+        text: qs(q.text, `${at}: the question`, QZ.question, 1),
+        options: arr(q.options, `${at}: answers`, QZ.options, 2).map((o, oi) => {
+          if (!o || typeof o !== "object") throw new HttpError(400, `${at}, answer ${oi + 1} couldn't be read.`);
+          const clean = { text: qs(o.text, `${at}, answer ${oi + 1}`, QZ.option, 1) };
+          if (o.idk) clean.idk = true;
+          else if (poly) {
+            clean.to = [...new Set((Array.isArray(o.to) ? o.to : []).map(Number))]
+              .filter((k) => Number.isInteger(k) && k >= 0 && k < poles.length).sort((a, b) => a - b);
+          }
+          return clean;
+        }),
+      };
+    });
+    return out;
+  });
+  if (questions > QZ.total) throw new HttpError(400, `That's ${questions} questions; the most a quiz can have is ${QZ.total}.`);
+
+  const matches = arr(raw.matches ?? [], "Result lists", QZ.groups).map((g, gi) => {
+    const at = `Result list ${gi + 1}`;
+    if (!g || typeof g !== "object") throw new HttpError(400, `${at} couldn't be read.`);
+    const label = qs(g.label, `${at}: its heading`, QZ.label, 1);
+    return {
+      id: typeof g.id === "string" && SECTION_ID.test(g.id) ? g.id : "m" + (gi + 1),
+      title: qs(g.title, `${at}: its name`, QZ.label) || label,
+      label,
+      items: arr(g.items ?? [], `${at}: entries`, QZ.items).map((it, ii) => {
+        if (!it || typeof it !== "object") throw new HttpError(400, `${at}, entry ${ii + 1} couldn't be read.`);
+        const image = typeof it.image === "string" ? it.image.trim() : "";
+        if (image && !/^\/api\/quiz-image\/\d+$/.test(image) && !/^https:\/\/[^\s"'<>]+$/.test(image)) throw new HttpError(400, `${at}, entry ${ii + 1}: the picture address must start with https://.`);
+        if (image.length > QZ.image) throw new HttpError(400, `${at}, entry ${ii + 1}: the picture address is too long.`);
+        const pos = {};
+        sections.forEach((sec) => {
+          const v = it.pos && it.pos[sec.id];
+          if (sec.poles.length >= 3) {
+            if (!Array.isArray(v) || v.length !== sec.poles.length) return;
+            const nums = v.map(unit), total = nums.reduce((s, x) => s + x, 0);
+            if (total > 0) pos[sec.id] = nums.map((x) => Math.round((x / total) * 1000) / 1000);
+          } else if (v != null && v !== "" && Number.isFinite(Number(v))) pos[sec.id] = Math.round(unit(v) * 1000) / 1000;
+        });
+        return { name: qs(it.name, `${at}, entry ${ii + 1}: the name`, QZ.name, 1), blurb: qs(it.blurb, `${at}, entry ${ii + 1}: the description`, QZ.blurb), image, pos };
+      }),
+    };
+  });
+
+  const quiz = {
+    title: qs(raw.title, "The title", QZ.title, 1),
+    eyebrow: qs(raw.eyebrow, "The line above the title", QZ.eyebrow),
+    intro: qs(raw.intro, "The introduction", QZ.intro),
+    sections, matches,
+  };
+  if (JSON.stringify(quiz).length > QZ.json) throw new HttpError(400, "That quiz is too big to save.");
+  return quiz;
+}
+
+// the digits of a saved result must fit the quiz: one per question, no higher than its number of answers
+function answersFit(quiz, s) {
+  if (typeof s !== "string" || !/^[0-9]+$/.test(s)) return false;
+  let at = 0;
+  for (const sec of quiz.sections) for (const q of sec.questions) {
+    if (at >= s.length || Number(s[at++]) > q.options.length) return false;
+  }
+  return at === s.length;
+}
+
+async function seedQuizzes(env) {
+  if (await env.DB.prepare("SELECT 1 AS x FROM meta WHERE key = 'quiz_seed'").first()) return;
+  const now = Date.now();
+  const stmts = [];
+  for (const q of QUIZ_SEED) {
+    try {
+      const quiz = cleanQuiz(q);
+      stmts.push(env.DB.prepare(
+        `INSERT OR IGNORE INTO quizzes (slug, title, summary, questions, published, data, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)`)
+        .bind(q.slug, quiz.title, qs(q.summary, "summary", QZ.summary), quiz.sections.reduce((n, s) => n + s.questions.length, 0), q.published ? 1 : 0, JSON.stringify(quiz), now));
+    } catch (e) { console.error("quiz seed skipped:", q.slug, e.message); }
+  }
+  stmts.push(env.DB.prepare("INSERT INTO meta (key, value) VALUES ('quiz_seed', '1') ON CONFLICT (key) DO NOTHING"));
+  await env.DB.batch(stmts);
+}
+
+const quizRow = async (c, slug) => {
+  const r = await one(c.env, "SELECT slug, title, summary, questions, published, data, updated_at FROM quizzes WHERE slug = ?1", slug);
+  if (!r || (!r.published && !(c.user && c.user.role === "admin"))) throw new HttpError(404, "That quiz doesn't exist.");
+  return r;
+};
+
+async function quizList(c) {
+  const admin = c.user && c.user.role === "admin";
+  const rows = await all(c.env, `SELECT slug, title, summary, questions, published, updated_at FROM quizzes ${admin ? "" : "WHERE published = 1"} ORDER BY created_at, slug`);
+  return json({ quizzes: rows.map((r) => ({ slug: r.slug, title: r.title, summary: r.summary, questions: r.questions, published: !!r.published, updated: r.updated_at })) });
+}
+async function quizGet(c) {
+  const r = await quizRow(c, c.params[0]);
+  return json({ quiz: { slug: r.slug, published: !!r.published, summary: r.summary, updated: r.updated_at, ...JSON.parse(r.data) } });
+}
+async function quizMine(c) {
+  const u = need(c);
+  const r = await one(c.env, "SELECT answers, shared, taken_at FROM quiz_results WHERE user_id = ?1 AND slug = ?2", u.id, c.params[0]);
+  return json({ result: r ? { answers: r.answers, shared: !!r.shared, taken: r.taken_at } : null });
+}
+async function quizSave(c) {
+  const u = need(c);
+  const q = await quizRow(c, c.params[0]);
+  const answers = String(c.body.answers || "");
+  if (!answersFit(JSON.parse(q.data), answers) || !/[1-9]/.test(answers)) throw new HttpError(400, "Those answers don't fit this quiz. Reload the page and try again.");
+  await limit(c, "quiz-save", 40, 3600, "u" + u.id);
+  const now = Date.now();
+  // saving again keeps the "shown on my profile" choice unless this request says otherwise
+  const r = await one(c.env,
+    `INSERT INTO quiz_results (user_id, slug, answers, shared, taken_at) VALUES (?1, ?2, ?3, ?4, ?5)
+     ON CONFLICT (user_id, slug) DO UPDATE SET answers = ?3, shared = CASE WHEN ?6 = 1 THEN ?4 ELSE shared END, taken_at = ?5
+     RETURNING shared`,
+    u.id, q.slug, answers, c.body.shared ? 1 : 0, now, c.body.shared === undefined ? 0 : 1);
+  return json({ result: { answers, shared: !!r.shared, taken: now } });
+}
+async function quizShare(c) {   // only the "shared on my profile" switch
+  const u = need(c);
+  const r = await one(c.env, "UPDATE quiz_results SET shared = ?3 WHERE user_id = ?1 AND slug = ?2 RETURNING shared", u.id, c.params[0], c.body.shared ? 1 : 0);
+  if (!r) throw new HttpError(404, "There's no saved result to share yet.");
+  return json({ shared: !!r.shared });
+}
+async function quizForget(c) {
+  const u = need(c);
+  await run(c.env, "DELETE FROM quiz_results WHERE user_id = ?1 AND slug = ?2", u.id, c.params[0]);
+  return json({ ok: true });
+}
+async function quizShared(c) {
+  const r = await one(c.env,
+    `SELECT u.username, r.answers, r.taken_at FROM quiz_results r JOIN users u ON u.id = r.user_id JOIN quizzes q ON q.slug = r.slug
+     WHERE u.username = ?1 AND r.slug = ?2 AND r.shared = 1 AND u.banned = 0 AND q.published = 1`, c.params[1], c.params[0]);
+  if (!r) throw new HttpError(404, "That result isn't shared.");
+  return json({ username: r.username, answers: r.answers, taken: r.taken_at });
+}
+
+async function adminQuizSave(c) {
+  need(c, true);
+  const slug = String(c.body.slug || "").trim();
+  if (!QUIZ_SLUG.test(slug)) throw new HttpError(400, "The address can only use lowercase letters, numbers and dashes.");
+  const quiz = cleanQuiz(c.body.quiz);
+  const summary = qs(c.body.summary, "The summary", QZ.summary);
+  const have = await one(c.env, "SELECT slug FROM quizzes WHERE slug = ?1", slug);
+  if (c.body.create && have) throw new HttpError(409, "There's already a quiz at that address. Pick another.");
+  const now = Date.now(), n = quiz.sections.reduce((t, s) => t + s.questions.length, 0);
+  await run(c.env,
+    `INSERT INTO quizzes (slug, title, summary, questions, published, data, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)
+     ON CONFLICT (slug) DO UPDATE SET title = ?2, summary = ?3, questions = ?4, published = ?5, data = ?6, updated_at = ?7`,
+    slug, quiz.title, summary, n, c.body.published ? 1 : 0, JSON.stringify(quiz), now);
+  return json({ slug, updated: now });
+}
+async function adminQuizDelete(c) {
+  need(c, true);
+  await c.env.DB.batch([
+    c.env.DB.prepare("DELETE FROM quiz_results WHERE slug = ?1").bind(c.params[0]),
+    c.env.DB.prepare("DELETE FROM quizzes WHERE slug = ?1").bind(c.params[0]),
+  ]);
+  return json({ ok: true });
+}
+async function adminQuizImage(c) {
+  need(c, true);
+  const img = String(c.body.image || "");
+  if (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/.test(img)) throw new HttpError(400, "That picture couldn't be read. Try a PNG or JPEG.");
+  if (img.length > QZ.picture) throw new HttpError(400, "That picture is too big. Try a smaller one.");
+  const row = await one(c.env, "INSERT INTO quiz_images (data, created_at) VALUES (?1, ?2) RETURNING id", img, Date.now());
+  return json({ url: `/api/quiz-image/${row.id}` });
+}
+async function quizImage(c) {
+  const r = await one(c.env, "SELECT data FROM quiz_images WHERE id = ?1", Number(c.params[0]));
+  if (!r) throw new HttpError(404, "No picture.");
+  const [, mime, data] = r.data.match(/^data:([^;]+);base64,(.*)$/);
+  return new Response(Uint8Array.from(atob(data), (ch) => ch.charCodeAt(0)),
+    { headers: { "Content-Type": mime, "Cache-Control": "public, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff" } });
 }
 
 /* ───────── reviewing (Silver) ───────── */
@@ -1177,6 +1427,10 @@ async function previewFor(env, url, kind, slug) {
   }
   if (!env.DB) return null;
   await ensureSchema(env);
+  if (kind === "quiz") {
+    const q = await one(env, "SELECT title, summary FROM quizzes WHERE slug = ?1 AND published = 1", slug);
+    return q ? { title: q.title, description: q.summary || "A quiz from According To Knowledge.", image: "", type: "website" } : null;
+  }
   const r = await one(env, `SELECT cm.title, cm.subtitle, cm.summary, cm.published_at, u.username FROM community cm JOIN users u ON u.id = cm.user_id
     WHERE cm.slug = ?1 AND u.banned = 0`, slug);
   if (!r) return null;
@@ -1192,7 +1446,7 @@ async function withPreview(request, env, url, kind, slug) {
   const pageUrl = `${url.origin}/${kind}/${slug}`;
   const description = p.description.replace(/\s+/g, " ").trim().slice(0, 300);
   const tags = {
-    "og:type": "article", "og:site_name": SITE_NAME, "og:title": p.title, "og:description": description, "og:url": pageUrl,
+    "og:type": p.type || "article", "og:site_name": SITE_NAME, "og:title": p.title, "og:description": description, "og:url": pageUrl,
     "og:image": image, "og:image:width": "1200", "og:image:height": "630", "og:image:alt": p.image ? p.title : SITE_NAME,
     "twitter:card": "summary_large_image", "twitter:title": p.title, "twitter:description": description, "twitter:image": image,
     ...(p.published ? { "article:published_time": p.published } : {}),
