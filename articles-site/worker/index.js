@@ -1174,7 +1174,7 @@ function cleanQuiz(raw) {
           else if (poly) {
             opt.to = [...new Set((Array.isArray(o.to) ? o.to : []).map(Number))]
               .filter((k) => Number.isInteger(k) && k >= 0 && k < poles.length).sort((a, b) => a - b);
-          }
+          } else if (typeof o.v === "number" && Number.isFinite(o.v)) opt.v = Math.round(unit(o.v) * 1000) / 1000;   // its own place on the spectrum
           return opt;
         }),
       };

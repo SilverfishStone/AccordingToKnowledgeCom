@@ -511,6 +511,8 @@ button.item { width: 100%; border: 0; background: none; color: inherit; font: in
 .mk-pick select { width: 100%; padding: 5px 6px; border: 1.5px solid var(--ink-soft); border-radius: 8px; background: rgba(255, 249, 228, .8); color: var(--ink); font: 400 13.5px var(--ui); }
 .mk-pick-h { margin: 14px 0 2px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
 @media (max-width: 560px) { .mk-pick { grid-template-columns: 1fr; } }
+.mk-v { margin: 2px 0 0; }
+.mk-vnote { margin: 0 0 4px; }
 .mk-img { display: grid; gap: 8px; justify-items: start; }
 .mk-img img { border-radius: 10px; object-fit: cover; box-shadow: 0 0 0 1.5px var(--ink); }
 @media (max-width: 520px) {

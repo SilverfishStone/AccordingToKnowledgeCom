@@ -204,6 +204,18 @@
       </div></div>`;
   }
 
+  // where an answer points on a spectrum: by default its place in the list; the slider sets it exactly
+  function spectrumSlider(s, q, o, oi, p) {
+    const auto = typeof o.v !== "number", val = auto ? (q.options.length > 1 ? oi / (q.options.length - 1) : 0.5) : o.v;
+    return `<div class="mk-range mk-range-line mk-v"><span>${esc(clip(s.poles[0], 22))}</span>
+      <input type="range" min="0" max="100" value="${Math.round(val * 100)}" data-v="${p}.options.${oi}" aria-label="Where this answer points">
+      <span class="mk-end">${esc(clip(s.poles[1], 22))}</span></div>
+      <p class="small mk-vnote" data-vnote>${vnote([p.split(".")[1], p.split(".")[3], oi], val, auto, s)}</p>`;
+  }
+  function vnote([si, qi, oi], val, auto, s) {
+    return `${Math.round(val * 100)}% toward ${esc(clip(s.poles[1], 30))} ${auto ? "(by its place in the list)" : `(set by you) <button class="link-btn" type="button" data-act="reset-v" data-a="${si}" data-b="${qi}" data-c="${oi}">use list order</button>`}`;
+  }
+
   function questionBody(si, qi) {
     const s = doc.sections[si], q = s.questions[qi], p = `sections.${si}.questions.${qi}`, poly = s.poles.length >= 3;
     return `<div class="form">
@@ -214,6 +226,7 @@
           <input type="text" data-f="${p}.options.${oi}.text" value="${esc(o.text)}" maxlength="400" placeholder="Answer ${oi + 1}">
           <div class="mk-opt-set">
             <label class="check"><input type="checkbox" data-idk="${p}.options.${oi}"${o.idk ? " checked" : ""}> "I don't know"</label>
+            ${!poly && !o.idk ? spectrumSlider(s, q, o, oi, p) : ""}
             ${poly && !o.idk ? `<span class="mk-to">Votes for:</span>${s.poles.map((pole, pi) => `<label class="check mk-to" title="${esc(pole)}"><input type="checkbox" data-to="${p}.options.${oi}" data-pi="${pi}"${(o.to || []).includes(pi) ? " checked" : ""}> ${esc(clip(pole, 16) || "Pole " + (pi + 1))}</label>`).join("")}` : ""}
           </div></div>
         <div class="mk-opt-tools">
@@ -316,7 +329,7 @@
       const s = doc.sections[a], was = s.poles.length;
       s.poles.push("");
       if (was === 2) {   // spectrum -> polygon: answers start with no votes, entries need new positions
-        delete s.mid; s.questions.forEach((q) => q.options.forEach((o) => { if (!o.idk) o.to = []; }));
+        delete s.mid; s.questions.forEach((q) => q.options.forEach((o) => { delete o.v; if (!o.idk) o.to = []; }));
         doc.matches.forEach((g) => g.items.forEach((it) => { if (it.pos) delete it.pos[s.id]; }));
       } else doc.matches.forEach((g) => g.items.forEach((it) => { if (it.pos && Array.isArray(it.pos[s.id])) it.pos[s.id].push(0); }));
     },
@@ -360,6 +373,7 @@
     "dup-item": (a, b) => { const l = doc.matches[a].items, c = JSON.parse(JSON.stringify(l[b])); c.name = c.name ? c.name + " (copy)" : ""; l.splice(b + 1, 0, c); shiftKeys(); openKeys.add(`g.${a}`); },
     "del-item": (a, b) => { doc.matches[a].items.splice(b, 1); shiftKeys(); openKeys.add(`g.${a}`); },
     "sort-items": (a) => { doc.matches[a].items.sort((x, y) => x.name.localeCompare(y.name)); shiftKeys(); openKeys.add(`g.${a}`); },
+    "reset-v": (a, b, c) => { delete doc.sections[a].questions[b].options[c].v; openKeys.add(`s.${a}`); openKeys.add(`q.${a}.${b}`); },
     "clear-img": (a, b) => { doc.matches[a].items[b].image = ""; openKeys.add(`g.${a}`); openKeys.add(`m.${a}.${b}`); },
   };
 
@@ -404,6 +418,11 @@
     root.addEventListener("input", (e) => {
       const t = e.target;
       if (t.dataset.f) { put(t.dataset.f, t.value); touch(); refreshSummaries(); }
+      else if (t.dataset.v) {   // a spectrum answer's position
+        const o = get(t.dataset.v), ks = t.dataset.v.split(".");   // sections.<si>.questions.<qi>.options.<oi>
+        o.v = t.value / 100; touch();
+        t.closest(".mk-opt-set").querySelector("[data-vnote]").innerHTML = vnote([+ks[1], +ks[3], +ks[5]], o.v, false, doc.sections[+ks[1]]);
+      }
       else if (t.dataset.pos) {   // a position slider
         const it = get(t.dataset.pos), s = doc.sections[+t.dataset.sec];
         if (s.poles.length >= 3) {

@@ -7,6 +7,7 @@
                    pole's end, last answer = the other end). `mid` names the middle.
      - 3+ poles -> a polygon with one corner per pole. Each answer has `to`: the poles it votes
                    for (it counts 1, shared evenly when it names more than one).
+   An answer can set its own place on the spectrum with `v` (0..1); without it, the order decides.
    An answer marked `idk` ("I don't know") leaves the person's position where it is.
    Answers are stored as one digit per question: 0 = skipped, 1 = the first answer, 2 = the second…
    Matches are lists of things to compare people with (sects, figures…). Each entry can say how it would
@@ -17,6 +18,8 @@
   "use strict";
 
   const isPoly = (sec) => sec.poles.length >= 3;
+  // where an answer sits on a spectrum, 0 (first pole) to 1 (second): set on the answer (`v`), else its place in the list
+  const optValue = (q, i) => (typeof q.options[i].v === "number" ? q.options[i].v : q.options.length > 1 ? i / (q.options.length - 1) : 0.5);
   const WORDS = ["", "", "two", "three", "four", "five", "six", "seven", "eight"];
 
   const questionCount = (quiz) => quiz.sections.reduce((n, s) => n + s.questions.length, 0);
@@ -63,7 +66,7 @@
       if (!a) { skipped++; return; }
       const o = q.options[a - 1];
       if (!o || o.idk) { idk++; return; }
-      vals.push(q.options.length > 1 ? (a - 1) / (q.options.length - 1) : 0.5);
+      vals.push(optValue(q, a - 1));
     });
     const pos = vals.length ? vals.reduce((s, x) => s + x, 0) / vals.length : 0.5;
     const [left, right] = sec.poles, mid = sec.mid || "Balanced";
@@ -86,7 +89,7 @@
       n++;
       if (mine === theirs) { sum += 1; same++; continue; }
       if (isPoly(sec)) sum += (a.to || []).some((k) => (b.to || []).includes(k)) ? 0.5 : 0;
-      else sum += Math.max(0, 1 - Math.abs(mine - theirs) / 2);
+      else sum += Math.max(0, 1 - Math.abs(optValue(q, mine - 1) - optValue(q, theirs - 1)) * 3);   // one step on a seven-answer scale costs half
     }
     return n >= 3 ? { score: sum / n, counted: n, same } : null;
   }
