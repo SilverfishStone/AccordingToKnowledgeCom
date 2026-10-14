@@ -474,6 +474,11 @@ button.item { width: 100%; border: 0; background: none; color: inherit; font: in
 .q-keep .check { justify-content: center; }
 .q-share { margin: 22px 0 10px; text-align: center; }
 .q-share h2 { margin: 0 0 4px; font-size: 20px; }
+.q-pic-dialog { width: min(760px, calc(100vw - 24px)); }
+.q-layouts { margin: 0; }
+.q-pics { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.q-pics figure { margin: 0; display: grid; gap: 6px; justify-items: center; align-content: start; }
+.q-pics figcaption { margin: 0; }
 .q-pic { display: block; width: 100%; max-height: 60vh; object-fit: contain; border-radius: 8px; border: 1px solid var(--line); }
 
 /* the quiz maker */

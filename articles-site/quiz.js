@@ -130,9 +130,12 @@
     g.font = `600 30px ${FONT}`; g.fillStyle = DIM; g.fillText("My results", P, 252);
     g.strokeStyle = INK; g.lineWidth = 4; g.beginPath(); g.moveTo(P, 282); g.lineTo(W - P, 282); g.stroke();
     let y = 340;
-    matches.forEach((m) => {
-      g.fillStyle = DIM; g.font = `700 20px ${FONT}`; g.fillText(m.label.toUpperCase(), P, y, W - 2 * P);
-      g.fillStyle = ACC; g.font = `800 48px ${FONT}`; g.fillText(`${m.ranked[0].item.name}  ${pct(m.ranked[0].score)}`, P, y + 58, W - 2 * P);
+    const faces = await topFaces(matches);
+    matches.forEach((m, i) => {
+      const room = W - 2 * P - (faces[i] ? 124 : 0);
+      if (faces[i]) drawFace(g, faces[i], W - P - 104, y - 22, 104);
+      g.fillStyle = DIM; g.font = `700 20px ${FONT}`; g.fillText(m.label.toUpperCase(), P, y, room);
+      g.fillStyle = ACC; g.font = `800 48px ${FONT}`; g.fillText(`${m.ranked[0].item.name}  ${pct(m.ranked[0].score)}`, P, y + 58, room);
       y += 150;
     });
     g.strokeStyle = LINE; g.lineWidth = 2; g.beginPath(); g.moveTo(P, y - 60); g.lineTo(W - P, y - 60); g.stroke();
@@ -171,6 +174,194 @@
     });
     g.textAlign = "left"; g.fillStyle = DIM; g.font = `600 20px ${FONT}`; g.fillText("accordingtoknowledge.com", P, H - 62);
     return new Promise((res2) => cv.toBlob(res2, "image/png"));
+  }
+
+  /* More picture shapes: a square one with everything, or two square ones (who you match, where you stand). */
+  const IMG = { FONT: '"Open Sans", "Segoe UI", Arial, sans-serif', PAPER: "#e9cb77", INK: "#1f160a", DIM: "#6e5628", LINE: "rgba(70,45,10,.35)", ACC: "#7b2d12", WASH: "rgba(123,45,18,.1)" };
+  // a result's picture, if its entry has one (a picture on another website only draws if that site allows it)
+  function loadPic(src) {
+    return new Promise((done) => {
+      if (!src) return done(null);
+      const img = new Image();
+      if (!src.startsWith("/")) img.crossOrigin = "anonymous";
+      img.onload = () => done(img);
+      img.onerror = () => done(null);
+      img.src = src;
+    });
+  }
+  function drawFace(g, img, x, y, s) {
+    const r = s * 0.14, side = Math.min(img.naturalWidth, img.naturalHeight);
+    g.save(); g.beginPath(); g.roundRect(x, y, s, s, r); g.clip();
+    g.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, x, y, s, s);
+    g.restore();
+    g.strokeStyle = IMG.INK; g.lineWidth = 3; g.beginPath(); g.roundRect(x, y, s, s, r); g.stroke();
+  }
+  const topFaces = (ms) => Promise.all(ms.map((m) => loadPic(m.ranked[0].item.image)));
+  const toBlob = (cv) => new Promise((done) => cv.toBlob(done, "image/png"));
+  function newCanvas(W, H) {
+    const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+    const g = cv.getContext("2d");
+    g.fillStyle = IMG.PAPER; g.fillRect(0, 0, W, H);
+    g.strokeStyle = IMG.INK; g.lineWidth = 3; g.strokeRect(24, 24, W - 48, H - 48);
+    g.textBaseline = "alphabetic"; g.textAlign = "left";
+    return [cv, g];
+  }
+  // brand and title (and an optional second line); returns where the content can start
+  function cardHeader(g, W, P, title, sub) {
+    g.fillStyle = IMG.DIM; g.font = `700 20px ${IMG.FONT}`; g.fillText("ACCORDING TO KNOWLEDGE", P, 76);
+    g.fillStyle = IMG.INK; g.font = `800 46px ${IMG.FONT}`; g.fillText(title, P, 130, W - 2 * P);
+    let y = 154;
+    if (sub) { g.fillStyle = IMG.DIM; g.font = `600 26px ${IMG.FONT}`; g.fillText(sub, P, 172); y = 190; }
+    g.strokeStyle = IMG.INK; g.lineWidth = 4; g.beginPath(); g.moveTo(P, y); g.lineTo(W - P, y); g.stroke();
+    return y + 34;
+  }
+  const cardFooter = (g, W, H, P) => { g.fillStyle = IMG.DIM; g.font = `600 20px ${IMG.FONT}`; g.textAlign = "left"; g.fillText("accordingtoknowledge.com", P, H - 52); };
+
+  // one section as a small tile: its name, the verdict, a little chart and the numbers
+  function drawTile(g, sec, r, x, y, w) {
+    const { FONT, INK, DIM, LINE, ACC, WASH, PAPER } = IMG;
+    g.textAlign = "left";
+    g.fillStyle = DIM; g.font = `700 15px ${FONT}`; g.fillText((sec.short || sec.title).toUpperCase(), x, y + 14, w);
+    g.fillStyle = ACC; g.font = `800 25px ${FONT}`;
+    const vl = wrap(r.verdict, 19).slice(0, 2);
+    vl.forEach((t, k) => g.fillText(t, x, y + 46 + k * 28, w));
+    const top = y + 46 + vl.length * 28 + 8;
+    if (r.kind === "poly") {
+      const n = sec.poles.length, R = Math.min(56, (w - 24) / 2), cx = x + w / 2, cy = top + R + 6, v = corners(n, cx, cy, R);
+      const pt = [0, 1].map((k) => v.reduce((s, c, j) => s + r.p[j] * c[k], 0));
+      const path = (f) => { g.beginPath(); v.forEach((c, j) => { const px = cx + (c[0] - cx) * f, py = cy + (c[1] - cy) * f; j ? g.lineTo(px, py) : g.moveTo(px, py); }); g.closePath(); };
+      path(1); g.fillStyle = WASH; g.fill(); g.strokeStyle = ACC; g.lineWidth = 2.5; g.stroke();
+      path(0.5); g.setLineDash([4, 6]); g.strokeStyle = LINE; g.lineWidth = 1.5; g.stroke(); g.setLineDash([]);
+      if (r.answered) { g.fillStyle = "rgba(123,45,18,.25)"; g.beginPath(); g.arc(pt[0], pt[1], 13, 0, 7); g.fill(); g.fillStyle = ACC; g.strokeStyle = PAPER; g.lineWidth = 3; g.beginPath(); g.arc(pt[0], pt[1], 7, 0, 7); g.fill(); g.stroke(); }
+      sec.poles.forEach((p, k) => {
+        const ly = cy + R + 28 + k * 19;
+        g.textAlign = "left"; g.fillStyle = INK; g.font = `600 14px ${FONT}`; g.fillText(p, x, ly, w - 50);
+        g.textAlign = "right"; g.fillStyle = ACC; g.font = `700 14px ${FONT}`; g.fillText(pct(r.p[k]), x + w, ly);
+      });
+    } else {
+      const by = top + 34, x0 = x + 4, x1 = x + w - 4, mx = x0 + (x1 - x0) * r.pos;
+      g.fillStyle = WASH; g.strokeStyle = LINE; g.lineWidth = 1.5; g.beginPath(); g.roundRect(x0, by - 5, x1 - x0, 10, 5); g.fill(); g.stroke();
+      if (r.answered) { g.fillStyle = "rgba(123,45,18,.25)"; g.beginPath(); g.arc(mx, by, 14, 0, 7); g.fill(); g.fillStyle = ACC; g.strokeStyle = PAPER; g.lineWidth = 3; g.beginPath(); g.arc(mx, by, 8, 0, 7); g.fill(); g.stroke(); }
+      g.font = `600 14px ${FONT}`; g.fillStyle = INK; g.textAlign = "left"; g.fillText(sec.poles[0], x, by + 34, w / 2 - 6);
+      g.textAlign = "right"; g.fillText(sec.poles[1], x + w, by + 34, w / 2 - 6);
+      g.textAlign = "center"; g.fillStyle = ACC; g.font = `700 16px ${FONT}`; g.fillText(`${pct(r.pos)} toward ${sec.poles[1]}`, x + w / 2, by + 64, w);
+      g.textAlign = "left";
+    }
+  }
+  // the tiles in rows of three; returns the y where they end
+  function drawTiles(g, quizData, res, P, W, y0, rowH) {
+    const cols = 3, gap = 24, w = (W - 2 * P - (cols - 1) * gap) / cols;
+    quizData.sections.forEach((sec, i) => drawTile(g, sec, res.sections[i], P + (i % cols) * (w + gap), y0 + Math.floor(i / cols) * rowH, w));
+    return y0 + Math.ceil(quizData.sections.length / cols) * rowH;
+  }
+  const tileRows = (quizData) => Math.ceil(quizData.sections.length / 3);
+  // a row of tiles is as tall as its longest list of corners needs
+  const tileRowH = (quizData, base) => base + Math.max(0, Math.max(...quizData.sections.map((s) => (s.poles.length >= 3 ? s.poles.length : 0))) - 3) * 19;
+  const rankedMatches = (res) => res.matches.filter((m) => m.ranked.length);
+
+  async function drawSquare(quizData, res) {
+    try { await document.fonts.ready; } catch { }
+    const W = 1080, P = 60, ms = rankedMatches(res), rowH = tileRowH(quizData, 326);
+    const H = Math.max(1080, 188 + ms.length * 66 + 10 + tileRows(quizData) * rowH + 96);
+    const [cv, g] = newCanvas(W, H);
+    let y = cardHeader(g, W, P, quizData.title, "");
+    const faces = await topFaces(ms);
+    ms.forEach((m, i) => {
+      const room = W - 2 * P - (faces[i] ? 72 : 0);
+      if (faces[i]) drawFace(g, faces[i], W - P - 58, y - 16, 58);
+      g.fillStyle = IMG.DIM; g.font = `700 17px ${IMG.FONT}`; g.fillText(m.label.toUpperCase(), P, y, room);
+      g.fillStyle = IMG.ACC; g.font = `800 34px ${IMG.FONT}`; g.fillText(`${m.ranked[0].item.name}  ${pct(m.ranked[0].score)}`, P, y + 36, room);
+      y += 66;
+    });
+    y += 6;
+    g.strokeStyle = IMG.LINE; g.lineWidth = 2; g.beginPath(); g.moveTo(P, y - 24); g.lineTo(W - P, y - 24); g.stroke();
+    drawTiles(g, quizData, res, P, W, y + 4, rowH);
+    cardFooter(g, W, H, P);
+    return toBlob(cv);
+  }
+  // picture 1 of 2: who you match, with a line about each
+  async function drawMatchesCard(quizData, res) {
+    try { await document.fonts.ready; } catch { }
+    const W = 1080, P = 64, ms = rankedMatches(res), per = Math.max(330, Math.floor(730 / Math.max(ms.length, 1)));
+    const H = Math.max(1080, 270 + ms.length * per + 80);
+    const [cv, g] = newCanvas(W, H);
+    let y = cardHeader(g, W, P, quizData.title, "My closest matches");
+    const faces = await topFaces(ms);
+    ms.forEach((m, i) => {
+      const [top, ...rest] = m.ranked, face = faces[i], room = W - 2 * P - (face ? 200 : 0);
+      if (face) drawFace(g, face, W - P - 176, y - 16, 176);
+      g.fillStyle = IMG.DIM; g.font = `700 22px ${IMG.FONT}`; g.fillText(m.label.toUpperCase(), P, y + 6, room);
+      g.fillStyle = IMG.ACC; g.font = `800 ${face ? 52 : 62}px ${IMG.FONT}`; g.fillText(`${top.item.name}  ${pct(top.score)}`, P, y + 76, room);
+      g.fillStyle = IMG.INK; g.font = `400 29px ${IMG.FONT}`;
+      let ly = y + 128;
+      wrap(top.item.blurb || "", face ? 46 : 62).slice(0, 4).forEach((t) => { g.fillText(t, P, ly, room); ly += 40; });
+      if (rest.length) {
+        g.fillStyle = IMG.DIM; g.font = `600 22px ${IMG.FONT}`;
+        wrap("Also close: " + rest.slice(0, 3).map((x) => `${x.item.name} ${pct(x.score)}`).join(" · "), 84).slice(0, 2)
+          .forEach((t, k) => g.fillText(t, P, Math.max(ly + 14, y + 250) + k * 30, W - 2 * P));
+      }
+      y += per;
+    });
+    cardFooter(g, W, H, P);
+    return toBlob(cv);
+  }
+  // picture 2 of 2: where you stand on every section
+  async function drawPositionsCard(quizData, res) {
+    try { await document.fonts.ready; } catch { }
+    const W = 1080, P = 60, rowH = tileRowH(quizData, 340);
+    const H = Math.max(1080, 250 + tileRows(quizData) * rowH + 90);
+    const [cv, g] = newCanvas(W, H);
+    const y = cardHeader(g, W, P, quizData.title, "Where I stand");
+    drawTiles(g, quizData, res, P, W, y + 14, rowH);
+    cardFooter(g, W, H, P);
+    return toBlob(cv);
+  }
+
+  const LAYOUTS = {
+    long: { label: "Tall", note: "Everything in one long picture.", make: async (Q, res) => [{ blob: await makeImage(Q, res), name: "results" }] },
+    square: { label: "Square", note: "Everything in one square picture.", make: async (Q, res) => [{ blob: await drawSquare(Q, res), name: "results-square" }] },
+    two: {
+      label: "Two pictures", note: "Who you match, and where you stand, as two square pictures.",
+      make: async (Q, res) => [{ blob: await drawMatchesCard(Q, res), name: "results-1-matches", caption: "1 of 2: matches" }, { blob: await drawPositionsCard(Q, res), name: "results-2-positions", caption: "2 of 2: positions" }],
+    },
+  };
+
+  // the "save as a picture" window: pick a shape, then download or press-and-hold to save
+  function openPictureDialog(Q, res) {
+    const dlg = document.createElement("dialog");
+    dlg.className = "parch-dialog q-pic-dialog";
+    dlg.innerHTML = `<form method="dialog"><h2>Save your results as a picture</h2>
+      <div class="tabs q-layouts" role="tablist">${Object.entries(LAYOUTS).map(([k, l]) => `<button type="button" role="tab" data-layout="${k}" aria-selected="false">${esc(l.label)}</button>`).join("")}</div>
+      <p class="small" id="q-pic-note"></p>
+      <div class="q-pics" id="q-pics"></div>
+      <p class="small">Press and hold (or right-click) a picture to save it, or use its button.</p>
+      <div class="row dialog-row"><button class="btn ghost small-btn" value="close">Close</button></div></form>`;
+    document.body.appendChild(dlg);
+    let urls = [], token = 0;
+    const show = async (key) => {
+      const mine = ++token;
+      dlg.querySelectorAll("[data-layout]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.layout === key)));
+      $("#q-pic-note", dlg).textContent = LAYOUTS[key].note;
+      const box = $("#q-pics", dlg);
+      box.innerHTML = `<p class="note">Drawing…</p>`;
+      let pics;
+      try { pics = await LAYOUTS[key].make(Q, res); } catch { box.innerHTML = `<p class="note">The picture couldn't be made here.</p>`; return; }
+      if (mine !== token) return;
+      urls.forEach((u) => URL.revokeObjectURL(u));
+      urls = pics.map((p) => URL.createObjectURL(p.blob));
+      box.innerHTML = pics.map((p, i) => `<figure><img class="q-pic" src="${urls[i]}" alt="Your quiz results${p.caption ? ", " + esc(p.caption) : ""}">
+        ${p.caption ? `<figcaption class="small">${esc(p.caption)}</figcaption>` : ""}
+        <a class="btn small-btn" href="${urls[i]}" download="${esc(Q.slug)}-${esc(p.name)}.png">Download${pics.length > 1 ? " " + (i + 1) : ""}</a></figure>`).join("");
+    };
+    dlg.querySelectorAll("[data-layout]").forEach((b) => b.addEventListener("click", () => {
+      try { localStorage.setItem("atk-quiz-layout", b.dataset.layout); } catch { }
+      show(b.dataset.layout);
+    }));
+    dlg.addEventListener("close", () => { token++; urls.forEach((u) => URL.revokeObjectURL(u)); dlg.remove(); });
+    dlg.showModal();
+    let first = "long";
+    try { const s = localStorage.getItem("atk-quiz-layout"); if (LAYOUTS[s]) first = s; } catch { }
+    show(first);
   }
 
   /* ───────── taking a quiz ───────── */
@@ -318,19 +509,10 @@
         try { await navigator.clipboard.writeText(text + "\n" + url); say("Results copied"); }
         catch { say("Copy didn't work here. Select the text manually."); }
       };
-      $("#q-img").onclick = async () => {
-        const blob = await makeImage(Q, res), href = URL.createObjectURL(blob);
-        const dlg = document.createElement("dialog");
-        dlg.className = "parch-dialog";
-        dlg.innerHTML = `<form method="dialog"><h2>Your results picture</h2><img class="q-pic" src="${href}" alt="Your quiz results"><p class="small">Press and hold (or right-click) the picture to save it, or use the button.</p>
-          <div class="row dialog-row"><a class="btn small-btn" href="${href}" download="${esc(Q.slug)}-results.png">Download</a><button class="btn ghost small-btn" value="close">Close</button></div></form>`;
-        document.body.appendChild(dlg);
-        dlg.addEventListener("close", () => { dlg.remove(); URL.revokeObjectURL(href); });
-        dlg.showModal();
-      };
+      $("#q-img").onclick = () => openPictureDialog(Q, res);
       $("#q-copyimg").onclick = () => {
         try {
-          navigator.clipboard.write([new ClipboardItem({ "image/png": makeImage(Q, res) })])
+          navigator.clipboard.write([new ClipboardItem({ "image/png": drawSquare(Q, res) })])
             .then(() => say("Image copied. Paste it into a post."), () => say("Copying images isn't supported here. Use Save image."));
         } catch { say("Copying images isn't supported here. Use Save image."); }
       };
