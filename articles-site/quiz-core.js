@@ -9,8 +9,10 @@
                    for (it counts 1, shared evenly when it names more than one).
    An answer marked `idk` ("I don't know") leaves the person's position where it is.
    Answers are stored as one digit per question: 0 = skipped, 1 = the first answer, 2 = the second…
-   Matches are lists of things to compare people with (sects, figures…); each has a `pos` per section:
-   a number 0..1 on a spectrum, or a share for each pole on a polygon. */
+   Matches are lists of things to compare people with (sects, figures…). Each entry can say how it would
+   answer each question (`picks`: { questionId: answer number }); a person is then compared answer by
+   answer. An entry without picks is compared by its `pos` per section instead: a number 0..1 on a
+   spectrum, or a share for each pole on a polygon. */
 (() => {
   "use strict";
 
@@ -70,6 +72,25 @@
     return { kind: "line", pos, verdict, idk, skipped, answered: !!vals.length };
   }
 
+  // Answer by answer: the same answer counts 1. On a spectrum a neighbouring answer counts half; on a
+  // polygon an answer that votes for one of the same corners counts half. Questions the person skipped
+  // or answered "I don't know" (or the entry has no answer for) are left out.
+  function byAnswers(quiz, answers, item) {
+    if (!item.picks) return null;
+    let sum = 0, n = 0, same = 0, at = 0;
+    for (const sec of quiz.sections) for (const q of sec.questions) {
+      const mine = answers[at++], theirs = q.id && item.picks[q.id];
+      if (!mine || !theirs) continue;
+      const a = q.options[mine - 1], b = q.options[theirs - 1];
+      if (!a || !b || a.idk || b.idk) continue;
+      n++;
+      if (mine === theirs) { sum += 1; same++; continue; }
+      if (isPoly(sec)) sum += (a.to || []).some((k) => (b.to || []).includes(k)) ? 0.5 : 0;
+      else sum += Math.max(0, 1 - Math.abs(mine - theirs) / 2);
+    }
+    return n >= 3 ? { score: sum / n, counted: n, same } : null;
+  }
+
   // how alike a person's result and a match are on the sections both have: 1 = identical
   function closeness(quiz, sections, item) {
     let sum = 0, n = 0;
@@ -96,9 +117,11 @@
       return scoreSection(sec, mine);
     });
     const matches = (quiz.matches || []).map((g) => {
-      const ranked = g.items.map((item) => ({ item, c: closeness(quiz, sections, item) }))
-        .filter((x) => x.c).sort((a, b) => b.c.score - a.c.score)
-        .map((x) => ({ item: x.item, score: x.c.score, sections: x.c.sections }));
+      const ranked = g.items.map((item) => {
+        const a = byAnswers(quiz, answers, item);
+        return { item, c: a || closeness(quiz, sections, item), answers: a };
+      }).filter((x) => x.c).sort((a, b) => b.c.score - a.c.score)
+        .map((x) => ({ item: x.item, score: x.c.score, sections: x.c.sections, same: x.answers ? x.answers.same : null, counted: x.answers ? x.answers.counted : null }));
       return { id: g.id, title: g.title, label: g.label, ranked };
     });
     return { sections, matches };

@@ -94,6 +94,7 @@
       <div class="q-match-top">${img}<div>
         <h3>${esc(top.item.name)} <span class="q-pct">${pct(top.score)}</span></h3>
         ${top.item.blurb ? `<p>${esc(top.item.blurb)}</p>` : ""}
+        ${top.same != null ? `<p class="q-same">Same answer as you on <b>${top.same}</b> of the ${top.counted} questions you answered${top.same < top.counted ? ", and close on many of the rest" : ""}.</p>` : ""}
       </div></div>
       ${rest.length ? `<p class="q-also"><b>Also close:</b> ${rest.slice(0, 3).map((x) => `${esc(x.item.name)} (${pct(x.score)})`).join(" · ")}</p>` : ""}
     </article>`;
@@ -287,10 +288,11 @@
       box.innerHTML = `
         <p class="eyebrow">${esc(Q.title)}</p>
         <h1 class="page-h">${heading}</h1>
+        <p class="center small">Based on ${a.filter(Boolean).length} of ${N} questions answered.</p>
         ${mode.who ? `<p class="center small">Shared by <a class="text-link" href="people/${encodeURIComponent(mode.who)}" data-link>${esc(mode.who)}</a>.</p>` : ""}
         <div id="q-save"></div>
         <div class="q-results">${resultsHTML(Q, res)}</div>
-        <p class="small center">Each polygon places a person between its corners and each spectrum between two ends; the closer the mark sits to one, the more consistently they answered that way. A percentage next to a sect or figure says how close the answers sit to its usual position, across the sections answered.</p>
+        <p class="small center">Each polygon places a person between its corners and each spectrum between two ends; the closer the mark sits to one, the more consistently they answered that way. A percentage next to a sect or figure says how often its usual answers match the answers given: the same answer counts in full, and a neighbouring answer counts half.</p>
         <div class="q-share">
           <h2>Share these results</h2>
           <div class="row-center q-row">

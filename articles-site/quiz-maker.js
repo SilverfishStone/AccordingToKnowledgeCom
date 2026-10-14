@@ -21,7 +21,11 @@
   let openKeys = new Set();   // which <details> are open, kept across redraws
   let box = null;
 
+  const qid = () => "q" + Math.random().toString(36).slice(2, 8);
+  // every question needs an id: result-list entries refer to their answers through it
+  const ensureIds = () => { doc.sections.forEach((s) => s.questions.forEach((q) => { if (!q.id) q.id = qid(); })); };
   const blankQuestion = (like) => ({
+    id: qid(),
     text: "",
     options: like ? like.options.map((o) => (o.idk ? { text: "", idk: true } : { text: "", to: [] })) : [1, 2, 3, 4, 5].map(() => ({ text: "", to: [] })),
   });
@@ -51,7 +55,7 @@
       const { quiz } = await L().api("quizzes/" + encodeURIComponent(slug));
       const { slug: s, published, summary, updated, ...rest } = quiz;
       doc = rest; meta = { slug: s, summary: summary || "", published, isNew: false }; dirty = false; openKeys = new Set();
-      draw();
+      ensureIds(); draw();
     } catch (e) { box.innerHTML = `<p class="note">${esc(e.message)}</p><p class="center"><a class="text-link" href="quiz-maker" data-link>Back to the list</a></p>`; }
   }
 
@@ -80,7 +84,7 @@
     let j; try { j = JSON.parse(text); } catch { throw new Error("That file isn't a quiz (it couldn't be read)."); }
     if (!j || !Array.isArray(j.sections)) throw new Error("That file isn't a quiz (no sections in it).");
     const { slug, summary, published, updated, ...rest } = j;
-    doc = rest; doc.matches = doc.matches || [];
+    doc = rest; doc.matches = doc.matches || []; ensureIds();
     meta = asNew ? { slug: slugify(slug || doc.title || ""), summary: summary || "", published: false, isNew: true } : { ...meta, summary: summary ?? meta.summary };
     dirty = true; openKeys = new Set();
     history.replaceState(null, "", "/quiz-maker/" + (asNew ? "new" : meta.slug));
@@ -152,6 +156,11 @@
   const questionSummary = (si, qi) => `${qi + 1}. ${clip(doc.sections[si].questions[qi].text, 90) || "(blank question)"}`;
   const groupSummary = (gi) => `${clip(doc.matches[gi].title || doc.matches[gi].label, 60) || "(untitled list)"} · ${doc.matches[gi].items.length} entries`;
   const itemSummary = (gi, ii) => clip(doc.matches[gi].items[ii].name, 70) || "(unnamed entry)";
+  const pickSummary = (gi, ii) => {
+    const it = doc.matches[gi].items[ii], all = doc.sections.reduce((n, s) => n + s.questions.length, 0);
+    const set = doc.sections.reduce((n, s) => n + s.questions.filter((q) => it.picks && it.picks[q.id]).length, 0);
+    return `How it would answer each question (${set} of ${all} set)`;
+  };
 
   function summaryFor(key) {
     const [kind, a, b] = key.split(".");
@@ -160,6 +169,7 @@
       if (kind === "q") return questionSummary(+a, +b);
       if (kind === "g") return groupSummary(+a);
       if (kind === "m") return itemSummary(+a, +b);
+      if (kind === "a") return pickSummary(+a, +b);
     } catch { }
     return "";
   }
@@ -169,7 +179,7 @@
     if (body.dataset.done) return;
     body.dataset.done = "1";
     const [kind, a, b] = d.dataset.key.split(".").map((x, i) => (i ? +x : x));
-    body.innerHTML = kind === "s" ? sectionBody(a) : kind === "q" ? questionBody(a, b) : kind === "g" ? groupBody(a) : itemBody(a, b);
+    body.innerHTML = kind === "s" ? sectionBody(a) : kind === "q" ? questionBody(a, b) : kind === "g" ? groupBody(a) : kind === "a" ? pickBody(a, b) : itemBody(a, b);
   }
 
   function sectionBody(si) {
@@ -233,6 +243,14 @@
       </div></div>`;
   }
 
+  function pickBody(gi, ii) {
+    const it = doc.matches[gi].items[ii];
+    it.picks = it.picks || {};
+    return doc.sections.map((s, si) => `<h4 class="mk-pick-h">${esc(clip(s.title || s.short, 80) || "Section " + (si + 1))}</h4>` + s.questions.map((q, qi) =>
+      `<label class="mk-pick"><span>${qi + 1}. ${esc(clip(q.text, 100))}</span><select data-pick="matches.${gi}.items.${ii}" data-qid="${esc(q.id)}">
+        <option value="">(no answer)</option>${q.options.map((o, oi) => (o.idk ? "" : `<option value="${oi + 1}"${it.picks[q.id] === oi + 1 ? " selected" : ""}>${oi + 1}. ${esc(clip(o.text, 80))}</option>`)).join("")}</select></label>`).join("")).join("");
+  }
+
   function itemBody(gi, ii) {
     const it = doc.matches[gi].items[ii], p = `matches.${gi}.items.${ii}`;
     it.pos = it.pos || {};
@@ -261,7 +279,10 @@
         </div>
         ${label("…or a picture address <small>(https://…)</small>", inp(`${p}.image`, 'maxlength="300" placeholder="https://"'))}
       </div>
-      <h3 class="small-h">Where it stands</h3>
+      <h3 class="small-h">How it would answer</h3>
+      <p class="small">Pick the answer this entry would give to each question. A result is worked out by comparing answers one by one; an entry with none set is compared by the positions below instead.</p>
+      ${detailsHTML(`a.${gi}.${ii}`, pickSummary(gi, ii), false)}
+      <h3 class="small-h">Where it stands <small>(used when no answers are set)</small></h3>
       ${controls}
       <div class="row mk-tools">
         <button class="link-btn" type="button" data-act="dup-item" data-a="${gi}" data-b="${ii}">Duplicate</button>
@@ -270,6 +291,14 @@
   }
 
   /* ───────── changes ───────── */
+  const eachItem = (fn) => doc.matches.forEach((g) => g.items.forEach(fn));
+  function reorderOpt(a, b, c, d) {   // entries' answers follow the answer they chose
+    const q = doc.sections[a].questions[b], j = c + d;
+    if (j < 0 || j >= q.options.length) return;
+    move(q.options, c, d);
+    eachItem((it) => { const n = it.picks && it.picks[q.id]; if (n === c + 1) it.picks[q.id] = j + 1; else if (n === j + 1) it.picks[q.id] = c + 1; });
+    shiftKeys(); openKeys.add(`s.${a}`); openKeys.add(`q.${a}.${b}`);
+  }
   const move = (list, i, d) => { const j = i + d; if (j < 0 || j >= list.length) return; [list[i], list[j]] = [list[j], list[i]]; };
   const shiftKeys = () => { openKeys = new Set(); };   // positions changed, so forget which were open
 
@@ -306,7 +335,7 @@
       }
     },
     "add-q": (a) => { const s = doc.sections[a]; s.questions.push(blankQuestion(s.questions[s.questions.length - 1])); openKeys.add(`s.${a}`); openKeys.add(`q.${a}.${s.questions.length - 1}`); },
-    "dup-q": (a, b) => { const s = doc.sections[a]; s.questions.splice(b + 1, 0, JSON.parse(JSON.stringify(s.questions[b]))); shiftKeys(); openKeys.add(`s.${a}`); },
+    "dup-q": (a, b) => { const s = doc.sections[a], copy = JSON.parse(JSON.stringify(s.questions[b])); copy.id = qid(); s.questions.splice(b + 1, 0, copy); shiftKeys(); openKeys.add(`s.${a}`); },
     "up-q": (a, b) => { move(doc.sections[a].questions, b, -1); shiftKeys(); openKeys.add(`s.${a}`); },
     "down-q": (a, b) => { move(doc.sections[a].questions, b, 1); shiftKeys(); openKeys.add(`s.${a}`); },
     "del-q": async (a, b) => {
@@ -314,15 +343,20 @@
       doc.sections[a].questions.splice(b, 1); shiftKeys(); openKeys.add(`s.${a}`);
     },
     "add-opt": (a, b) => { const poly = doc.sections[a].poles.length >= 3; doc.sections[a].questions[b].options.push(poly ? { text: "", to: [] } : { text: "" }); },
-    "del-opt": (a, b, c) => { doc.sections[a].questions[b].options.splice(c, 1); },
-    "up-opt": (a, b, c) => move(doc.sections[a].questions[b].options, c, -1),
-    "down-opt": (a, b, c) => move(doc.sections[a].questions[b].options, c, 1),
+    "del-opt": (a, b, c) => {
+      const q = doc.sections[a].questions[b];
+      q.options.splice(c, 1);
+      eachItem((it) => { const n = it.picks && it.picks[q.id]; if (n === c + 1) delete it.picks[q.id]; else if (n > c + 1) it.picks[q.id] = n - 1; });
+      shiftKeys(); openKeys.add(`s.${a}`); openKeys.add(`q.${a}.${b}`);
+    },
+    "up-opt": (a, b, c) => reorderOpt(a, b, c, -1),
+    "down-opt": (a, b, c) => reorderOpt(a, b, c, 1),
     "add-group": () => { doc.matches.push({ id: sid(), title: "", label: "", items: [] }); openKeys.add(`g.${doc.matches.length - 1}`); },
     "del-group": async (a) => {
       if (!(await L().confirmBox({ title: "Delete this list?", text: `“${doc.matches[a].title || doc.matches[a].label || "Untitled"}” and its ${doc.matches[a].items.length} entries.`, yes: "Delete", danger: true }))) return false;
       doc.matches.splice(a, 1); shiftKeys();
     },
-    "add-item": (a) => { doc.matches[a].items.push({ name: "", blurb: "", image: "", pos: {} }); openKeys.add(`g.${a}`); openKeys.add(`m.${a}.${doc.matches[a].items.length - 1}`); },
+    "add-item": (a) => { doc.matches[a].items.push({ name: "", blurb: "", image: "", pos: {}, picks: {} }); openKeys.add(`g.${a}`); openKeys.add(`m.${a}.${doc.matches[a].items.length - 1}`); },
     "dup-item": (a, b) => { const l = doc.matches[a].items, c = JSON.parse(JSON.stringify(l[b])); c.name = c.name ? c.name + " (copy)" : ""; l.splice(b + 1, 0, c); shiftKeys(); openKeys.add(`g.${a}`); },
     "del-item": (a, b) => { doc.matches[a].items.splice(b, 1); shiftKeys(); openKeys.add(`g.${a}`); },
     "sort-items": (a) => { doc.matches[a].items.sort((x, y) => x.name.localeCompare(y.name)); shiftKeys(); openKeys.add(`g.${a}`); },
@@ -398,6 +432,11 @@
         const it = get(t.dataset.poson), s = doc.sections[+t.dataset.sec];
         if (t.checked) it.pos[s.id] = s.poles.length >= 3 ? s.poles.map(() => 1 / s.poles.length) : 0.5; else delete it.pos[s.id];
         touch(); const d = t.closest("details"); d.querySelector(".mk-body").dataset.done = ""; fillBody(d); return;
+      }
+      if (t.dataset.pick) {
+        const it = get(t.dataset.pick); it.picks = it.picks || {};
+        t.value ? (it.picks[t.dataset.qid] = +t.value) : delete it.picks[t.dataset.qid];
+        touch(); refreshSummaries(); return;
       }
       if (t.dataset.upload) {
         const f = t.files[0]; if (!f) return;

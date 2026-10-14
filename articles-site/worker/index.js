@@ -1144,7 +1144,7 @@ const arr = (v, name, max, min = 0) => {
 // Checks a quiz and returns a clean copy: only the fields the site uses, all within limits.
 function cleanQuiz(raw) {
   if (!raw || typeof raw !== "object") throw new HttpError(400, "That quiz couldn't be read.");
-  const ids = new Set();
+  const ids = new Set(), qids = new Set(), qmap = new Map();   // qmap: question id -> its answers
   let questions = 0;
   const sections = arr(raw.sections, "Sections", QZ.sections, 1).map((s, si) => {
     if (!s || typeof s !== "object") throw new HttpError(400, `Section ${si + 1} couldn't be read.`);
@@ -1161,19 +1161,25 @@ function cleanQuiz(raw) {
       const at = `${where}, question ${qi + 1}`;
       if (!q || typeof q !== "object") throw new HttpError(400, `${at} couldn't be read.`);
       questions++;
-      return {
+      let qid = typeof q.id === "string" && SECTION_ID.test(q.id) ? q.id : "q" + questions;
+      while (qids.has(qid)) qid += "x";
+      qids.add(qid);
+      const question = {
+        id: qid,
         text: qs(q.text, `${at}: the question`, QZ.question, 1),
         options: arr(q.options, `${at}: answers`, QZ.options, 2).map((o, oi) => {
           if (!o || typeof o !== "object") throw new HttpError(400, `${at}, answer ${oi + 1} couldn't be read.`);
-          const clean = { text: qs(o.text, `${at}, answer ${oi + 1}`, QZ.option, 1) };
-          if (o.idk) clean.idk = true;
+          const opt = { text: qs(o.text, `${at}, answer ${oi + 1}`, QZ.option, 1) };
+          if (o.idk) opt.idk = true;
           else if (poly) {
-            clean.to = [...new Set((Array.isArray(o.to) ? o.to : []).map(Number))]
+            opt.to = [...new Set((Array.isArray(o.to) ? o.to : []).map(Number))]
               .filter((k) => Number.isInteger(k) && k >= 0 && k < poles.length).sort((a, b) => a - b);
           }
-          return clean;
+          return opt;
         }),
       };
+      qmap.set(qid, question.options);
+      return question;
     });
     return out;
   });
@@ -1201,7 +1207,15 @@ function cleanQuiz(raw) {
             if (total > 0) pos[sec.id] = nums.map((x) => Math.round((x / total) * 1000) / 1000);
           } else if (v != null && v !== "" && Number.isFinite(Number(v))) pos[sec.id] = Math.round(unit(v) * 1000) / 1000;
         });
-        return { name: qs(it.name, `${at}, entry ${ii + 1}: the name`, QZ.name, 1), blurb: qs(it.blurb, `${at}, entry ${ii + 1}: the description`, QZ.blurb), image, pos };
+        // how the entry would answer each question: { question id: answer number }
+        const picks = {};
+        if (it.picks && typeof it.picks === "object") {
+          for (const [k, v] of Object.entries(it.picks)) {
+            const opts = qmap.get(k), n = Number(v);
+            if (opts && Number.isInteger(n) && n >= 1 && n <= opts.length && !opts[n - 1].idk) picks[k] = n;
+          }
+        }
+        return { name: qs(it.name, `${at}, entry ${ii + 1}: the name`, QZ.name, 1), blurb: qs(it.blurb, `${at}, entry ${ii + 1}: the description`, QZ.blurb), image, pos, picks };
       }),
     };
   });

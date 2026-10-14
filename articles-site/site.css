@@ -467,6 +467,7 @@ button.item { width: 100%; border: 0; background: none; color: inherit; font: in
 .q-match-top p { margin: 0; font-size: 15.5px; color: var(--ink-soft); }
 .q-pct { margin-left: 6px; padding: 1px 9px; border-radius: 999px; background: var(--accent); color: #fff4d6; font-size: 14px; vertical-align: 3px; }
 .q-match-img { flex: none; width: 96px; height: 96px; border-radius: 12px; object-fit: cover; box-shadow: 0 0 0 1.5px var(--ink); }
+.q-match-top p.q-same { margin-top: 6px; font-size: 14px; color: var(--dim); }
 .q-also { margin: 10px 0 0; font-size: 14px; color: var(--ink-soft); }
 .q-keep { margin: 16px 0; text-align: center; }
 .q-keep p { margin: 0 0 10px; }
@@ -506,6 +507,10 @@ button.item { width: 100%; border: 0; background: none; color: inherit; font: in
 .mk-range output { font-size: 13px; text-align: right; color: var(--dim); }
 .mk-range-line { grid-template-columns: minmax(70px, 22%) 1fr minmax(70px, 22%); }
 .mk-range-line .mk-end { text-align: right; }
+.mk-pick { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4px 12px; align-items: center; margin: 6px 0; font-size: 13.5px; font-weight: 600; }
+.mk-pick select { width: 100%; padding: 5px 6px; border: 1.5px solid var(--ink-soft); border-radius: 8px; background: rgba(255, 249, 228, .8); color: var(--ink); font: 400 13.5px var(--ui); }
+.mk-pick-h { margin: 14px 0 2px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+@media (max-width: 560px) { .mk-pick { grid-template-columns: 1fr; } }
 .mk-img { display: grid; gap: 8px; justify-items: start; }
 .mk-img img { border-radius: 10px; object-fit: cover; box-shadow: 0 0 0 1.5px var(--ink); }
 @media (max-width: 520px) {
