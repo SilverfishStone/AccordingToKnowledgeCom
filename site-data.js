@@ -1,11 +1,11 @@
 /* ------------------------------------------------------------------
    Edit this file to change the tools shown in the left panel.
-   Articles, stories and gallery images are published from /write/ and
+   Stories and gallery images are published from /write/ and
    don't live here.
    ------------------------------------------------------------------ */
 
 const SITE = {
-  name: "According to Knowledge",
+  name: "SilverfishStone",
   author: "Silver",
 
   /* LEFT PANEL — tools.
@@ -35,7 +35,7 @@ const SITE = {
   ],
 
   /* Starter category lists offered in the editor. Categories already used by a
-     published article / gallery image are offered too, and you can type new
+     published gallery image are offered too, and you can type new
      ones in the editor, so these are only a convenience.                      */
   categories: ["Mormons", "Comparative Religion", "Apologetics"],
   galleryCategories: ["Art", "Photography"],
@@ -45,9 +45,9 @@ const SITE = {
 
   /* The Nine Rules now live on the articles site: articles-site/config.js */
 
-  /* While reading a story or article the page switches to two panels so the
-     text gets more room. Which side panel steps aside: "right" (latest
-     articles) or "left" (tools and the latest-story card).                      */
+  /* While reading a story the page switches to two panels so the text gets
+     more room. Which side panel steps aside: "right" (the footer) or "left"
+     (tools and the latest-story card).                                         */
   readingHides: "right",
 
   /* The "Why am I not…" page (#why-not) works already but has no tab yet, so you

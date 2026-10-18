@@ -30,7 +30,7 @@
   }).join("");
   $("#year").textContent = new Date().getFullYear();
 
-  /* ───────── data (articles/, stories/ — written by /write/) ───────── */
+  /* ───────── data (stories/, gallery/ — written by /write/) ───────── */
   const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
   const RESERVED = new Set(["index", "series"]);
   const cache = new Map();
@@ -49,8 +49,6 @@
   const newest = (a, b) => new Date(b.published) - new Date(a.published);
   const cleanList = (l) => (Array.isArray(l) ? l : []).filter((s) => s && SLUG_RE.test(s.slug) && !RESERVED.has(s.slug));
 
-  const loadArticles = () => getJSON("articles/index.json", { optional: true }).then((l) =>
-    cleanList(l).map((a) => ({ ...a, categories: (Array.isArray(a.categories) ? a.categories : []).filter(Boolean) })).sort(newest));
   const loadStories = () => getJSON("stories/index.json", { optional: true }).then((l) => cleanList(l).sort(newest));
   const loadSeriesMeta = () => getJSON("stories/series.json", { optional: true }).then((l) =>
     (Array.isArray(l) ? l : []).filter((s) => s && SLUG_RE.test(s.slug)));
@@ -61,9 +59,6 @@
   };
   const readTime = (words) => (words ? Math.max(1, Math.round(words / 220)) + " min read" : "");
   const metaLine = (s) => [fmtDate(s.published), readTime(s.words)].filter(Boolean).join(" · ");
-  // an article's thumbnail (published into articles/thumbs/ by the editor), if it has one
-  const thumbOf = (a) => (/^articles\/thumbs\/[a-z0-9-]+\.jpg$/.test(a.thumbnail || "") ? a.thumbnail : "");
-
   /* series: derived from each story's `series` + `chapter`, titled from stories/series.json */
   function buildSeries(stories, meta) {
     const map = new Map();
@@ -156,30 +151,6 @@
     markLatest();
   }, () => { latestEl.hidden = true; });
 
-  /* ───────── right panel: latest articles ───────── */
-  const postList = $("#post-list"), postEmpty = $("#post-empty"), search = $("#search");
-  let allArticles = [];
-  function renderHighlights() {
-    const q = search.value.trim().toLowerCase();
-    const list = q
-      ? allArticles.filter((a) => (a.title + " " + (a.subtitle || "") + " " + a.categories.join(" ")).toLowerCase().includes(q))
-      : allArticles.slice(0, 5);
-    postList.innerHTML = list.map((a) => `<a class="post-card" href="#article/${esc(a.slug)}">
-      <div class="kicker">${a.categories.slice(0, 1).map((c) => `<b>${esc(c)}</b>`).join("")}<span>${esc(fmtDate(a.published))}</span></div>
-      <div class="title">${esc(a.title)}</div>
-    </a>`).join("");
-    postEmpty.hidden = list.length > 0;
-  }
-  loadArticles().then((articles) => {
-    allArticles = articles;
-    const has = articles.length > 0;
-    $("#wip-card").hidden = has;
-    $("#search-wrap").hidden = !has;
-    $("#articles-card").hidden = !has;
-    renderHighlights();
-  }, () => { $("#wip-card").hidden = false; });
-  search.addEventListener("input", renderHighlights);
-
   /* ───────── views ───────── */
   async function showStories() {
     const box = $("#stories-box");
@@ -255,7 +226,7 @@
   }
 
   /* one reader for both kinds of writing */
-  const DIRS = { story: "stories", article: "articles" };
+  const DIRS = { story: "stories" };
   let docToken = 0;
   // downloads come from shared/export.js (the same as on accordingtoknowledge.com), fetched when first needed
   let exportLoad = null;
@@ -277,7 +248,7 @@
   }
 
   async function renderDoc(kind, slug) {
-    const box = $(kind === "story" ? "#story-box" : "#article-box");
+    const box = $("#story-box");
     const mine = ++docToken;
     if (!SLUG_RE.test(slug) || RESERVED.has(slug)) { box.innerHTML = errNote("That page doesn't exist."); return; }
     box.innerHTML = note("Loading…");
@@ -306,30 +277,12 @@
       const meta = document.createElement("p"); meta.className = "story-meta";
       meta.textContent = metaLine(doc) + (doc.updated && doc.updated !== doc.published && kind === "story" ? ` · Updated ${fmtDate(doc.updated)}` : "");
       parts.push(meta);
-      if (kind === "article" && Array.isArray(doc.categories) && doc.categories.length) {
-        const tags = document.createElement("div"); tags.className = "tags doc-tags";
-        for (const name of doc.categories) {
-          const a = document.createElement("a"); a.className = "tag"; a.textContent = name;
-          a.href = `https://accordingtoknowledge.com/?category=${encodeURIComponent(slugify(name))}#articles`;
-          a.target = "_blank"; a.rel = "noopener";
-          tags.appendChild(a);
-        }
-        parts.push(tags);
-      }
       const body = document.createElement("div"); body.className = "story-body ql-snow";
       const inner = document.createElement("div"); inner.className = "ql-editor";
       inner.innerHTML = DOMPurify.sanitize(String(doc.html || ""));
       window.ATKEmbeds?.hydrate(inner);
       body.appendChild(inner); parts.push(body);
 
-      // comments live on the articles site (it has the accounts)
-      if (kind === "article") {
-        const p = document.createElement("p"); p.className = "doc-source";
-        const a = document.createElement("a"); a.className = "text-link"; a.target = "_blank"; a.rel = "noopener";
-        a.href = `https://accordingtoknowledge.com/article/${encodeURIComponent(slug)}#comments`;
-        a.textContent = "Comments and discussion on accordingtoknowledge.com ↗";
-        p.appendChild(a); parts.push(p);
-      }
       // to read offline or open in a word processor
       {
         const p = document.createElement("p"); p.className = "doc-source doc-download";
@@ -341,11 +294,6 @@
           p.append(b);
         });
         parts.push(p);
-      }
-      if (kind === "article" && doc.source && /^https:\/\//.test(doc.source)) {
-        const p = document.createElement("p"); p.className = "doc-source";
-        const a = document.createElement("a"); a.className = "text-link"; a.href = doc.source; a.target = "_blank"; a.rel = "noopener"; a.textContent = "Originally published on Substack ↗";
-        p.appendChild(a); parts.push(p);
       }
       if (series) {
         const nav = seriesNav(doc, series);
@@ -536,26 +484,11 @@
     }
   }
 
-  /* ───────── home: about, pinned article, gallery button ───────── */
+  /* ───────── home: about, pinned story, gallery button ───────── */
   $("#h-home").textContent = SITE.about || "";
 
   async function showHome() {
-    const [articles, gallery, stories, seriesMeta] = await Promise.allSettled([loadArticles(), loadGallery(), loadStories(), loadSeriesMeta()]);
-
-    // the pinned article (or, until one is pinned, the newest)
-    const list = articles.status === "fulfilled" ? articles.value : [];
-    const a = list.find((x) => x.pinned) || list[0];
-    $("#home-pinned").hidden = !a;
-    if (a) {
-      $("#home-pinned .eyebrow").textContent = a.pinned ? "Pinned article" : "Latest article";
-      $("#pinned-link").href = "#article/" + a.slug;
-      $("#pinned-title").textContent = a.title || "Untitled";
-      $("#pinned-sub").textContent = a.subtitle || "";
-      $("#pinned-tags").innerHTML = a.categories.map((c) => `<span class="tag">${esc(c)}</span>`).join("");
-      $("#pinned-summary").textContent = a.summary || "";
-      $("#pinned-thumb").hidden = !thumbOf(a);
-      if (thumbOf(a)) $("#pinned-thumb").src = thumbOf(a);
-    }
+    const [gallery, stories, seriesMeta] = await Promise.allSettled([loadGallery(), loadStories(), loadSeriesMeta()]);
 
     // the pinned story (or the latest one)
     const sl = stories.status === "fulfilled" ? stories.value : [];
@@ -621,7 +554,7 @@
   if (SITE.whyNotTab) $("#key-whynot").hidden = false;
   const notFound = $("#not-found");
   const TAB = { home: "home", games: "games", stories: "stories", story: "stories", series: "stories", gallery: "gallery", image: "gallery", contact: "contact", "why-not": "why-not" };
-  const TITLE = { home: "Home", games: "Games", stories: "Stories", gallery: "Gallery", contact: "Contact", article: "Article", story: "Story", series: "Series", image: "Image", "why-not": "Why am I not…", secret: "Shh…" };
+  const TITLE = { home: "Home", games: "Games", stories: "Stories", gallery: "Gallery", contact: "Contact", story: "Story", series: "Series", image: "Image", "why-not": "Why am I not…", secret: "Shh…" };
 
   function route() {
     const raw = location.hash.replace(/^#\/?/, "");
@@ -642,7 +575,6 @@
     else if (a === "gallery" && !b) view = "gallery";
     else if (a === "gallery" && (b === "category" || b === "tag") && c) { view = "gallery"; arg = b; arg2 = decodeURIComponent(c); }
     else if (a === "image" && b) { view = "image"; arg = b; }
-    else if (a === "article" && b) { view = "article"; arg = b; }
     else if (a === "stories" && !b) view = "stories";
     else if (a === "story" && b) { view = "story"; arg = b; }
     else if (a === "series" && b) { view = "series"; arg = b; }
@@ -657,8 +589,8 @@
       on ? k.setAttribute("aria-current", "page") : k.removeAttribute("aria-current");
     });
 
-    // reading a story or article (or playing a game): two panels, so it gets the room
-    const reading = view === "article" || view === "story" || view === "games" || view === "secret";
+    // reading a story (or playing a game): two panels, so it gets the room
+    const reading = view === "story" || view === "games" || view === "secret";
     document.body.classList.toggle("reading", reading);
     document.body.classList.toggle("hide-left", reading && SITE.readingHides !== "right");
     document.body.classList.toggle("hide-right", reading && SITE.readingHides === "right");
@@ -669,7 +601,6 @@
     if (view === "image") showImage(arg);
     if (view === "stories") showStories();
     if (view === "series") showSeries(arg);
-    if (view === "article") renderDoc("article", arg);
     if (view === "story") renderDoc("story", arg);
     setGameFrame(view === "games");
     markLatest();

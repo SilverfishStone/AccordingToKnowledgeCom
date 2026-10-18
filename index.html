@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>According to Knowledge</title>
-  <meta name="description" content="Articles, stories, and tools by Silver." />
+  <title>SilverfishStone</title>
+  <meta name="description" content="Stories, games, art, and tools by Silver." />
   <meta name="theme-color" content="#0c101a" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%23000'/%3E%3Cpath d='M12 3l2.6 6.2 6.4.5-4.9 4.2 1.5 6.3L12 16.9 6.4 20.2l1.5-6.3L3 9.7l6.4-.5z' fill='%238ab4ff'/%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -19,8 +19,8 @@
   <!-- ═════════ Control-panel bar (full width) ═════════ -->
   <header class="console">
     <div class="console-inner">
-      <a class="plate brand" href="#home" aria-label="According to Knowledge, home">
-        <span>According to Knowledge</span>
+      <a class="plate brand" href="#home" aria-label="SilverfishStone, home">
+        <span>SilverfishStone</span>
       </a>
 
       <nav class="keys" aria-label="Site sections">
@@ -59,18 +59,6 @@
           <p class="eyebrow">About me</p>
           <h1 id="h-home" class="about-text"></h1>
           <div class="goat-lane" aria-hidden="true"><div class="goat-walk"><span class="goat"></span></div></div>
-        </div>
-
-        <div class="home-block" id="home-pinned" hidden>
-          <p class="eyebrow">Pinned article</p>
-          <a class="featured" id="pinned-link" href="#home">
-            <img class="featured-thumb" id="pinned-thumb" alt="" hidden />
-            <span class="featured-title" id="pinned-title"></span>
-            <span class="entry-sub" id="pinned-sub"></span>
-            <span class="tags" id="pinned-tags"></span>
-            <span class="featured-summary" id="pinned-summary"></span>
-            <span class="more">Read the article →</span>
-          </a>
         </div>
 
         <div class="home-block" id="home-story" hidden>
@@ -112,12 +100,6 @@
           <iframe class="game-frame" id="game-satellite" title="Satellite Courier" data-src="games/satellite/index.html?v=__BUILD__" allow="fullscreen" allowfullscreen></iframe>
           <p class="activity-note">Click the game first so it can hear your keyboard. Progress is saved in this browser.</p>
         </article>
-      </section>
-
-      <!-- ARTICLE (reader) -->
-      <section class="view" data-view="article" aria-label="Article" hidden>
-        <div class="reader-bar"><a class="back-link" href="https://accordingtoknowledge.com">← All articles (accordingtoknowledge.com)</a></div>
-        <article class="story" id="article-box" aria-live="polite"></article>
       </section>
 
       <!-- STORIES -->
@@ -217,31 +199,12 @@
       </div>
     </main>
 
-    <!-- ═════════ RIGHT: article highlights ═════════ -->
-    <aside class="side side-right" id="panel-articles" aria-label="Article highlights">
+    <!-- ═════════ RIGHT ═════════ -->
+    <aside class="side side-right" id="panel-side" aria-label="About this site">
       <div class="side-inner">
 
-        <!-- shown until there is at least one article -->
-        <section class="card wip" id="wip-card" hidden>
-          <p class="wip-badge">Work in progress</p>
-          <h2>Still being built</h2>
-          <p>This site is a work in progress. Articles will show up here as I write them. In the meantime, the stories and tools are ready to explore.</p>
-          <div class="wip-bar" aria-hidden="true"></div>
-        </section>
-
-        <label class="search" id="search-wrap" hidden>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-          <input id="search" type="search" placeholder="Search articles" autocomplete="off" />
-        </label>
-
-        <section class="card" id="articles-card" hidden>
-          <h2>Latest articles</h2>
-          <div id="post-list"></div>
-          <p class="empty" id="post-empty" hidden>No articles match your search.</p>
-        </section>
-
         <footer class="side-foot">
-          <span>© <span id="year"></span> According to Knowledge</span>
+          <span>© <span id="year"></span> SilverfishStone</span>
           <a class="kofi" href="https://ko-fi.com/silverfishstone" target="_blank" rel="noopener">☕ Buy me a coffee</a>
         </footer>
       </div>
@@ -252,7 +215,7 @@
   <nav class="bottom-bar" aria-label="Panels">
     <button type="button" data-show="left"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5 5L3 18l3 3 6.7-6.7a4 4 0 0 0 5-5l-2.4 2.4-2.6-.6-.6-2.6z"/></svg><span>Tools</span></button>
     <button type="button" data-show="mid"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg><span>Main</span></button>
-    <button type="button" data-show="right"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5"/></svg><span>Latest</span></button>
+    <button type="button" data-show="right"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5"/></svg><span>More</span></button>
   </nav>
 
   <script src="site-data.js?v=__BUILD__"></script>
