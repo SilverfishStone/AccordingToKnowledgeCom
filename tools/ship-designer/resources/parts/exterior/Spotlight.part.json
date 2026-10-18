@@ -1,0 +1,74 @@
+{
+ "format": "ship-part",
+ "version": 1,
+ "name": "Spotlight",
+ "mount": "any",
+ "nodes": [
+  {
+   "shape": "cyl",
+   "size": [
+    0.07,
+    0.07,
+    0.2
+   ],
+   "pos": [
+    0,
+    0.1,
+    0
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#3a414c",
+   "metal": 0.55,
+   "rough": 0.45,
+   "glow": 0
+  },
+  {
+   "shape": "cyl",
+   "size": [
+    0.2,
+    0.15,
+    0.3
+   ],
+   "pos": [
+    0,
+    0.36,
+    0.05
+   ],
+   "rot": [
+    -25,
+    0,
+    0
+   ],
+   "color": "#8e98a6",
+   "metal": 0.55,
+   "rough": 0.45,
+   "glow": 0
+  },
+  {
+   "shape": "sphere",
+   "size": [
+    0.15,
+    0.04,
+    0.15
+   ],
+   "pos": [
+    0,
+    0.46,
+    0.12
+   ],
+   "rot": [
+    -25,
+    0,
+    0
+   ],
+   "color": "#ffffff",
+   "metal": 0.55,
+   "rough": 0.45,
+   "glow": 2.4
+  }
+ ]
+}

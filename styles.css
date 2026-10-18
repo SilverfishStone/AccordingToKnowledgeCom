@@ -359,7 +359,9 @@ a.post-card::before {
   background: repeating-linear-gradient(-45deg, rgba(255, 196, 107, .6) 0 8px, transparent 8px 16px);
 }
 
-.side-foot { padding: 4px 16px; color: var(--dim); font-size: 13px; }
+.side-foot { padding: 4px 16px; color: var(--dim); font-size: 13px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.kofi { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px; color: var(--text); font-weight: 600; white-space: nowrap; }
+.kofi:hover { background: var(--hover); border-color: var(--accent); }
 
 @media (prefers-reduced-motion: no-preference) {
   .wip-tool::after { animation: lamp 2.4s ease-in-out infinite; }

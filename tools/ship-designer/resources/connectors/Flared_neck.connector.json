@@ -1,0 +1,9 @@
+{
+ "format": "ship-connector",
+ "version": 1,
+ "name": "Flared neck",
+ "params": {
+  "flare": 0.5,
+  "flareLen": 0.3
+ }
+}

@@ -1,0 +1,122 @@
+{
+ "format": "ship-part",
+ "version": 2,
+ "name": "Docking Ring",
+ "kind": "gadget",
+ "mount": "any",
+ "variants": [
+  {
+   "name": "Station rear cap ring",
+   "nodes": [
+    {
+     "shape": "lathe",
+     "pos": [
+      0,
+      0,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#6a7380",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "profile": [
+      [
+       1.0,
+       -0.5
+      ],
+      [
+       1.5,
+       -0.5
+      ],
+      [
+       1.5,
+       0.1
+      ],
+      [
+       1.0,
+       0.1
+      ]
+     ],
+     "closed": true
+    },
+    {
+     "shape": "lathe",
+     "pos": [
+      0,
+      0,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#6a7380",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "profile": [
+      [
+       1.5,
+       0
+      ],
+      [
+       2.3,
+       0.7
+      ],
+      [
+       2.6,
+       1.6
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Plain ring",
+   "nodes": [
+    {
+     "shape": "lathe",
+     "pos": [
+      0,
+      0,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#6a7380",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "profile": [
+      [
+       1.0,
+       0
+      ],
+      [
+       1.5,
+       0
+      ],
+      [
+       1.5,
+       0.4
+      ],
+      [
+       1.0,
+       0.4
+      ]
+     ],
+     "closed": true
+    }
+   ]
+  }
+ ]
+}

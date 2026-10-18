@@ -1,0 +1,239 @@
+{
+ "format": "ship-part",
+ "version": 2,
+ "name": "Radiator Wing",
+ "kind": "gadget",
+ "mount": "any",
+ "variants": [
+  {
+   "name": "Flat, with truss",
+   "nodes": [
+    {
+     "shape": "truss",
+     "pos": [
+      0,
+      0,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#8e98a6",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      2.0,
+      0.12,
+      0.95
+     ]
+    },
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      2.4,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#c9ced6",
+     "metal": 0.3,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      5,
+      0.05,
+      2.2
+     ]
+    },
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      2.4,
+      -0.9
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#c2452d",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      5,
+      0.07,
+      0.05
+     ]
+    },
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      2.4,
+      -0.45
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#c2452d",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      5,
+      0.07,
+      0.05
+     ]
+    },
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      2.4,
+      0.0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#c2452d",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      5,
+      0.07,
+      0.05
+     ]
+    },
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      2.4,
+      0.45000000000000007
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#c2452d",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      5,
+      0.07,
+      0.05
+     ]
+    },
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      2.4,
+      0.9
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#c2452d",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      5,
+      0.07,
+      0.05
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Torn wing",
+   "nodes": [
+    {
+     "shape": "truss",
+     "pos": [
+      0,
+      0,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#8e98a6",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      2.0,
+      0.12,
+      0.95
+     ]
+    },
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      2.4,
+      0
+     ],
+     "rot": [
+      20,
+      3,
+      5
+     ],
+     "color": "#c9ced6",
+     "metal": 0.3,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      5,
+      0.05,
+      2.2
+     ]
+    },
+    {
+     "shape": "box",
+     "pos": [
+      1.2,
+      3.0,
+      1.9
+     ],
+     "rot": [
+      70,
+      -4,
+      5
+     ],
+     "color": "#c9ced6",
+     "metal": 0.3,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      3,
+      0.05,
+      1.6
+     ]
+    }
+   ]
+  }
+ ]
+}

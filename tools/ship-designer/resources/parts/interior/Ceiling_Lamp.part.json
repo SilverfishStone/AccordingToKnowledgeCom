@@ -1,0 +1,52 @@
+{
+ "format": "ship-part",
+ "version": 1,
+ "name": "Ceiling Lamp",
+ "mount": "any",
+ "nodes": [
+  {
+   "shape": "cyl",
+   "size": [
+    0.4,
+    0.42,
+    0.06
+   ],
+   "pos": [
+    0,
+    0.03,
+    0
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#3a414c",
+   "metal": 0.55,
+   "rough": 0.45,
+   "glow": 0
+  },
+  {
+   "shape": "cyl",
+   "size": [
+    0.32,
+    0.32,
+    0.03
+   ],
+   "pos": [
+    0,
+    0.075,
+    0
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#fff6dc",
+   "metal": 0.55,
+   "rough": 0.45,
+   "glow": 2.2
+  }
+ ]
+}

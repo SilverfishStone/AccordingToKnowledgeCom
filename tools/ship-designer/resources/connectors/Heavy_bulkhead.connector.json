@@ -1,0 +1,12 @@
+{
+ "format": "ship-connector",
+ "version": 1,
+ "name": "Heavy bulkhead",
+ "params": {
+  "flare": 0.9,
+  "flareLen": 0.45,
+  "ribs": 2,
+  "ribSize": 0.06,
+  "ribWidth": 0.1
+ }
+}

@@ -1,0 +1,12 @@
+{
+ "format": "ship-connector",
+ "version": 1,
+ "name": "Gangway",
+ "params": {
+  "ribs": 8,
+  "ribSize": 0.05,
+  "ribWidth": 0.05,
+  "flare": 0.3,
+  "flareLen": 0.15
+ }
+}

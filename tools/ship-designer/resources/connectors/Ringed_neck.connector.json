@@ -1,0 +1,12 @@
+{
+ "format": "ship-connector",
+ "version": 1,
+ "name": "Ringed neck",
+ "params": {
+  "ribs": 4,
+  "ribSize": 0.1,
+  "ribWidth": 0.12,
+  "flare": 0.15,
+  "flareLen": 0.2
+ }
+}

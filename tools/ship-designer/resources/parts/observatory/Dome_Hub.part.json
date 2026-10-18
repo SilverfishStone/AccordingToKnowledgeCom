@@ -1,0 +1,85 @@
+{
+ "format": "ship-part",
+ "version": 2,
+ "name": "Dome Hub",
+ "kind": "gadget",
+ "mount": "any",
+ "variants": [
+  {
+   "name": "Apex hub (ball)",
+   "nodes": [
+    {
+     "shape": "sphere",
+     "pos": [
+      0,
+      0,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#6a7380",
+     "metal": 0.6,
+     "rough": 0.4,
+     "glow": 0,
+     "size": [
+      0.26,
+      0.26,
+      0.26
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Apex hub (ball and collar)",
+   "nodes": [
+    {
+     "shape": "sphere",
+     "pos": [
+      0,
+      0.0,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#6a7380",
+     "metal": 0.6,
+     "rough": 0.4,
+     "glow": 0,
+     "size": [
+      0.26,
+      0.26,
+      0.26
+     ]
+    },
+    {
+     "shape": "cyl",
+     "pos": [
+      0,
+      -0.1,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#3a414c",
+     "metal": 0.6,
+     "rough": 0.4,
+     "glow": 0,
+     "size": [
+      0.34,
+      0.34,
+      0.08
+     ]
+    }
+   ]
+  }
+ ]
+}

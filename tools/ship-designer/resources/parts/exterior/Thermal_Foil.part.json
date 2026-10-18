@@ -1,0 +1,88 @@
+{
+ "format": "ship-part",
+ "version": 2,
+ "name": "Thermal Foil",
+ "kind": "gadget",
+ "mount": "any",
+ "variants": [
+  {
+   "name": "Flat patch",
+   "nodes": [
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.02,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#c9a73a",
+     "metal": 0.9,
+     "rough": 0.3,
+     "glow": 0,
+     "size": [
+      2.0,
+      0.04,
+      1.4
+     ],
+     "flat": true
+    }
+   ]
+  },
+  {
+   "name": "Peeling flap",
+   "nodes": [
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.02,
+      -0.3
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#c9a73a",
+     "metal": 0.9,
+     "rough": 0.3,
+     "glow": 0,
+     "size": [
+      2.0,
+      0.04,
+      0.8
+     ],
+     "flat": true
+    },
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.22,
+      0.45
+     ],
+     "rot": [
+      28,
+      0,
+      0
+     ],
+     "color": "#c9a73a",
+     "metal": 0.9,
+     "rough": 0.3,
+     "glow": 0,
+     "size": [
+      2.0,
+      0.04,
+      0.7
+     ],
+     "flat": true
+    }
+   ]
+  }
+ ]
+}

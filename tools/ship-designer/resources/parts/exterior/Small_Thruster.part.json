@@ -1,0 +1,96 @@
+{
+ "format": "ship-part",
+ "version": 1,
+ "name": "Small Thruster",
+ "mount": "exterior",
+ "nodes": [
+  {
+   "shape": "cyl",
+   "size": [
+    0.22,
+    0.22,
+    0.12
+   ],
+   "pos": [
+    0,
+    0.06,
+    0
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#3a414c",
+   "metal": 0.55,
+   "rough": 0.45,
+   "glow": 0
+  },
+  {
+   "shape": "cyl",
+   "size": [
+    0.3,
+    0.18,
+    0.12
+   ],
+   "pos": [
+    0,
+    0.18,
+    0
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#8e98a6",
+   "metal": 0.55,
+   "rough": 0.45,
+   "glow": 0
+  },
+  {
+   "shape": "cyl",
+   "size": [
+    0.38,
+    0.17,
+    0.4
+   ],
+   "pos": [
+    0,
+    0.44,
+    0
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#59616e",
+   "metal": 0.8,
+   "rough": 0.45,
+   "glow": 0
+  },
+  {
+   "shape": "cyl",
+   "size": [
+    0.28,
+    0.28,
+    0.03
+   ],
+   "pos": [
+    0,
+    0.55,
+    0
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#7fdcff",
+   "metal": 0.55,
+   "rough": 0.45,
+   "glow": 2.2
+  }
+ ]
+}

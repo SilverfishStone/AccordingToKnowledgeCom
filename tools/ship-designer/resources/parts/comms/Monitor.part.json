@@ -1,0 +1,381 @@
+{
+ "format": "ship-part",
+ "version": 2,
+ "name": "Monitor",
+ "kind": "gadget",
+ "mount": "any",
+ "variants": [
+  {
+   "name": "Terminal text",
+   "nodes": [
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.02,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#3a414c",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.3,
+      0.04,
+      0.22
+     ]
+    },
+    {
+     "shape": "cyl",
+     "pos": [
+      0,
+      0.19,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#3a414c",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.03,
+      0.03,
+      0.3
+     ]
+    },
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.45,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#25272a",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.56,
+      0.44,
+      0.1
+     ]
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.45,
+      0.052
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.1,
+     "rough": 0.3,
+     "glow": 0.8,
+     "size": [
+      0.5,
+      0.38
+     ],
+     "tex": "gen:screen-text"
+    }
+   ]
+  },
+  {
+   "name": "Amber text",
+   "nodes": [
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.02,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#3a414c",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.3,
+      0.04,
+      0.22
+     ]
+    },
+    {
+     "shape": "cyl",
+     "pos": [
+      0,
+      0.19,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#3a414c",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.03,
+      0.03,
+      0.3
+     ]
+    },
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.45,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#25272a",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.56,
+      0.44,
+      0.1
+     ]
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.45,
+      0.052
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.1,
+     "rough": 0.3,
+     "glow": 0.8,
+     "size": [
+      0.5,
+      0.38
+     ],
+     "tex": "gen:screen-amber"
+    }
+   ]
+  },
+  {
+   "name": "Oscilloscope",
+   "nodes": [
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.02,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#3a414c",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.3,
+      0.04,
+      0.22
+     ]
+    },
+    {
+     "shape": "cyl",
+     "pos": [
+      0,
+      0.19,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#3a414c",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.03,
+      0.03,
+      0.3
+     ]
+    },
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.45,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#25272a",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.56,
+      0.44,
+      0.1
+     ]
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.45,
+      0.052
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.1,
+     "rough": 0.3,
+     "glow": 0.8,
+     "size": [
+      0.5,
+      0.38
+     ],
+     "tex": "gen:screen-scope"
+    }
+   ]
+  },
+  {
+   "name": "Spectrum bars",
+   "nodes": [
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.02,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#3a414c",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.3,
+      0.04,
+      0.22
+     ]
+    },
+    {
+     "shape": "cyl",
+     "pos": [
+      0,
+      0.19,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#3a414c",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.03,
+      0.03,
+      0.3
+     ]
+    },
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.45,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#25272a",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.56,
+      0.44,
+      0.1
+     ]
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.45,
+      0.052
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.1,
+     "rough": 0.3,
+     "glow": 0.8,
+     "size": [
+      0.5,
+      0.38
+     ],
+     "tex": "gen:screen-spectrum"
+    }
+   ]
+  }
+ ]
+}

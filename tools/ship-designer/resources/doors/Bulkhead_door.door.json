@@ -1,0 +1,152 @@
+{
+ "format": "ship-door",
+ "version": 1,
+ "name": "Bulkhead door",
+ "hinge": {
+  "side": "-x",
+  "angle": 95
+ },
+ "frame": [
+  {
+   "shape": "rframe",
+   "pos": [
+    0,
+    -0.04,
+    0
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#2b3037",
+   "metal": 0.55,
+   "rough": 0.5,
+   "glow": 0,
+   "size": [
+    "w+0.06",
+    "h+0.06",
+    0.12,
+    0.16
+   ]
+  }
+ ],
+ "leaf": [
+  {
+   "shape": "box",
+   "pos": [
+    0,
+    0,
+    0
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#6a7380",
+   "metal": 0.55,
+   "rough": 0.5,
+   "glow": 0,
+   "size": [
+    "w+0.04",
+    0.1,
+    "h+0.04"
+   ]
+  },
+  {
+   "shape": "box",
+   "pos": [
+    0,
+    0.07,
+    0
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#5d6672",
+   "metal": 0.55,
+   "rough": 0.5,
+   "glow": 0,
+   "size": [
+    "w*0.8",
+    0.04,
+    "h*0.84"
+   ]
+  },
+  {
+   "shape": "wheel",
+   "pos": [
+    "w*0.08",
+    0.14,
+    0
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#a8442d",
+   "metal": 0.55,
+   "rough": 0.5,
+   "glow": 0,
+   "size": [
+    0.26,
+    0.032
+   ],
+   "spokes": 6,
+   "anim": {
+    "type": "spin",
+    "axis": "y",
+    "turns": 2
+   }
+  },
+  {
+   "shape": "ring",
+   "pos": [
+    "-w*0.26",
+    0.1,
+    "-h*0.22"
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#3a414c",
+   "metal": 0.55,
+   "rough": 0.5,
+   "glow": 0,
+   "size": [
+    0.2,
+    0.15,
+    0.1
+   ]
+  },
+  {
+   "shape": "cyl",
+   "pos": [
+    "-w*0.26",
+    0.1,
+    "-h*0.22"
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#9fd0ff",
+   "metal": 0.55,
+   "rough": 0.5,
+   "glow": 0,
+   "size": [
+    0.15,
+    0.15,
+    0.05
+   ],
+   "glass": true
+  }
+ ]
+}

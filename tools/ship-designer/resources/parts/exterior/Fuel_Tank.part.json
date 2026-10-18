@@ -1,0 +1,120 @@
+{
+ "format": "ship-part",
+ "version": 1,
+ "name": "Fuel Tank",
+ "mount": "exterior",
+ "nodes": [
+  {
+   "shape": "cyl",
+   "size": [
+    0.5,
+    0.5,
+    1.2
+   ],
+   "pos": [
+    0,
+    0.8,
+    0
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#d3d8df",
+   "metal": 0.4,
+   "rough": 0.45,
+   "glow": 0
+  },
+  {
+   "shape": "sphere",
+   "size": [
+    0.5,
+    0.45,
+    0.5
+   ],
+   "pos": [
+    0,
+    1.4,
+    0
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#d3d8df",
+   "metal": 0.4,
+   "rough": 0.45,
+   "glow": 0,
+   "hemi": true
+  },
+  {
+   "shape": "sphere",
+   "size": [
+    0.5,
+    0.45,
+    0.5
+   ],
+   "pos": [
+    0,
+    0.2,
+    0
+   ],
+   "rot": [
+    180,
+    0,
+    0
+   ],
+   "color": "#d3d8df",
+   "metal": 0.4,
+   "rough": 0.45,
+   "glow": 0,
+   "hemi": true
+  },
+  {
+   "shape": "cyl",
+   "size": [
+    0.53,
+    0.53,
+    0.08
+   ],
+   "pos": [
+    0,
+    0.5,
+    0
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#c2452d",
+   "metal": 0.55,
+   "rough": 0.45,
+   "glow": 0
+  },
+  {
+   "shape": "cyl",
+   "size": [
+    0.53,
+    0.53,
+    0.08
+   ],
+   "pos": [
+    0,
+    1.1,
+    0
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#c2452d",
+   "metal": 0.55,
+   "rough": 0.45,
+   "glow": 0
+  }
+ ]
+}

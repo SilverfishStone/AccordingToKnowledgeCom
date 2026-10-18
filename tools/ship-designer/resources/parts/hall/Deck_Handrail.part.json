@@ -1,0 +1,102 @@
+{
+ "format": "ship-part",
+ "version": 2,
+ "name": "Deck Handrail",
+ "kind": "gadget",
+ "mount": "any",
+ "variants": [
+  {
+   "name": "2 m rail on posts",
+   "nodes": [
+    {
+     "shape": "cyl",
+     "pos": [
+      0,
+      0.45,
+      0
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#d6b34a",
+     "metal": 0.3,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.035,
+      0.035,
+      2.0
+     ]
+    },
+    {
+     "shape": "cyl",
+     "pos": [
+      0,
+      0.22,
+      -0.95
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#8e98a6",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.02,
+      0.02,
+      0.42
+     ]
+    },
+    {
+     "shape": "cyl",
+     "pos": [
+      0,
+      0.22,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#8e98a6",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.02,
+      0.02,
+      0.42
+     ]
+    },
+    {
+     "shape": "cyl",
+     "pos": [
+      0,
+      0.22,
+      0.95
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#8e98a6",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.02,
+      0.02,
+      0.42
+     ]
+    }
+   ]
+  }
+ ]
+}

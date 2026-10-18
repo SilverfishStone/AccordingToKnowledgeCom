@@ -1,0 +1,9 @@
+{
+ "format": "ship-connector",
+ "version": 1,
+ "name": "Bellows",
+ "params": {
+  "bellows": 6,
+  "bellowsDepth": 0.1
+ }
+}

@@ -1,0 +1,205 @@
+{
+ "format": "ship-part",
+ "version": 2,
+ "name": "Beacon Light",
+ "kind": "gadget",
+ "mount": "exterior",
+ "variants": [
+  {
+   "name": "Amber",
+   "nodes": [
+    {
+     "shape": "cyl",
+     "size": [
+      0.12,
+      0.17,
+      0.1
+     ],
+     "pos": [
+      0,
+      0.05,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#3a414c",
+     "metal": 0.55,
+     "rough": 0.45,
+     "glow": 0
+    },
+    {
+     "shape": "sphere",
+     "size": [
+      0.14,
+      0.14,
+      0.14
+     ],
+     "pos": [
+      0,
+      0.17,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#ffb02e",
+     "metal": 0.55,
+     "rough": 0.2,
+     "glow": 2.0
+    }
+   ]
+  },
+  {
+   "name": "Red",
+   "nodes": [
+    {
+     "shape": "cyl",
+     "size": [
+      0.12,
+      0.17,
+      0.1
+     ],
+     "pos": [
+      0,
+      0.05,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#3a414c",
+     "metal": 0.55,
+     "rough": 0.45,
+     "glow": 0
+    },
+    {
+     "shape": "sphere",
+     "size": [
+      0.14,
+      0.14,
+      0.14
+     ],
+     "pos": [
+      0,
+      0.17,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#ff3b2f",
+     "metal": 0.55,
+     "rough": 0.2,
+     "glow": 2.0
+    }
+   ]
+  },
+  {
+   "name": "White",
+   "nodes": [
+    {
+     "shape": "cyl",
+     "size": [
+      0.12,
+      0.17,
+      0.1
+     ],
+     "pos": [
+      0,
+      0.05,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#3a414c",
+     "metal": 0.55,
+     "rough": 0.45,
+     "glow": 0
+    },
+    {
+     "shape": "sphere",
+     "size": [
+      0.14,
+      0.14,
+      0.14
+     ],
+     "pos": [
+      0,
+      0.17,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.55,
+     "rough": 0.2,
+     "glow": 2.0
+    }
+   ]
+  },
+  {
+   "name": "Green",
+   "nodes": [
+    {
+     "shape": "cyl",
+     "size": [
+      0.12,
+      0.17,
+      0.1
+     ],
+     "pos": [
+      0,
+      0.05,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#3a414c",
+     "metal": 0.55,
+     "rough": 0.45,
+     "glow": 0
+    },
+    {
+     "shape": "sphere",
+     "size": [
+      0.14,
+      0.14,
+      0.14
+     ],
+     "pos": [
+      0,
+      0.17,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#52ff7a",
+     "metal": 0.55,
+     "rough": 0.2,
+     "glow": 2.0
+    }
+   ]
+  }
+ ]
+}

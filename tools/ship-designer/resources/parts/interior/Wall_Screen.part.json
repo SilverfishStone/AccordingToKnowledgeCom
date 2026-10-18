@@ -1,0 +1,52 @@
+{
+ "format": "ship-part",
+ "version": 1,
+ "name": "Wall Screen",
+ "mount": "any",
+ "nodes": [
+  {
+   "shape": "box",
+   "size": [
+    1.3,
+    0.06,
+    0.8
+   ],
+   "pos": [
+    0,
+    0.03,
+    0
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#3a414c",
+   "metal": 0.55,
+   "rough": 0.45,
+   "glow": 0
+  },
+  {
+   "shape": "box",
+   "size": [
+    1.2,
+    0.02,
+    0.7
+   ],
+   "pos": [
+    0,
+    0.065,
+    0
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#7fd0ff",
+   "metal": 0.1,
+   "rough": 0.2,
+   "glow": 1.1
+  }
+ ]
+}

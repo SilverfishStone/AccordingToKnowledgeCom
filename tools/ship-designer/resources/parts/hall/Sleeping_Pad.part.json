@@ -1,0 +1,191 @@
+{
+ "format": "ship-part",
+ "version": 2,
+ "name": "Sleeping Pad",
+ "kind": "gadget",
+ "mount": "wall",
+ "variants": [
+  {
+   "name": "Padded board with belts",
+   "nodes": [
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.06,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#3a3d42",
+     "metal": 0.05,
+     "rough": 0.9,
+     "glow": 0,
+     "size": [
+      0.8,
+      0.12,
+      2.0
+     ]
+    },
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.14,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#5b5f66",
+     "metal": 0.05,
+     "rough": 0.9,
+     "glow": 0,
+     "size": [
+      0.64,
+      0.05,
+      1.8
+     ]
+    },
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.18,
+      0.4
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#c9a73a",
+     "metal": 0.1,
+     "rough": 0.8,
+     "glow": 0,
+     "size": [
+      0.9,
+      0.04,
+      0.09
+     ]
+    },
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.18,
+      0.02
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#c9a73a",
+     "metal": 0.1,
+     "rough": 0.8,
+     "glow": 0,
+     "size": [
+      0.9,
+      0.04,
+      0.09
+     ]
+    },
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.18,
+      -0.52
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#c9a73a",
+     "metal": 0.1,
+     "rough": 0.8,
+     "glow": 0,
+     "size": [
+      0.9,
+      0.04,
+      0.09
+     ]
+    },
+    {
+     "shape": "box",
+     "pos": [
+      0.43,
+      0.18,
+      0.4
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#8e98a6",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.08,
+      0.05,
+      0.12
+     ]
+    },
+    {
+     "shape": "box",
+     "pos": [
+      0.43,
+      0.18,
+      0.02
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#8e98a6",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.08,
+      0.05,
+      0.12
+     ]
+    },
+    {
+     "shape": "box",
+     "pos": [
+      0.43,
+      0.18,
+      -0.52
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#8e98a6",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.08,
+      0.05,
+      0.12
+     ]
+    }
+   ],
+   "mount": "wall"
+  }
+ ]
+}

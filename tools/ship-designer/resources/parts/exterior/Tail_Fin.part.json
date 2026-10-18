@@ -1,0 +1,74 @@
+{
+ "format": "ship-part",
+ "version": 1,
+ "name": "Tail Fin",
+ "mount": "exterior",
+ "nodes": [
+  {
+   "shape": "box",
+   "size": [
+    0.08,
+    1.4,
+    1.8
+   ],
+   "pos": [
+    0,
+    0.7,
+    0
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#8e98a6",
+   "metal": 0.55,
+   "rough": 0.45,
+   "glow": 0
+  },
+  {
+   "shape": "box",
+   "size": [
+    0.1,
+    0.5,
+    1.0
+   ],
+   "pos": [
+    0,
+    0.28,
+    -1.0
+   ],
+   "rot": [
+    30,
+    0,
+    0
+   ],
+   "color": "#8e98a6",
+   "metal": 0.55,
+   "rough": 0.45,
+   "glow": 0
+  },
+  {
+   "shape": "box",
+   "size": [
+    0.12,
+    0.1,
+    1.8
+   ],
+   "pos": [
+    0,
+    1.38,
+    0
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#c2452d",
+   "metal": 0.55,
+   "rough": 0.45,
+   "glow": 0
+  }
+ ]
+}

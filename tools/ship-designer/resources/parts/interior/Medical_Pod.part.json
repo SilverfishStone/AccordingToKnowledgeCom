@@ -1,0 +1,96 @@
+{
+ "format": "ship-part",
+ "version": 1,
+ "name": "Medical Pod",
+ "mount": "interior",
+ "nodes": [
+  {
+   "shape": "box",
+   "size": [
+    0.95,
+    0.45,
+    2.0
+   ],
+   "pos": [
+    0,
+    0.28,
+    0
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#d3d8df",
+   "metal": 0.2,
+   "rough": 0.45,
+   "glow": 0
+  },
+  {
+   "shape": "box",
+   "size": [
+    0.85,
+    0.22,
+    1.7
+   ],
+   "pos": [
+    0,
+    0.62,
+    0.05
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#8fe8ff",
+   "metal": 0.1,
+   "rough": 0.1,
+   "glow": 0.6
+  },
+  {
+   "shape": "box",
+   "size": [
+    0.4,
+    0.5,
+    0.3
+   ],
+   "pos": [
+    0,
+    0.55,
+    -0.95
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#3a414c",
+   "metal": 0.55,
+   "rough": 0.45,
+   "glow": 0
+  },
+  {
+   "shape": "box",
+   "size": [
+    0.3,
+    0.02,
+    0.18
+   ],
+   "pos": [
+    0,
+    0.82,
+    -0.95
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#60ff9b",
+   "metal": 0.55,
+   "rough": 0.45,
+   "glow": 1.2
+  }
+ ]
+}

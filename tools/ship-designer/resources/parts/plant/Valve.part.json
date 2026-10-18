@@ -1,0 +1,173 @@
+{
+ "format": "ship-part",
+ "version": 2,
+ "name": "Valve",
+ "kind": "gadget",
+ "mount": "any",
+ "variants": [
+  {
+   "name": "Hand wheel valve",
+   "nodes": [
+    {
+     "shape": "cyl",
+     "pos": [
+      0,
+      0.2,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#b88a3a",
+     "metal": 0.7,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.08,
+      0.08,
+      0.4
+     ]
+    },
+    {
+     "shape": "cyl",
+     "pos": [
+      0,
+      0.5,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#3a414c",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.03,
+      0.03,
+      0.3
+     ]
+    },
+    {
+     "shape": "wheel",
+     "pos": [
+      0,
+      0.62,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#a8442d",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.16,
+      0.025
+     ],
+     "spokes": 5
+    }
+   ]
+  },
+  {
+   "name": "Gate valve with flanges",
+   "nodes": [
+    {
+     "shape": "cyl",
+     "pos": [
+      0,
+      0.25,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#b88a3a",
+     "metal": 0.7,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.09,
+      0.09,
+      0.5
+     ]
+    },
+    {
+     "shape": "cyl",
+     "pos": [
+      0,
+      0.02,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#3a414c",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.14,
+      0.14,
+      0.04
+     ]
+    },
+    {
+     "shape": "cyl",
+     "pos": [
+      0,
+      0.48,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#3a414c",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.14,
+      0.14,
+      0.04
+     ]
+    },
+    {
+     "shape": "wheel",
+     "pos": [
+      0,
+      0.7,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#c9a73a",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.18,
+      0.025
+     ],
+     "spokes": 6
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,212 @@
+{
+ "format": "ship-part",
+ "version": 2,
+ "name": "Broadcaster Cabinet",
+ "kind": "gadget",
+ "mount": "any",
+ "variants": [
+  {
+   "name": "With knife switch",
+   "nodes": [
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.95,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#2c2f33",
+     "metal": 0.3,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      1.1,
+      1.9,
+      0.6
+     ]
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      1.65,
+      0.302
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.9,
+      0.22
+     ],
+     "tex": "gen:broadcaster"
+    },
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      1.2,
+      0.33
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#3a414c",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.4,
+      0.05,
+      0.08
+     ]
+    },
+    {
+     "shape": "box",
+     "pos": [
+      -0.14,
+      1.2,
+      0.35
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#b9b9b9",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.03,
+      0.03,
+      0.5
+     ]
+    },
+    {
+     "shape": "box",
+     "pos": [
+      0.14,
+      1.2,
+      0.35
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#b9b9b9",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.03,
+      0.03,
+      0.5
+     ]
+    },
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      1.2,
+      0.62
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#a02c24",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.35,
+      0.04,
+      0.06
+     ]
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.25,
+      0.278
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.25,
+     "rough": 0.55,
+     "glow": 0,
+     "size": [
+      0.9,
+      0.2
+     ],
+     "tex": "gen:rack-tx"
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.47,
+      0.278
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.25,
+     "rough": 0.55,
+     "glow": 0,
+     "size": [
+      0.9,
+      0.2
+     ],
+     "tex": "gen:rack-rx"
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.69,
+      0.278
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.25,
+     "rough": 0.55,
+     "glow": 0,
+     "size": [
+      0.9,
+      0.2
+     ],
+     "tex": "gen:rack-amp"
+    }
+   ]
+  }
+ ]
+}

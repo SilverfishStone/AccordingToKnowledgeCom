@@ -1,0 +1,268 @@
+{
+ "format": "ship-part",
+ "version": 2,
+ "name": "Lamp Fixture",
+ "kind": "gadget",
+ "mount": "any",
+ "variants": [
+  {
+   "name": "Red emergency (flickers)",
+   "nodes": [
+    {
+     "shape": "cyl",
+     "pos": [
+      0,
+      0.04,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#3a414c",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.14,
+      0.18,
+      0.08
+     ]
+    },
+    {
+     "shape": "cyl",
+     "pos": [
+      0,
+      0.1,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#ff2a14",
+     "metal": 0.55,
+     "rough": 0.3,
+     "glow": 2.5,
+     "size": [
+      0.12,
+      0.12,
+      0.05
+     ]
+    }
+   ],
+   "light": {
+    "color": "#ff2a14",
+    "intensity": 6,
+    "y": 0.25,
+    "flicker": 0.55,
+    "speed": 1.3,
+    "shadows": true
+   }
+  },
+  {
+   "name": "Red emergency (steady)",
+   "nodes": [
+    {
+     "shape": "cyl",
+     "pos": [
+      0,
+      0.04,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#3a414c",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.14,
+      0.18,
+      0.08
+     ]
+    },
+    {
+     "shape": "cyl",
+     "pos": [
+      0,
+      0.1,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#ff2a14",
+     "metal": 0.55,
+     "rough": 0.3,
+     "glow": 2.5,
+     "size": [
+      0.12,
+      0.12,
+      0.05
+     ]
+    }
+   ],
+   "light": {
+    "color": "#ff2a14",
+    "intensity": 6,
+    "y": 0.25,
+    "flicker": 0,
+    "speed": 1,
+    "shadows": true
+   }
+  },
+  {
+   "name": "Amber work lamp",
+   "nodes": [
+    {
+     "shape": "cyl",
+     "pos": [
+      0,
+      0.04,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#3a414c",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.14,
+      0.18,
+      0.08
+     ]
+    },
+    {
+     "shape": "cyl",
+     "pos": [
+      0,
+      0.1,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#ffb040",
+     "metal": 0.55,
+     "rough": 0.3,
+     "glow": 2.2,
+     "size": [
+      0.12,
+      0.12,
+      0.05
+     ]
+    }
+   ],
+   "light": {
+    "color": "#ffb040",
+    "intensity": 12,
+    "y": 0.25,
+    "shadows": true
+   }
+  },
+  {
+   "name": "Cool white panel",
+   "nodes": [
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.025,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#3a414c",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.9,
+      0.05,
+      0.3
+     ]
+    },
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.06,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#e8f0ff",
+     "metal": 0.55,
+     "rough": 0.3,
+     "glow": 2.2,
+     "size": [
+      0.8,
+      0.03,
+      0.22
+     ]
+    }
+   ],
+   "light": {
+    "color": "#dfe9ff",
+    "intensity": 14,
+    "y": 0.3,
+    "shadows": true
+   }
+  },
+  {
+   "name": "Pale ghost light",
+   "nodes": [
+    {
+     "shape": "sphere",
+     "pos": [
+      0,
+      0.2,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#b8dcff",
+     "metal": 0.55,
+     "rough": 0.2,
+     "glow": 3,
+     "size": [
+      0.11,
+      0.11,
+      0.11
+     ]
+    }
+   ],
+   "light": {
+    "color": "#b8dcff",
+    "intensity": 25,
+    "y": 0.2,
+    "flicker": 0.2,
+    "speed": 0.6,
+    "shadows": true
+   }
+  }
+ ]
+}

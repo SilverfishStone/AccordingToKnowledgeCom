@@ -1,0 +1,692 @@
+{
+ "format": "ship-part",
+ "version": 2,
+ "name": "Equipment Rack",
+ "kind": "gadget",
+ "mount": "any",
+ "variants": [
+  {
+   "name": "Transmitter",
+   "nodes": [
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.1,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#2c2f33",
+     "metal": 0.3,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.6,
+      0.2,
+      0.5
+     ]
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.1,
+      0.252
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.25,
+     "rough": 0.55,
+     "glow": 0,
+     "size": [
+      0.56,
+      0.175
+     ],
+     "tex": "gen:rack-tx"
+    }
+   ]
+  },
+  {
+   "name": "Receiver",
+   "nodes": [
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.1,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#2c2f33",
+     "metal": 0.3,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.6,
+      0.2,
+      0.5
+     ]
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.1,
+      0.252
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.25,
+     "rough": 0.55,
+     "glow": 0,
+     "size": [
+      0.56,
+      0.175
+     ],
+     "tex": "gen:rack-rx"
+    }
+   ]
+  },
+  {
+   "name": "Amplifier",
+   "nodes": [
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.1,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#2c2f33",
+     "metal": 0.3,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.6,
+      0.2,
+      0.5
+     ]
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.1,
+      0.252
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.25,
+     "rough": 0.55,
+     "glow": 0,
+     "size": [
+      0.56,
+      0.175
+     ],
+     "tex": "gen:rack-amp"
+    }
+   ]
+  },
+  {
+   "name": "Patch bay",
+   "nodes": [
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.1,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#2c2f33",
+     "metal": 0.3,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.6,
+      0.2,
+      0.5
+     ]
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.1,
+      0.252
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.25,
+     "rough": 0.55,
+     "glow": 0,
+     "size": [
+      0.56,
+      0.175
+     ],
+     "tex": "gen:rack-patch"
+    }
+   ]
+  },
+  {
+   "name": "Line switch",
+   "nodes": [
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.1,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#2c2f33",
+     "metal": 0.3,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.6,
+      0.2,
+      0.5
+     ]
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.1,
+      0.252
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.25,
+     "rough": 0.55,
+     "glow": 0,
+     "size": [
+      0.56,
+      0.175
+     ],
+     "tex": "gen:rack-switch"
+    }
+   ]
+  },
+  {
+   "name": "Tape recorder",
+   "nodes": [
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.1,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#2c2f33",
+     "metal": 0.3,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.6,
+      0.2,
+      0.5
+     ]
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.1,
+      0.252
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.25,
+     "rough": 0.55,
+     "glow": 0,
+     "size": [
+      0.56,
+      0.175
+     ],
+     "tex": "gen:rack-tape"
+    }
+   ]
+  },
+  {
+   "name": "Master clock",
+   "nodes": [
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.1,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#2c2f33",
+     "metal": 0.3,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.6,
+      0.2,
+      0.5
+     ]
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.1,
+      0.252
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.25,
+     "rough": 0.55,
+     "glow": 0,
+     "size": [
+      0.56,
+      0.175
+     ],
+     "tex": "gen:rack-clock"
+    }
+   ]
+  },
+  {
+   "name": "Full rack (all units)",
+   "nodes": [
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      1.0,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#2c2f33",
+     "metal": 0.3,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.62,
+      2.0,
+      0.55
+     ]
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.18,
+      0.278
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.25,
+     "rough": 0.55,
+     "glow": 0,
+     "size": [
+      0.56,
+      0.2
+     ],
+     "tex": "gen:rack-tx"
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.4,
+      0.278
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.25,
+     "rough": 0.55,
+     "glow": 0,
+     "size": [
+      0.56,
+      0.2
+     ],
+     "tex": "gen:rack-rx"
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.62,
+      0.278
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.25,
+     "rough": 0.55,
+     "glow": 0,
+     "size": [
+      0.56,
+      0.2
+     ],
+     "tex": "gen:rack-amp"
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.8400000000000001,
+      0.278
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.25,
+     "rough": 0.55,
+     "glow": 0,
+     "size": [
+      0.56,
+      0.2
+     ],
+     "tex": "gen:rack-patch"
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      1.06,
+      0.278
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.25,
+     "rough": 0.55,
+     "glow": 0,
+     "size": [
+      0.56,
+      0.2
+     ],
+     "tex": "gen:rack-switch"
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      1.28,
+      0.278
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.25,
+     "rough": 0.55,
+     "glow": 0,
+     "size": [
+      0.56,
+      0.2
+     ],
+     "tex": "gen:rack-tape"
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      1.5,
+      0.278
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.25,
+     "rough": 0.55,
+     "glow": 0,
+     "size": [
+      0.56,
+      0.2
+     ],
+     "tex": "gen:rack-clock"
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      1.72,
+      0.278
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.25,
+     "rough": 0.55,
+     "glow": 0,
+     "size": [
+      0.56,
+      0.2
+     ],
+     "tex": "gen:rack-tx"
+    }
+   ]
+  },
+  {
+   "name": "Tall rack, 5 units",
+   "nodes": [
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.75,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#2c2f33",
+     "metal": 0.3,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.62,
+      1.5,
+      0.55
+     ]
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.2,
+      0.278
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.25,
+     "rough": 0.55,
+     "glow": 0,
+     "size": [
+      0.56,
+      0.22
+     ],
+     "tex": "gen:rack-tx"
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.46,
+      0.278
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.25,
+     "rough": 0.55,
+     "glow": 0,
+     "size": [
+      0.56,
+      0.22
+     ],
+     "tex": "gen:rack-rx"
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.72,
+      0.278
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.25,
+     "rough": 0.55,
+     "glow": 0,
+     "size": [
+      0.56,
+      0.22
+     ],
+     "tex": "gen:rack-amp"
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.98,
+      0.278
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.25,
+     "rough": 0.55,
+     "glow": 0,
+     "size": [
+      0.56,
+      0.22
+     ],
+     "tex": "gen:rack-patch"
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      1.76,
+      0.278
+     ],
+     "rot": [
+      90,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.25,
+     "rough": 0.55,
+     "glow": 0,
+     "size": [
+      0.56,
+      0.22
+     ],
+     "tex": "gen:rack-clock"
+    }
+   ]
+  }
+ ]
+}

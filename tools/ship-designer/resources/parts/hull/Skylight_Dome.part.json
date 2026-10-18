@@ -1,0 +1,171 @@
+{
+ "format": "ship-part",
+ "version": 2,
+ "name": "Skylight Dome",
+ "kind": "hull",
+ "mount": "any",
+ "variants": [
+  {
+   "name": "Round dome",
+   "nodes": [
+    {
+     "shape": "ring",
+     "size": [
+      1.0,
+      0.8,
+      0.1
+     ],
+     "pos": [
+      0,
+      0.05,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#59616e",
+     "metal": 0.55,
+     "rough": 0.45,
+     "glow": 0,
+     "seg": 40
+    },
+    {
+     "shape": "ring",
+     "size": [
+      0.83,
+      0.8,
+      "t+0.1"
+     ],
+     "pos": [
+      0,
+      "-t/2",
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#3a414c",
+     "metal": 0.55,
+     "rough": 0.45,
+     "glow": 0,
+     "seg": 40
+    },
+    {
+     "shape": "sphere",
+     "size": [
+      0.88,
+      0.62,
+      0.88
+     ],
+     "pos": [
+      0,
+      0.05,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#9fd0ff",
+     "metal": 0.55,
+     "rough": 0.45,
+     "glow": 0,
+     "glass": true,
+     "hemi": true,
+     "seg": 32
+    }
+   ],
+   "cut": {
+    "shape": "round",
+    "w": 1.6,
+    "h": 1.6
+   }
+  },
+  {
+   "name": "Long dome",
+   "nodes": [
+    {
+     "shape": "rframe",
+     "size": [
+      2.4,
+      1.0,
+      0.12,
+      0.1
+     ],
+     "pos": [
+      0,
+      0.05,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#59616e",
+     "metal": 0.55,
+     "rough": 0.45,
+     "glow": 0
+    },
+    {
+     "shape": "rframe",
+     "size": [
+      2.4,
+      1.0,
+      0.03,
+      "t+0.1"
+     ],
+     "pos": [
+      0,
+      "-t/2",
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#3a414c",
+     "metal": 0.55,
+     "rough": 0.45,
+     "glow": 0
+    },
+    {
+     "shape": "sphere",
+     "size": [
+      1.2,
+      0.55,
+      0.5
+     ],
+     "pos": [
+      0,
+      0.0,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#9fd0ff",
+     "metal": 0.55,
+     "rough": 0.45,
+     "glow": 0,
+     "glass": true,
+     "hemi": true,
+     "seg": 32
+    }
+   ],
+   "cut": {
+    "shape": "rect",
+    "w": 2.4,
+    "h": 1.0
+   }
+  }
+ ]
+}

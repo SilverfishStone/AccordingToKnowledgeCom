@@ -1,0 +1,170 @@
+{
+ "format": "ship-door",
+ "version": 1,
+ "name": "Airlock hatch",
+ "where": "ends",
+ "hinge": {
+  "side": "-y",
+  "angle": 100
+ },
+ "frame": [
+  {
+   "shape": "ring",
+   "pos": [
+    0,
+    -0.06,
+    0
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#2b3037",
+   "metal": 0.55,
+   "rough": 0.5,
+   "glow": 0,
+   "size": [
+    "w/2+0.2",
+    "w/2-0.02",
+    0.12
+   ],
+   "scale": [
+    1,
+    1,
+    "h/w"
+   ],
+   "seg": 48
+  }
+ ],
+ "leaf": [
+  {
+   "shape": "cyl",
+   "pos": [
+    0,
+    0,
+    0
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#5d6672",
+   "metal": 0.55,
+   "rough": 0.5,
+   "glow": 0,
+   "size": [
+    "w/2",
+    "w/2",
+    0.14
+   ],
+   "scale": [
+    1,
+    1,
+    "h/w"
+   ],
+   "seg": 48
+  },
+  {
+   "shape": "ring",
+   "pos": [
+    0,
+    0.09,
+    0
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "$frame",
+   "metal": 0.55,
+   "rough": 0.5,
+   "glow": 0,
+   "size": [
+    "w/2",
+    "w/2-0.12",
+    0.06
+   ],
+   "scale": [
+    1,
+    1,
+    "h/w"
+   ],
+   "seg": 48
+  },
+  {
+   "shape": "wheel",
+   "pos": [
+    0,
+    0.16,
+    0
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#c9a73a",
+   "metal": 0.55,
+   "rough": 0.5,
+   "glow": 0,
+   "size": [
+    "w*0.2",
+    0.04
+   ],
+   "spokes": 5,
+   "anim": {
+    "type": "spin",
+    "axis": "y",
+    "turns": 2
+   }
+  },
+  {
+   "shape": "ring",
+   "pos": [
+    0,
+    0.1,
+    "-h*0.3"
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#3a414c",
+   "metal": 0.55,
+   "rough": 0.5,
+   "glow": 0,
+   "size": [
+    "w*0.14",
+    "w*0.1",
+    0.08
+   ]
+  },
+  {
+   "shape": "cyl",
+   "pos": [
+    0,
+    0.1,
+    "-h*0.3"
+   ],
+   "rot": [
+    0,
+    0,
+    0
+   ],
+   "color": "#9fd0ff",
+   "metal": 0.55,
+   "rough": 0.5,
+   "glow": 0,
+   "size": [
+    "w*0.1",
+    "w*0.1",
+    0.04
+   ],
+   "glass": true
+  }
+ ]
+}

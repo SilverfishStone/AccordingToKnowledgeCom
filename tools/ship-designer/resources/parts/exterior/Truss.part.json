@@ -1,0 +1,119 @@
+{
+ "format": "ship-part",
+ "version": 2,
+ "name": "Truss",
+ "kind": "gadget",
+ "mount": "any",
+ "variants": [
+  {
+   "name": "Short (3 m)",
+   "nodes": [
+    {
+     "shape": "truss",
+     "pos": [
+      0,
+      0,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#8e98a6",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      3,
+      0.24,
+      1.0
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Long (6 m)",
+   "nodes": [
+    {
+     "shape": "truss",
+     "pos": [
+      0,
+      0,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#8e98a6",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      6,
+      0.24,
+      1.0
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Fine lattice (4 m)",
+   "nodes": [
+    {
+     "shape": "truss",
+     "pos": [
+      0,
+      0,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#8e98a6",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      4,
+      0.12,
+      0.5
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Snapped (broken end)",
+   "nodes": [
+    {
+     "shape": "truss",
+     "pos": [
+      0,
+      0,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#8e98a6",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      5,
+      0.24,
+      1.0
+     ],
+     "damage": 0.6,
+     "seed": 3
+    }
+   ]
+  }
+ ]
+}

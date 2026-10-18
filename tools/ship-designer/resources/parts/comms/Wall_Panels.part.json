@@ -1,0 +1,287 @@
+{
+ "format": "ship-part",
+ "version": 2,
+ "name": "Wall Panels",
+ "kind": "gadget",
+ "mount": "wall",
+ "variants": [
+  {
+   "name": "Intercom panel",
+   "nodes": [
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.02,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#25272a",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.52,
+      0.04,
+      0.66
+     ]
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.045,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.5,
+      0.64
+     ],
+     "tex": "gen:intercom"
+    }
+   ],
+   "mount": "wall"
+  },
+  {
+   "name": "Frequency dial",
+   "nodes": [
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.02,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#25272a",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.52,
+      0.04,
+      0.52
+     ]
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.045,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.5,
+      0.5
+     ],
+     "tex": "gen:dial"
+    }
+   ],
+   "mount": "wall"
+  },
+  {
+   "name": "Speaker grille",
+   "nodes": [
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.02,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#25272a",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.7,
+      0.04,
+      0.55
+     ]
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.045,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.66,
+      0.5
+     ],
+     "tex": "gen:grille"
+    }
+   ],
+   "mount": "wall"
+  },
+  {
+   "name": "ON AIR sign",
+   "nodes": [
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.05,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#25272a",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.7,
+      0.1,
+      0.28
+     ]
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.101,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 1.1,
+     "size": [
+      0.64,
+      0.24
+     ],
+     "tex": "gen:on-air"
+    }
+   ],
+   "mount": "wall"
+  },
+  {
+   "name": "Warning sign",
+   "nodes": [
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.01,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.2,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.4,
+      0.4
+     ],
+     "tex": "gen:warning-sign"
+    }
+   ],
+   "mount": "wall"
+  },
+  {
+   "name": "Status panel",
+   "nodes": [
+    {
+     "shape": "box",
+     "pos": [
+      0,
+      0.02,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#25272a",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0,
+     "size": [
+      0.9,
+      0.04,
+      0.4
+     ]
+    },
+    {
+     "shape": "plane",
+     "pos": [
+      0,
+      0.045,
+      0
+     ],
+     "rot": [
+      0,
+      0,
+      0
+     ],
+     "color": "#ffffff",
+     "metal": 0.55,
+     "rough": 0.5,
+     "glow": 0.6,
+     "size": [
+      0.84,
+      0.34
+     ],
+     "tex": "gen:status-panel"
+    }
+   ],
+   "mount": "wall"
+  }
+ ]
+}

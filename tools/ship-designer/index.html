@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ship Designer</title>
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{ "imports": {
+  "three": "./vendor/three/build/three.module.js",
+  "three/addons/": "./vendor/three/examples/jsm/",
+  "three-mesh-bvh": "./vendor/bvh/index.module.js",
+  "three-bvh-csg": "./vendor/csg/index.module.js"
+} }
+</script>
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <div class="brand">Ship Designer</div>
+    <input id="shipName" class="shipname" spellcheck="false" aria-label="Ship name">
+    <div class="topbtns">
+      <button id="btnUndo" class="btn small" title="Undo (Ctrl+Z)" disabled>↶ Undo</button>
+      <button id="btnRedo" class="btn small" title="Redo (Ctrl+Y)" disabled>↷ Redo</button>
+      <button id="btnNew" class="btn small">New</button>
+      <button id="btnOpen" class="btn small">Open…</button>
+      <button id="btnSave" class="btn small">Save</button>
+      <button id="btnSettings" class="btn small" title="Settings: keys, picture quality">⚙ Settings</button>
+    </div>
+    <span id="stats"></span>
+  </header>
+  <div id="docBar"></div>
+
+  <aside id="left">
+    <nav id="leftTabs" class="tabs"></nav>
+    <div id="leftBody" class="scroll"></div>
+  </aside>
+
+  <main id="stage">
+    <canvas id="view"></canvas>
+    <div id="tools"></div>
+    <div id="gizmoBar"></div>
+    <div id="camBar"></div>
+    <div id="hint"><span></span></div>
+    <div id="start"></div>
+  </main>
+
+  <aside id="right" class="scroll">
+    <div id="inspector"></div>
+    <div id="lightPanel"></div>
+    <div id="viewPanel"></div>
+    <div id="exportPanel"></div>
+  </aside>
+</div>
+<div id="loading">Loading…</div>
+<script>
+// if the app fails while starting (a script error), say so instead of sitting on "Loading..."
+function startFailed(msg) {
+  const l = document.getElementById('loading');
+  if (!l || l.classList.contains('done') || l.querySelector('button')) return;
+  l.innerHTML = '';
+  const d = document.createElement('div');
+  d.style.cssText = 'max-width:560px;text-align:center';
+  d.append('The designer could not start: ' + msg);
+  const b = document.createElement('button');
+  b.textContent = 'Clear the saved session and reload';
+  b.style.cssText = 'display:block;margin:14px auto 0;padding:6px 12px';
+  b.onclick = () => { try { localStorage.removeItem('shipdesigner.autosave.v1'); } catch (e) {} location.search = '?fresh=1'; };
+  d.append(b);
+  l.append(d);
+}
+addEventListener('error', e => startFailed(e.message));
+addEventListener('unhandledrejection', e => startFailed(String(e.reason && e.reason.message || e.reason)));
+</script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
