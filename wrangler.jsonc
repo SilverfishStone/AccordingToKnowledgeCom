@@ -1,5 +1,8 @@
+// Cloudflare settings for silverfishstone.com (this repo's root). `name` must match the Worker's name
+// in the Cloudflare dashboard. A file in _site can't be bigger than 25 MiB, so the Ship Designer's
+// hillside world file is stored in three pieces (tools/ship-designer/resources/environments/).
 {
-  "name": "silverfishstone",
+  "name": "silverfishstonecom",
   "compatibility_date": "2026-10-18",
   "assets": {
     "directory": "./_site"
