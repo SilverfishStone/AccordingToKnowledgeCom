@@ -54,7 +54,7 @@ export function newHall(shape, over = {}) {
   const d = HALL_DEFAULTS[shape];
   const names = { box: 'Room', tube: 'Tube', prism: 'Prism hall', sphere: 'Sphere hall', profile: 'Shaped hall' };
   return {
-    id: newId('h'), name: names[shape], shape, sides: d.sides, w: d.w, h: d.h, l: d.l, sf: 1, sb: 1,
+    id: newId('h'), name: names[shape], shape, sides: d.sides, w: d.w, h: d.h, l: d.l, sf: 1, sb: 1, ay: 0,
     wall: null, hollow: true, deck: false, deckY: 0.6, hidden: false, openF: false, openB: false,
     tear: { f: 0, b: 0, seed: 1 }, profile: null, pkind: 'round', bulkheads: [], trim: { axis: '', pos: 0, keep: 'above' }, trim2: { axis: '', pos: 0, keep: 'above' },
     frame: { inSpacing: 0, inWidth: 0.14, inDepth: 0.28, outLongs: 0, outHoops: 0, thick: 0.07 }, rib: defaultSlot('frame'),

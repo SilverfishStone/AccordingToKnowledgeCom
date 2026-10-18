@@ -39,6 +39,7 @@ export const trackValue = (track, ch, t) => evalChannel(track[ch], t, CHANNELS[c
 /** set one component of a channel at time t (adding a key there if there is none): what typing into the pose boxes does */
 export function setKeyAt(track, ch, t, comp, value, snap = 0.02) {
   const keys = track[ch];
+  if (!keys.length && t > snap) keys.push(newKey(0, CHANNELS[ch].def));       // the first key after the start: it moves from how the thing was built, not from the key's own value
   let k = keys.find(x => Math.abs(x.t - t) < snap);
   if (!k) { k = newKey(t, evalChannel(keys, t, CHANNELS[ch].def)); keys.push(k); keys.sort((a, b) => a.t - b.t); }
   k.v[comp] = value;

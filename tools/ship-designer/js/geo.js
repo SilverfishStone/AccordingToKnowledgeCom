@@ -26,14 +26,16 @@ const ringLen = (pts, w, h) => {
 };
 
 /** dimensions of a loft hall, shared by the geometry and by the paint-canvas scale */
-function loftDims({ kind = 'rect', sides = 4, w, h, l, sf = 1, sb = 1, inset = 0, openF = false, openB = false }) {
+function loftDims({ kind = 'rect', sides = 4, w, h, l, sf = 1, sb = 1, ay = 0, inset = 0, openF = false, openB = false }) {
   const t = inset;
   const wF = Math.max(w * sf - 2 * t, 0.05), hF = Math.max(h * sf - 2 * t, 0.05);
   const wB = Math.max(w * sb - 2 * t, 0.05), hB = Math.max(h * sb - 2 * t, 0.05);
   const open = t > 0; // only the cavity is open-ended: it runs through the end wall
   const z1 = open && openF ? l / 2 + 0.06 : l / 2 - t, z0 = open && openB ? -l / 2 - 0.06 : -l / 2 + t;
   const L = Math.max(z1 - z0, 0.05);
-  return { t, wF, hF, wB, hB, z1: z0 + L, z0, L, kind, sides };
+  // ay = -1 / 0 / 1: an end that tapers shrinks toward the bottom, the middle or the top of the hall instead of always the middle
+  const oyF = ay * (h / 2) * (1 - sf), oyB = ay * (h / 2) * (1 - sb);
+  return { t, wF, hF, wB, hB, oyF, oyB, z1: z0 + L, z0, L, kind, sides };
 }
 
 /** the paint atlas of a loft: sides = a strip (perimeter x length), the two end caps sit beside it */
@@ -56,8 +58,8 @@ export function loftGeometry(params) {
   const n = pts.length;
   const smooth = d.kind === 'ngon' && n >= 13;
   const A = loftAtlas(d, pts);
-  const F = pts.map(p => new Vector3(p[0] * wF, p[1] * hF, z1));
-  const B = pts.map(p => new Vector3(p[0] * wB, p[1] * hB, z0));
+  const F = pts.map(p => new Vector3(p[0] * wF, p[1] * hF + d.oyF, z1));
+  const B = pts.map(p => new Vector3(p[0] * wB, p[1] * hB + d.oyB, z0));
 
   // running distance around the section (for u)
   const arc = [0];
@@ -99,8 +101,8 @@ export function loftGeometry(params) {
   }
   // caps
   const up = new Vector3(0, 0, 1), dn = new Vector3(0, 0, -1);
-  const cF = push(new Vector3(0, 0, z1), up, 0, 0, ...capUv(true, 0, 0)), fi = F.map(p => push(p, up, p.x, p.y, ...capUv(true, p.x, p.y)));
-  const cB = push(new Vector3(0, 0, z0), dn, 0, 0, ...capUv(false, 0, 0)), bi = B.map(p => push(p, dn, p.x, p.y, ...capUv(false, p.x, p.y)));
+  const cF = push(new Vector3(0, d.oyF, z1), up, 0, 0, ...capUv(true, 0, 0)), fi = F.map(p => push(p, up, p.x, p.y - d.oyF, ...capUv(true, p.x, p.y - d.oyF)));
+  const cB = push(new Vector3(0, d.oyB, z0), dn, 0, 0, ...capUv(false, 0, 0)), bi = B.map(p => push(p, dn, p.x, p.y - d.oyB, ...capUv(false, p.x, p.y - d.oyB)));
   for (let j = 0; j < n; j++) {
     const j1 = (j + 1) % n;
     idx.push(cF, fi[j], fi[j1], cB, bi[j1], bi[j]);
@@ -272,7 +274,7 @@ export function profileStations(hall, inset = 0) {
 // ------------------------------------------------------------------ halls
 const loftParams = (hall, inset) => ({
   kind: hall.shape === 'box' ? 'rect' : 'ngon', sides: hall.shape === 'tube' ? 32 : hall.shape === 'prism' ? hall.sides : 4,
-  w: hall.w, h: hall.h, l: hall.l, sf: hall.sf, sb: hall.sb, inset, openF: hall.openF, openB: hall.openB,
+  w: hall.w, h: hall.h, l: hall.l, sf: hall.sf, sb: hall.sb, ay: hall.ay || 0, inset, openF: hall.openF, openB: hall.openB,
 });
 
 /** outer shape of a hall (inset 0) or its cavity (inset = wall thickness) */

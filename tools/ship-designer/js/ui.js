@@ -209,7 +209,7 @@ function leftAnimate(body) {
         el('button', { class: 'btn primary' + (app.anim.on ? ' on' : ''), onclick: () => { A.animMode(!app.anim.on); renderLeft(); } }, app.anim.on ? '■ Animate mode: ON' : '▶ Animate mode'),
         button('Reset', () => { app.anim.state.reset(); app.sv.animTick(0); renderLeft(); }, 'small')),
       slider({ label: 'Engine power', get: () => Math.round(app.anim.throttle * 100), min: 0, max: 100, step: 1, unit: '%', onInput: v => { app.anim.throttle = v / 100; }, hardMin: 0, hardMax: 100 }),
-      el('p', { class: 'muted small' }, 'Animate mode opens the timeline under the view: drag the playhead, double-click a row to add a key, drag keys to move them. Everything is posed with Move, Rotate and Size keyframes. Switch it off to go back to editing.')),
+      el('p', { class: 'muted small' }, 'Animate mode opens the timeline under the view: drag the playhead, double-click a row to add a key, drag keys to move them. Everything is posed with Move, Rotate and Size keyframes. Switch it off to go back to editing. To animate your own: pick a hall, gadget or group, move the playhead, then drag its handles in the view (Move 1 / Rotate 2 / Scale 3): a key is recorded at the playhead. You can also type exact numbers under Pose.')),
     section('Clips',
       ...(anims.length ? [select({ label: 'Clip', options: Object.fromEntries(anims.map(c => [c.id, c.name])), get: () => clip?.id, onChange: v => { app.anim.clipId = v; app.anim.sel = null; renderLeft(); app.emit('animsel'); } })] : [el('p', { class: 'muted small' }, 'No clips yet. A clip is one animation (Open the hatch, Engines idle...).')]),
       el('div', { class: 'row wrap' },
@@ -821,8 +821,10 @@ function inspectHall(hall) {
       profileEditor(hall));
   }
   if (hall.shape !== 'sphere' && hall.shape !== 'profile') {
-    shape.push(slider({ label: 'Nose taper', get: () => hall.sf, min: 0.1, max: 1.6, step: 0.05, onInput: v => { hall.sf = v; A.requestHull(); }, onChange: commit, hardMin: 0.1 }));
-    shape.push(slider({ label: 'Tail taper', get: () => hall.sb, min: 0.1, max: 1.6, step: 0.05, onInput: v => { hall.sb = v; A.requestHull(); }, onChange: commit, hardMin: 0.1 }));
+    shape.push(slider({ label: 'Nose taper', get: () => hall.sf, min: 0.05, max: 1.6, step: 0.05, onInput: v => { hall.sf = v; A.requestHull(); }, onChange: commit, hardMin: 0.03 }));
+    shape.push(slider({ label: 'Tail taper', get: () => hall.sb, min: 0.05, max: 1.6, step: 0.05, onInput: v => { hall.sb = v; A.requestHull(); }, onChange: commit, hardMin: 0.03 }));
+    shape.push(select({ label: 'Taper toward', options: { mid: 'The middle', bottom: 'The bottom (flat belly, point below)', top: 'The top (flat roof)' }, get: () => ((hall.ay || 0) < -0.01 ? 'bottom' : (hall.ay || 0) > 0.01 ? 'top' : 'mid'), onChange: v => { hall.ay = { mid: 0, bottom: -1, top: 1 }[v]; A.requestHull(); commit(); } }),
+      el('p', { class: 'muted small' }, 'Where a tapered end shrinks to. Bottom keeps the underside flat while the nose closes down toward it, like the belly of a shuttle; top does the same upside down.'));
   }
   out.push(section('Shape & size', ...shape));
 

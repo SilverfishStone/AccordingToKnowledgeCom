@@ -8,6 +8,7 @@ import { newHall, newConn, childMatrix, attMatrix, tunnelMatrix, wallOf, matrixT
 import { instantiate, variantReady, loadVariant, isHullPiece, variantOf, attMode } from './assets.js';
 import { settings, held, pixelRatio, actionFor } from './settings.js';
 import { placeSize, placeY } from './layout.js';
+import { trackValue, setKeyAt, frameOf } from './anim.js';
 import { pickNode, nodeFrame, applyGizmo, beginGizmo, beginPaint, paintAt, endPaint } from './modelbuilder.js';
 import { wake } from './util.js';
 
@@ -326,9 +327,13 @@ export class Viewport {
     this.gizmo.addEventListener('dragging-changed', e => {
       this.orbit.enabled = !e.value && this.mode === 'orbit';
       this.gizmoDragging = e.value;
-      if (e.value) this.gizmoStart = this.snapshotTarget();
+      if (e.value) { this.gizmoStart = this.snapshotTarget(); this.beginAnimDrag(); }
       if (e.value && this.gizmoTarget?.type === 'node') beginGizmo(this.gizmoTarget.id);
-      if (!e.value) { this.endDragPreview(); this.app.actions.commit('Move'); }
+      if (!e.value) {
+        this.endDragPreview();
+        if (this.animRec) { this.animRec = null; this.app.actions.animEdited(); }       // a pose recorded as keys in Animate mode
+        else this.app.actions.commit('Move');
+      }
     });
     this.gizmo.addEventListener('objectChange', () => this.onGizmoChange());
     this.gizmoDragging = false;
@@ -345,7 +350,9 @@ export class Viewport {
       if (sel.type === 'hall') {
         const h = ship.halls.find(x => x.id === sel.id);
         if (h && !h.link && (!h.conn || h.conn.type === 'fuse') && worlds?.has(h.id)) {
-          const m = worlds.get(h.id);
+          let m = worlds.get(h.id);
+          const D = this.app.anim.on ? this.sv.rig?.deltas.get('h:' + h.id) : null;      // in Animate mode the gizmo sits where the hall is at the playhead
+          if (D) m = D.clone().multiply(m);
           m.decompose(this.proxy.position, this.proxy.quaternion, this.proxy.scale);
           this.proxy.scale.set(1, 1, 1);
           ok = true;
@@ -362,6 +369,8 @@ export class Viewport {
       } else if (sel.type === 'group') {
         if (this.app.actions.groupRoots(sel.id).length) {
           this.proxy.position.copy(this.app.actions.groupPivot(sel.id));
+          const D = this.app.anim.on ? this.sv.rig?.deltas.get('h:' + this.app.actions.groupRoots(sel.id)[0]?.id) : null;
+          if (D) this.proxy.position.applyMatrix4(D);
           this.proxy.quaternion.identity();
           this.proxy.scale.set(1, 1, 1);
           ok = true;
@@ -396,9 +405,46 @@ export class Viewport {
     this.gizmoTarget = ok ? sel : null;
   }
 
+  /** Animate mode: moving, turning or resizing the selected hall, gadget or group with the gizmo records Move / Rotate / Size keys at the playhead. */
+  beginAnimDrag() {
+    this.animRec = null;
+    const t = this.gizmoTarget, A = this.app.actions, app = this.app;
+    if (!app.anim.on || !t || !['hall', 'att', 'group'].includes(t.type)) return;
+    const mode = this.gizmo.mode;
+    const clip = A.curClip() || A.addClip('empty');
+    const tr = clip.tracks.find(x => x.target.type === t.type && x.target.id === t.id) || A.addTrack(clip, { type: t.type, id: t.id });
+    const time = app.anim.state.get(clip.id).t, F = frameOf(app.ship, app.worlds, tr.target);
+    this.animRec = {
+      tr, time, mode, p0: trackValue(tr, 'pos', time), r0: trackValue(tr, 'rot', time), s0: trackValue(tr, 'scl', time),
+      P0: this.proxy.position.clone(), Q0: this.proxy.quaternion.clone(), Frot: new THREE.Quaternion().setFromRotationMatrix(F),
+    };
+  }
+
+  recordAnimKey() {
+    const r = this.animRec, p = this.proxy;
+    if (!r) return false;
+    const inv = r.Frot.clone().invert();
+    if (r.mode === 'translate') {
+      const v = p.position.clone().sub(r.P0).applyQuaternion(inv).toArray();
+      v.forEach((d, i) => setKeyAt(r.tr, 'pos', r.time, i, round3(r.p0[i] + d)));
+    } else if (r.mode === 'rotate') {                               // the turn, seen in the thing's own axes, on top of how it is turned already
+      const dq = p.quaternion.clone().multiply(r.Q0.clone().invert());
+      const own = inv.clone().multiply(dq).multiply(r.Frot);
+      const cur = new THREE.Quaternion().setFromEuler(new THREE.Euler(...r.r0.map(THREE.MathUtils.degToRad), 'XYZ'));
+      const e = new THREE.Euler().setFromQuaternion(own.multiply(cur), 'XYZ');
+      [e.x, e.y, e.z].forEach((a, i) => setKeyAt(r.tr, 'rot', r.time, i, Math.round(THREE.MathUtils.radToDeg(a) * 100) / 100));
+    } else {
+      [p.scale.x, p.scale.y, p.scale.z].forEach((k, i) => setKeyAt(r.tr, 'scl', r.time, i, Math.max(0.05, round3(r.s0[i] * k))));
+    }
+    this.app.sv.animTick(0);
+    this.app.anim.refreshPose?.();
+    return true;
+  }
+
   onGizmoChange() {
     const t = this.gizmoTarget;
     if (!t) return;
+    if (this.animRec && this.recordAnimKey()) return;
     const { ship, worlds } = this.app;
     if (t.type === 'node') { applyGizmo(t.id, this.proxy, this.gizmo.mode); this.app.emit('inspector-values'); return; }
     if (t.type === 'group') {                               // move, turn or resize every hall of the group, always measured from where the drag began
@@ -873,7 +919,7 @@ export class Viewport {
     } else if (this.tool === 'hall') {
       const L = this.localHit(hit);
       const tmpl = A.placing.template();
-      const key = ['h', tmpl.shape, tmpl.w, tmpl.h, tmpl.l, tmpl.sides, tmpl.sf, tmpl.sb].join(':');
+      const key = ['h', tmpl.shape, tmpl.w, tmpl.h, tmpl.l, tmpl.sides, tmpl.sf, tmpl.sb, tmpl.ay].join(':');
       if (this.ghostKey !== key) {
         this.clearGhost();
         const hall = tmpl;

@@ -72,9 +72,14 @@ export class Env {
 const TILE = 600;
 const fileCache = new Map();
 
-// A website file can't be bigger than 25 MiB on Cloudflare, so a world file that is bigger is stored as
-// name.env.1, name.env.2 ... (the pieces, in order) and put back together here.
-const ENV_PARTS = { 'resources/environments/hillside.env': 3 };
+// A website file can't be bigger than 25 MiB on Cloudflare, so tools/publish_site.py stores a bigger world file as
+// name.env.1, name.env.2 ... and lists it in resources/environments/parts.json ({"hillside.env": 3}); it is put back together here.
+// Run from the folder with serve.py there is no parts.json and the whole file is read.
+let partsInfo = null;
+async function envParts(url) {
+  partsInfo ??= await fetch('resources/environments/parts.json').then(r => (r.ok ? r.json() : {})).catch(() => ({}));
+  return partsInfo[url.split('/').pop()] || 0;
+}
 
 async function readBytes(url, report) {
   const res = await fetch(url);
@@ -96,7 +101,7 @@ async function readBytes(url, report) {
 
 async function readEnvFile(url, progress) {
   if (fileCache.has(url)) return fileCache.get(url);
-  const n = ENV_PARTS[url] || 0;
+  const n = await envParts(url);
   let all;
   if (!n) all = await readBytes(url, (got, total) => total && progress?.(got / total));
   else {

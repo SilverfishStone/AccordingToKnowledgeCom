@@ -21,11 +21,12 @@ export function profileScale(hall, u) {
 
 /** cross-section at fraction u (0 = back, 1 = front) of a hall, shrunk by `inset` (negative = grown): {w, h, round, pts:[[x,y]...]} */
 export function crossAt(hall, u, inset = 0, N = 48) {
-  let w, h, kind = 'poly', corners;
+  let w, h, kind = 'poly', corners, oy = 0;   // oy: how far the section's centre moves when the hall tapers toward its bottom or top
+  const lift = s => (hall.ay || 0) * (hall.h / 2) * (1 - s);
   switch (hall.shape) {
-    case 'box': { const s = hall.sb + (hall.sf - hall.sb) * u; w = hall.w * s; h = hall.h * s; corners = sectionPoints('rect', 4); break; }
-    case 'tube': { const s = hall.sb + (hall.sf - hall.sb) * u; w = hall.w * s; h = hall.h * s; kind = 'round'; break; }
-    case 'prism': { const s = hall.sb + (hall.sf - hall.sb) * u; w = hall.w * s; h = hall.h * s; corners = sectionPoints('ngon', hall.sides); break; }
+    case 'box': { const s = hall.sb + (hall.sf - hall.sb) * u; w = hall.w * s; h = hall.h * s; oy = lift(s); corners = sectionPoints('rect', 4); break; }
+    case 'tube': { const s = hall.sb + (hall.sf - hall.sb) * u; w = hall.w * s; h = hall.h * s; oy = lift(s); kind = 'round'; break; }
+    case 'prism': { const s = hall.sb + (hall.sf - hall.sb) * u; w = hall.w * s; h = hall.h * s; oy = lift(s); corners = sectionPoints('ngon', hall.sides); break; }
     case 'sphere': { const s = Math.sqrt(Math.max(1 - (2 * u - 1) ** 2, 0.0004)); w = hall.w * s; h = hall.h * s; kind = 'round'; break; }
     default: { const s = profileScale(hall, u); w = hall.w * s; h = hall.h * s; kind = hall.pkind === 'rect' ? 'rectround' : 'round'; }
   }
@@ -36,6 +37,7 @@ export function crossAt(hall, u, inset = 0, N = 48) {
     const e = kind === 'rectround' ? 16 : 2;
     pts = Array.from({ length: N }, (_, j) => { const a = 2 * Math.PI * j / N, c = Math.cos(a), s = Math.sin(a); return [Math.sign(c) * Math.abs(c) ** (2 / e) * w / 2, Math.sign(s) * Math.abs(s) ** (2 / e) * h / 2]; });
   }
+  if (oy) pts = pts.map(p => [p[0], p[1] + oy]);
   return { w, h, round: !corners, pts };
 }
 

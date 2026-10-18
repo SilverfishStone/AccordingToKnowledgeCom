@@ -452,7 +452,10 @@ export class ShipView {
     if (whole) { this.root.matrix.copy(whole); this.rootLocked = true; } else if (this.rootLocked) { this.root.matrix.identity(); this.root.matrixAutoUpdate = true; this.rootLocked = false; this.root.position.set(0, 0, 0); this.root.quaternion.identity(); this.root.scale.set(1, 1, 1); }
     this.root.matrixWorldNeedsUpdate = true;
     this.exhaust?.setDeltas(k => deltas.get(k));
-    if (this.app.vp) { this.app.vp.shadowDirty = true; this.app.vp.invalidate(200); }
+    if (this.app.vp) {
+      this.app.vp.shadowDirty = true; this.app.vp.invalidate(200);
+      if (!this.app.vp.gizmoDragging && this.app.anim.on) this.app.vp.syncGizmo();           // the gizmo follows the object as the playhead moves
+    }
   }
 
   stopRig() {
