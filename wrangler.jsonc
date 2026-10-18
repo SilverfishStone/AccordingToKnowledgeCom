@@ -1,12 +1,6 @@
-// Cloudflare settings for silverfishstone.com (this repo's root). `name` must be exactly the Worker's
-// name in the Cloudflare dashboard, or the deploy warns about a mismatch. The site itself is the
-// _site folder that the build step assembles from this repo (see .github/workflows/pages.yml for
-// what goes into it); the articles site has its own settings in articles-site/wrangler.jsonc.
-// A file in _site can't be bigger than 25 MiB, so the Ship Designer's hillside world file is stored
-// in three pieces (tools/ship-designer/resources/environments/hillside.env.1 to .3).
 {
-  "name": "silverfishstonecom",
-  "compatibility_date": "2026-09-24",
+  "name": "silverfishstone",
+  "compatibility_date": "2026-10-18",
   "assets": {
     "directory": "./_site"
   }
