@@ -28,7 +28,7 @@ export function crossAt(hall, u, inset = 0, N = 48) {
     case 'tube': { const s = hall.sb + (hall.sf - hall.sb) * u; w = hall.w * s; h = hall.h * s; oy = lift(s); kind = 'round'; break; }
     case 'prism': { const s = hall.sb + (hall.sf - hall.sb) * u; w = hall.w * s; h = hall.h * s; oy = lift(s); corners = sectionPoints('ngon', hall.sides); break; }
     case 'sphere': { const s = Math.sqrt(Math.max(1 - (2 * u - 1) ** 2, 0.0004)); w = hall.w * s; h = hall.h * s; kind = 'round'; break; }
-    default: { const s = profileScale(hall, u); w = hall.w * s; h = hall.h * s; kind = hall.pkind === 'rect' ? 'rectround' : 'round'; }
+    default: { const s = profileScale(hall, u); w = hall.w * s; h = hall.h * s; oy = lift(s); kind = hall.pkind === 'rect' ? 'rectround' : 'round'; }
   }
   w = Math.max(w - 2 * inset, 0.05); h = Math.max(h - 2 * inset, 0.05);
   let pts;

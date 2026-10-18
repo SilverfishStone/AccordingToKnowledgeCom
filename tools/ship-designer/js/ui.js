@@ -818,7 +818,9 @@ function inspectHall(hall) {
   if (hall.shape === 'profile') {
     shape.push(select({ label: 'Section', options: { round: 'Round', rect: 'Rectangular' }, get: () => hall.pkind, onChange: v => { hall.pkind = v; A.requestHull(); commit(); } }),
       select({ label: 'Preset', options: { '': 'Start from…', ...Object.fromEntries(Object.keys(PROFILE_PRESETS).map(k => [k, k])) }, get: () => '', onChange: v => { if (v) { hall.profile = PROFILE_PRESETS[v].map(p => [...p]); A.requestHull(); commit(); renderInspector(); } } }),
-      profileEditor(hall));
+      profileEditor(hall),
+      slider({ label: 'Shrinks toward', get: () => hall.ay || 0, min: -1, max: 1, step: 0.05, onInput: v => { hall.ay = Math.round(v * 100) / 100; A.requestHull(); }, onChange: commit, hardMin: -1, hardMax: 1 }),
+      el('p', { class: 'muted small' }, 'Where the narrow parts of the profile sit: -1 = on the bottom (the belly stays flat and the nose or tail closes down to a point below), 0 = the middle, +1 = on the top.'));
   }
   if (hall.shape !== 'sphere' && hall.shape !== 'profile') {
     shape.push(slider({ label: 'Nose taper', get: () => hall.sf, min: 0.05, max: 1.6, step: 0.05, onInput: v => { hall.sf = v; A.requestHull(); }, onChange: commit, hardMin: 0.03 }));

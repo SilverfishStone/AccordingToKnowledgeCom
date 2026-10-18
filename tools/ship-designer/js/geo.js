@@ -149,7 +149,7 @@ export function buildRings(stations, N = 40) {
     for (let j = 0; j < N; j++) {
       const a = (2 * Math.PI * j) / N;
       const c = Math.cos(a), sn = Math.sin(a);
-      pts.push(new Vector3(Math.sign(c) * Math.abs(c) ** (2 / s.e) * s.w / 2, Math.sign(sn) * Math.abs(sn) ** (2 / s.e) * s.h / 2, s.z));
+      pts.push(new Vector3(Math.sign(c) * Math.abs(c) ** (2 / s.e) * s.w / 2, Math.sign(sn) * Math.abs(sn) ** (2 / s.e) * s.h / 2 + (s.y || 0), s.z));
     }
     return pts;
   });
@@ -198,9 +198,10 @@ export function morphLoft(stations, N = 40, atlas = false) {
   const cap = (ring, z, nz, flip, front) => {
     const c = pos.length / 3;
     const capUv = (x, y) => (AT ? [(AT.P + AT.G + AT.cw / 2 + x) * AT.s, ((front ? 0 : AT.ch + AT.G) + AT.ch / 2 + y) * AT.s] : [0, 0]);
-    pos.push(0, 0, z); nor.push(0, 0, nz); uv.push(0, 0); uv1.push(...capUv(0, 0));
+    const cy = ring.reduce((s, p) => s + p.y, 0) / ring.length;                      // a ring that hangs off-centre has its cap centre there too
+    pos.push(0, cy, z); nor.push(0, 0, nz); uv.push(0, 0); uv1.push(...capUv(0, 0));
     const first = pos.length / 3;
-    ring.forEach(p => { pos.push(p.x, p.y, z); nor.push(0, 0, nz); uv.push(p.x, p.y); uv1.push(...capUv(p.x, p.y)); });
+    ring.forEach(p => { pos.push(p.x, p.y, z); nor.push(0, 0, nz); uv.push(p.x, p.y - cy); uv1.push(...capUv(p.x, p.y - cy)); });
     for (let j = 0; j < N; j++) {
       const u0 = first + j, u1 = first + ((j + 1) % N);
       if (flip) idx.push(c, u1, u0); else idx.push(c, u0, u1);
@@ -246,7 +247,9 @@ export function profileStations(hall, inset = 0) {
     if (base.length && z - base[base.length - 1].z < 0.004) continue;
     base.push({ z, s: sc });
   }
-  const outer = base.map(p => ({ z: p.z, w: hall.w * p.s, h: hall.h * p.s, e }));
+  // ay = -1 / 0 / 1: the sections shrink toward the bottom, the middle or the top of the hall (a flat belly, or a flat roof)
+  const lift = s => (hall.ay || 0) * (hall.h / 2) * (1 - s);
+  const outer = base.map(p => ({ z: p.z, w: hall.w * p.s, h: hall.h * p.s, y: lift(p.s), e }));
   if (!(t > 0)) return outer.length >= 2 ? outer : [{ z: -L / 2, w: hall.w, h: hall.h, e }, { z: L / 2, w: hall.w, h: hall.h, e }];
   if (base.length < 2) return [{ z: -L / 2 + t, w: Math.max(hall.w - 2 * t, 0.05), h: Math.max(hall.h - 2 * t, 0.05), e }, { z: L / 2 - t, w: Math.max(hall.w - 2 * t, 0.05), h: Math.max(hall.h - 2 * t, 0.05), e }];
   // closed outline in (z, radius): axis -> first station -> ... -> last station -> axis; its inside is to the right of the walk
@@ -264,7 +267,7 @@ export function profileStations(hall, inset = 0) {
     const z = poly[k][0] + mz * k2, r = poly[k][1] + mr * k2;
     if (out.length && z - out[out.length - 1].z < 0.002) continue;
     const dr = poly[k][1] - r;                                      // how far inward the surface moved (radially)
-    out.push({ z, w: Math.max(hall.w * base[k - 1].s - 2 * dr, 0.05), h: Math.max(hall.h * base[k - 1].s - 2 * dr, 0.05), e });
+    out.push({ z, w: Math.max(hall.w * base[k - 1].s - 2 * dr, 0.05), h: Math.max(hall.h * base[k - 1].s - 2 * dr, 0.05), y: lift(base[k - 1].s), e });
   }
   if (hall.openB) out[0].z = -L / 2 - 0.06;
   if (hall.openF) out[out.length - 1].z = L / 2 + 0.06;
