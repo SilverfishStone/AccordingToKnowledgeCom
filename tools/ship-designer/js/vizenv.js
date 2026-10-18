@@ -72,8 +72,11 @@ export class Env {
 const TILE = 600;
 const fileCache = new Map();
 
-async function readEnvFile(url, progress) {
-  if (fileCache.has(url)) return fileCache.get(url);
+// A website file can't be bigger than 25 MiB on Cloudflare, so a world file that is bigger is stored as
+// name.env.1, name.env.2 ... (the pieces, in order) and put back together here.
+const ENV_PARTS = { 'resources/environments/hillside.env': 3 };
+
+async function readBytes(url, report) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Could not load ${url} (${res.status}) - run tools/prep_env.py to make it.`);
   const total = +res.headers.get('content-length') || 0;
@@ -83,11 +86,29 @@ async function readEnvFile(url, progress) {
     const { done, value } = await rd.read();
     if (done) break;
     parts.push(value); got += value.length;
-    if (total) progress?.(got / total);
+    report?.(got, total);
   }
   const all = new Uint8Array(got);
   let o = 0;
   for (const p of parts) { all.set(p, o); o += p.length; }
+  return all;
+}
+
+async function readEnvFile(url, progress) {
+  if (fileCache.has(url)) return fileCache.get(url);
+  const n = ENV_PARTS[url] || 0;
+  let all;
+  if (!n) all = await readBytes(url, (got, total) => total && progress?.(got / total));
+  else {
+    const got = new Array(n).fill(0), tot = new Array(n).fill(0);
+    const pieces = await Promise.all(Array.from({ length: n }, (_, i) => readBytes(`${url}.${i + 1}`, (g, t) => {
+      got[i] = g; tot[i] = t;
+      if (tot.every(Boolean)) progress?.(got.reduce((a, b) => a + b, 0) / tot.reduce((a, b) => a + b, 0));
+    })));
+    all = new Uint8Array(pieces.reduce((s, p) => s + p.length, 0));
+    let at = 0;
+    for (const p of pieces) { all.set(p, at); at += p.length; }
+  }
   const buf = all.buffer;
   const jl = new DataView(buf).getUint32(0, true);
   const meta = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 4, jl)));
