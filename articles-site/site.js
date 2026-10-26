@@ -7,6 +7,7 @@
      /write /write/<id> /community /community/<slug> /people/<name>   writing (writing.js)
      /quizzes /quiz/<slug> /quiz/<slug>/<name>   quizzes and their results (quiz.js)
      /quiz-maker /quiz-maker/<slug>   making them (quiz-maker.js, Silver only)
+     /comparisons      Denominational comparisons: a self-contained page from apps/, shown in a frame
      /writing-terms   the guidelines for community writers
    The articles are the same files the personal site publishes: articles/index.json and
    articles/<slug>.json (copied in when Cloudflare builds the site; see build.sh). */
@@ -197,6 +198,21 @@
   const views = document.querySelectorAll(".view");
   function showView(name) { views.forEach((v) => { v.hidden = v.dataset.view !== name; }); }
 
+  // a self-contained page from apps/, shown in a frame that grows to fit it (it is this site's own file,
+  // so the frame can be measured). Loaded the first time it's opened.
+  function loadApp(id) {
+    const f = $("#" + id);
+    if (f.getAttribute("src")) return;
+    f.addEventListener("load", () => {
+      try {
+        const d = f.contentDocument, fit = () => { f.style.height = Math.ceil(d.body.getBoundingClientRect().height) + "px"; };
+        fit();
+        new ResizeObserver(fit).observe(d.body);
+      } catch { f.style.height = "1500px"; }
+    });
+    f.src = f.dataset.src;
+  }
+
   function route() {
     const parts = location.pathname.replace(/^\/+|\/+$/g, "").split("/");
     const [a = "", b = ""] = parts;
@@ -209,6 +225,11 @@
     else if (a === "community" && parts.length === 1) { showView("community"); writing.list(); }
     else if (a === "community" && b && parts.length === 2) { showView("community-article"); writing.read(b); }
     else if (a === "people" && b && parts.length === 2) { showView("people"); writing.person(decodeURIComponent(b)); }
+    else if (a === "comparisons" && parts.length === 1) {
+      showView("comparisons");
+      setTitle("Denominational comparisons", "Examining the correlation between theological positions: how churches' positions on different spectrums line up, from official teaching and from surveys.");
+      loadApp("comparisons-frame");
+    }
     else if (a === "quizzes" && parts.length === 1) { showView("quizzes"); quiz.list(); }
     else if (a === "quiz" && b && parts.length <= 3) { showView("quiz"); quiz.play(b, parts[2] ? decodeURIComponent(parts[2]) : ""); }
     else if (a === "quiz-maker" && parts.length <= 2) { showView("quiz-maker"); quizMaker.show(b); }

@@ -17,6 +17,7 @@ cp assets/*.png dist/assets/
 cp assets/avatars/*.svg assets/avatars/*.png assets/avatars/index.json dist/assets/avatars/ 2>/dev/null || true
 test -f dist/assets/avatars/index.json   # the avatar list must be there
 cp -r ../articles dist/articles
+cp -r apps dist/apps   # self-contained pages the site shows in a frame (/comparisons)
 cp ../story-content.css dist/
 cp -r ../shared dist/shared   # the editor, shared with silverfishstone.com/write
 echo "Built dist/ with $(ls dist/articles/*.json | wc -l) article files."
