@@ -688,25 +688,32 @@
   }
   const FONT = '"Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif';
 
-  // paints the picture: a white card holding the message (and, if given, a reply under it) on a coloured background
-  function drawAskImage(canvas, { message, reply, size, palette, footer }) {
-    const S = SIZES[size] || SIZES.square, P = PALETTES[palette] || PALETTES.sunset;
+  // paints the picture: a card holding the message (and, if given, a reply under it) over a colour gradient or a picture
+  function drawAskImage(canvas, o) {
+    const S = SIZES[o.size] || SIZES.square;
     const W = (canvas.width = S.w), H = (canvas.height = S.h);
     const ctx = canvas.getContext("2d");
-    const g = ctx.createLinearGradient(0, 0, W, H);
-    g.addColorStop(0, P.bg[0]); g.addColorStop(1, P.bg[1]);
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    if (o.bg.img) {
+      const im = o.bg.img, k = Math.max(W / im.naturalWidth, H / im.naturalHeight), w = im.naturalWidth * k, h = im.naturalHeight * k;
+      ctx.drawImage(im, (W - w) / 2, (H - h) / 2, w, h);
+      if (o.bg.dim) { ctx.fillStyle = `rgba(0,0,0,${o.bg.dim / 100})`; ctx.fillRect(0, 0, W, H); }
+    } else {
+      const g = ctx.createLinearGradient(0, 0, W, H);
+      g.addColorStop(0, o.bg.colors[0]); g.addColorStop(1, o.bg.colors[1]);
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    }
+    const cardFill = o.dark ? "#1b1e27" : "#fff", ink = o.dark ? "#f4f5f8" : "#14161c";
 
-    const cardX = 80, cardW = W - 160, pad = 56, head = 112, gap = 36, lab = 30;
+    const cardX = 80, cardW = W - 160, pad = 56, head = 112, gap = 36;
     const textW = cardW - pad * 2, room = H - 2 * 150;    // keep clear of the top and the footer
     const layout = (fs) => {
       ctx.font = `700 ${fs}px ${FONT}`;
-      const mLines = wrapLines(ctx, message, textW), mLH = Math.round(fs * 1.28);
+      const mLines = wrapLines(ctx, o.message, textW), mLH = Math.round(fs * 1.28);
       const rfs = Math.round(fs * 0.82);
       let rLines = [], rLH = 0;
-      if (reply) { ctx.font = `600 ${rfs}px ${FONT}`; rLines = wrapLines(ctx, reply, textW); rLH = Math.round(rfs * 1.3); }
+      if (o.reply) { ctx.font = `600 ${rfs}px ${FONT}`; rLines = wrapLines(ctx, o.reply, textW); rLH = Math.round(rfs * 1.3); }
       const cardH = head + pad + mLines.length * mLH + pad;
-      const replyH = reply ? gap + pad * 0.75 + lab + 18 + rLines.length * rLH + pad * 0.75 : 0;
+      const replyH = o.reply ? gap + pad * 1.5 + rLines.length * rLH : 0;
       return { fs, rfs, mLines, mLH, rLines, rLH, cardH, replyH, total: cardH + replyH };
     };
     let L = layout(72);
@@ -716,39 +723,40 @@
     // the message card
     ctx.save();
     ctx.shadowColor = "rgba(0,0,0,.28)"; ctx.shadowBlur = 50; ctx.shadowOffsetY = 18;
-    roundRect(ctx, cardX, y, cardW, L.cardH, 44); ctx.fillStyle = "#fff"; ctx.fill();
+    roundRect(ctx, cardX, y, cardW, L.cardH, 44); ctx.fillStyle = cardFill; ctx.fill();
     ctx.restore();
     ctx.save();
     roundRect(ctx, cardX, y, cardW, L.cardH, 44); ctx.clip();
     const hg = ctx.createLinearGradient(cardX, 0, cardX + cardW, 0);
-    hg.addColorStop(0, P.accent[0]); hg.addColorStop(1, P.accent[1]);
+    hg.addColorStop(0, o.accent[0]); hg.addColorStop(1, o.accent[1]);
     ctx.fillStyle = hg; ctx.fillRect(cardX, y, cardW, head);
     ctx.restore();
     ctx.fillStyle = "#fff"; ctx.textBaseline = "middle"; ctx.textAlign = "center";
     ctx.font = `700 38px ${FONT}`;
     ctx.fillText("anonymous message", W / 2, y + head / 2 + 2);
     ctx.textBaseline = "top"; ctx.textAlign = "left";
-    ctx.font = `700 ${L.fs}px ${FONT}`; ctx.fillStyle = "#14161c";
+    ctx.font = `700 ${L.fs}px ${FONT}`; ctx.fillStyle = ink;
     let ty = y + head + pad;
     for (const line of L.mLines) { ctx.fillText(line, cardX + pad, ty); ty += L.mLH; }
     y += L.cardH;
 
     // the reply card
-    if (reply) {
+    if (o.reply) {
       y += gap;
       ctx.save();
-      roundRect(ctx, cardX, y, cardW, L.replyH, 40); ctx.fillStyle = "rgba(10,12,24,.55)"; ctx.fill();
+      roundRect(ctx, cardX, y, cardW, L.replyH - gap, 40); ctx.fillStyle = "rgba(10,12,24,.58)"; ctx.fill();
       ctx.restore();
-      ctx.fillStyle = "rgba(255,255,255,.72)"; ctx.font = `700 ${lab}px ${FONT}`;
-      ctx.fillText("MY REPLY", cardX + pad, y + pad * 0.75);
       ctx.fillStyle = "#fff"; ctx.font = `600 ${L.rfs}px ${FONT}`;
-      let ry = y + pad * 0.75 + lab + 18;
+      let ry = y + pad * 0.75;
       for (const line of L.rLines) { ctx.fillText(line, cardX + pad, ry); ry += L.rLH; }
     }
     // footer
+    ctx.save();
     ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-    ctx.fillStyle = "rgba(255,255,255,.88)"; ctx.font = `600 34px ${FONT}`;
-    ctx.fillText(footer, W / 2, H - 74);
+    ctx.shadowColor = "rgba(0,0,0,.55)"; ctx.shadowBlur = 10;
+    ctx.fillStyle = "rgba(255,255,255,.92)"; ctx.font = `600 34px ${FONT}`;
+    ctx.fillText(o.footer, W / 2, H - 74);
+    ctx.restore();
   }
 
   function mountAsks(box, asks) {
@@ -793,14 +801,58 @@
     draw();
   }
 
-  function openAskImage(host, ask, markPosted) {
+  /* The backgrounds are the pictures in articles-site/assets/ask-backgrounds/ (index.json is made from
+     that folder by build.sh, so adding a picture there is all it takes). */
+  const BG_DIR = "assets/ask-backgrounds/";
+  let bgList = null;
+  const loadBackgrounds = () => (bgList ||= fetch(BG_DIR + "index.json", { cache: "no-cache" })
+    .then((r) => (r.ok ? r.json() : [])).then((l) => (Array.isArray(l) ? l.filter((n) => typeof n === "string") : [])).catch(() => []));
+  const bgLabel = (f) => f.replace(/\.[^.]+$/, "").replace(/^\d+[-_ ]+/, "").replace(/[-_]+/g, " ").replace(/[a-z]/g, (c) => c.toUpperCase());
+  const bgImages = new Map();
+  function loadBg(f) {
+    if (!bgImages.has(f)) {
+      const p = new Promise((res, rej) => {
+        const im = new Image();
+        im.onload = () => res(im); im.onerror = () => rej(new Error("That picture wouldn't load."));
+        im.src = BG_DIR + encodeURIComponent(f);
+      });
+      p.catch(() => bgImages.delete(f));
+      bgImages.set(f, p);
+    }
+    return bgImages.get(f);
+  }
+  const LOOK_KEY = "atk_ask_look";
+  const savedLook = () => { try { return JSON.parse(localStorage.getItem(LOOK_KEY)) || {}; } catch { return {}; } };
+  const saveLook = (v) => { try { localStorage.setItem(LOOK_KEY, JSON.stringify(v)); } catch { /* private mode */ } };
+
+  async function openAskImage(host, ask, markPosted) {
     if (host.firstElementChild) { host.innerHTML = ""; return; }   // the button toggles it
-    const footer = (typeof ATK !== "undefined" && ATK.personalSite ? ATK.personalSite.replace(/^https?:\/\//, "") : "silverfishstone.com") + "/#ask";
+    host.innerHTML = `<p class="small">Loading…</p>`;
+    const pictures = await loadBackgrounds();
+    const saved = savedLook();
+    const footer = (typeof ATK !== "undefined" && ATK.personalSite ? ATK.personalSite.replace(/^https?:\/\//, "") : "silverfishstone.com") + "/ask";
+    const palOpts = (list) => list.map(([k, p]) => `<option value="${k}">${esc(p.name)}</option>`).join("");
     host.innerHTML = `
       <div class="ask-maker">
         <div class="row ask-opts">
-          <label>Colours <select name="palette">${Object.entries(PALETTES).map(([k, p]) => `<option value="${k}">${esc(p.name)}</option>`).join("")}</select></label>
+          <label>Background <select name="bg">
+            <optgroup label="Colours">${palOpts(Object.entries(PALETTES))}<option value="custom">Custom colours…</option></optgroup>
+            ${pictures.length ? `<optgroup label="Pictures">${pictures.map((f) => `<option value="img:${esc(f)}">${esc(bgLabel(f))}</option>`).join("")}</optgroup>` : ""}
+          </select></label>
           <label>Shape <select name="size">${Object.entries(SIZES).map(([k, s]) => `<option value="${k}">${esc(s.name)}</option>`).join("")}</select></label>
+        </div>
+        <div class="row ask-opts">
+          <label>Header <select name="head"><option value="auto">Match the background</option>${palOpts(Object.entries(PALETTES))}<option value="custom">Custom colours…</option></select></label>
+          <label>Message card <select name="card"><option value="light">Light</option><option value="dark">Dark</option></select></label>
+        </div>
+        <div class="row ask-opts" data-for="bg" hidden>
+          <label>Background colours <input type="color" name="bg1" value="#ff7a59" aria-label="First background colour"><input type="color" name="bg2" value="#c13584" aria-label="Second background colour"></label>
+        </div>
+        <div class="row ask-opts" data-for="head" hidden>
+          <label>Header colours <input type="color" name="h1" value="#ff5f6d" aria-label="First header colour"><input type="color" name="h2" value="#ffc371" aria-label="Second header colour"></label>
+        </div>
+        <div class="row ask-opts" data-for="dim" hidden>
+          <label>Darken the picture <input type="range" name="dim" min="0" max="70" value="0"></label>
         </div>
         <label class="review-note">Your reply (optional, shown under the message)
           <textarea name="reply" rows="3" maxlength="600" placeholder="Leave empty to show just the message…"></textarea></label>
@@ -812,13 +864,35 @@
         </div>
         <p class="form-note"></p>
       </div>`;
-    const canvas = $("canvas", host), note = $(".form-note", host);
-    const val = (n) => host.querySelector(`[name=${n}]`).value;
-    const paint = () => drawAskImage(canvas, { message: ask.body, reply: val("reply").trim(), size: val("size"), palette: val("palette"), footer });
-    host.querySelectorAll("select, textarea").forEach((el) => el.addEventListener("input", paint));
+    const maker = $(".ask-maker", host), canvas = $("canvas", maker), note = $(".form-note", maker);
+    const field = (n) => maker.querySelector(`[name=${n}]`);
+    for (const n of ["bg", "size", "head", "card", "bg1", "bg2", "h1", "h2", "dim"]) if (saved[n] != null) field(n).value = saved[n];
+    const read = () => Object.fromEntries(["bg", "size", "head", "card", "bg1", "bg2", "h1", "h2", "dim"].map((n) => [n, field(n).value]));
+
+    let token = 0;
+    const paint = async () => {
+      const v = read(), t = ++token;
+      const isPic = v.bg.startsWith("img:");
+      maker.querySelector("[data-for=bg]").hidden = v.bg !== "custom";
+      maker.querySelector("[data-for=head]").hidden = v.head !== "custom";
+      maker.querySelector("[data-for=dim]").hidden = !isPic;
+      let bg;
+      if (isPic) {
+        try { bg = { img: await loadBg(v.bg.slice(4)), dim: Number(v.dim) }; }
+        catch (err) { say(note, err.message); return; }
+      } else bg = { colors: v.bg === "custom" ? [v.bg1, v.bg2] : (PALETTES[v.bg] || PALETTES.sunset).bg };
+      if (t !== token) return;   // a newer choice is already being drawn
+      const accent = v.head === "custom" ? [v.h1, v.h2]
+        : v.head !== "auto" ? (PALETTES[v.head] || PALETTES.sunset).accent
+        : isPic ? PALETTES.sunset.accent
+        : v.bg === "custom" ? [v.bg1, v.bg2] : PALETTES[v.bg].accent;
+      say(note, "");
+      drawAskImage(canvas, { message: ask.body, reply: field("reply").value.trim(), size: v.size, bg, accent, dark: v.card === "dark", footer });
+    };
+    maker.addEventListener("input", (e) => { if (e.target.name !== "reply") saveLook(read()); paint(); });
     paint();
     const toBlob = () => new Promise((res) => canvas.toBlob(res, "image/png"));
-    $(".ask-maker", host).addEventListener("click", async (e) => {
+    maker.addEventListener("click", async (e) => {
       const b = e.target.closest("button[data-do]");
       if (!b) return;
       try {

@@ -536,3 +536,6 @@ button.item { width: 100%; border: 0; background: none; color: inherit; font: in
 .ask-opts label { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; }
 .ask-opts select { padding: 5px 8px; border: 1.5px solid var(--ink-soft); border-radius: 8px; background: rgba(255, 249, 228, .7); font: 400 14px var(--ui); color: var(--ink); }
 .ask-canvas { display: block; width: 100%; max-width: 380px; height: auto; margin: 10px 0; border-radius: 10px; box-shadow: 0 2px 10px rgba(0, 0, 0, .25); }
+.ask-maker [hidden] { display: none; }
+.ask-opts input[type="color"] { width: 38px; height: 30px; padding: 0; border: 1.5px solid var(--ink-soft); border-radius: 6px; background: none; cursor: pointer; }
+.ask-opts input[type="range"] { width: 140px; }

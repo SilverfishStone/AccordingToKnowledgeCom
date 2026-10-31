@@ -575,7 +575,7 @@
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || "That didn't send. Try again in a moment.");
       askForm.reset(); askCount.textContent = "0 / 500";
-      askSay("Sent! Thank you. It's anonymous: I can't see who you are.", "ok");
+      askSay("Sent! Thank you.", "ok");
     } catch (err) {
       askSay(err instanceof TypeError ? "Couldn't reach the server. Check your connection and try again." : err.message, "err");
     } finally {
