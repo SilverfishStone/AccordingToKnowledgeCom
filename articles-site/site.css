@@ -425,12 +425,6 @@ button.item { width: 100%; border: 0; background: none; color: inherit; font: in
   .item.has-thumb > .item-thumb { width: 100%; order: -1; margin-bottom: 8px; }
 }
 
-/* ════════ apps: self-contained pages shown in a frame (/comparisons) ════════ */
-/* wider than the article column, centred on it, so the charts have room */
-.view.comparisons { width: min(1100px, calc(100vw - 2 * var(--frame) - 60px)); position: relative; left: 50%; transform: translateX(-50%); }
-@media (max-width: 700px) { .view.comparisons { width: calc(100vw - 12px); } }   /* phones: the charts need nearly the whole screen, so it runs over the paper's edges */
-.app-frame { display: block; width: 100%; height: 1400px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); margin-top: 14px; }
-
 /* ════════ quizzes (quiz.js, quiz-maker.js) ════════ */
 .q-row { align-items: center; margin: 16px 0; }
 .toast { position: fixed; left: 50%; bottom: 24px; z-index: 30; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 10px 18px; border-radius: 999px; background: var(--ink); color: #fbe9b7; font-size: 14px; font-weight: 600; text-align: center; opacity: 0; pointer-events: none; transition: opacity .2s; }
@@ -531,3 +525,14 @@ button.item { width: 100%; border: 0; background: none; color: inherit; font: in
   .mk-range > span:first-child { grid-column: 1 / -1; }
   .mk-range-line .mk-end { grid-column: 1 / -1; text-align: left; }
 }
+
+/* anonymous messages in /admin */
+.ask-tabs { margin: 10px 0 6px; }
+.ask-tab[data-on="true"] { background: var(--ink-soft); color: #fff; }
+.ask-tab .count { margin-left: 4px; }
+.ask-item .meta { display: block; margin-top: 4px; }
+.ask-maker { margin-top: 12px; padding: 12px; border: 1px dashed var(--line); border-radius: 10px; }
+.ask-opts { margin-bottom: 4px; }
+.ask-opts label { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; }
+.ask-opts select { padding: 5px 8px; border: 1.5px solid var(--ink-soft); border-radius: 8px; background: rgba(255, 249, 228, .7); font: 400 14px var(--ui); color: var(--ink); }
+.ask-canvas { display: block; width: 100%; max-width: 380px; height: auto; margin: 10px 0; border-radius: 10px; box-shadow: 0 2px 10px rgba(0, 0, 0, .25); }

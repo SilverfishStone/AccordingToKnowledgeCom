@@ -139,7 +139,7 @@
       nav.innerHTML = state.offline ? "" : `<a class="nav-link" href="login?next=${encodeURIComponent(here())}" data-link>Sign in</a>`;
       return;
     }
-    const pending = state.pending ? (state.pending.comments || 0) + (state.pending.pictures || 0) + (state.pending.writing || 0) : 0;
+    const pending = state.pending ? (state.pending.comments || 0) + (state.pending.pictures || 0) + (state.pending.writing || 0) + (state.pending.asks || 0) : 0;
     nav.innerHTML = `
       ${u.role === "admin" ? `<a class="nav-link" href="admin" data-link>Admin${pending || state.unread ? ` <span class="dot">${pending + state.unread}</span>` : ""}</a>` : ""}
       ${u.role === "admin" || u.role === "writer" ? `<a class="nav-link" href="write" data-link>Write</a>` : ""}
@@ -522,9 +522,9 @@
       return;
     }
     box.innerHTML = `<p class="note">Loading…</p>`;
-    let d, words;
+    let d, words, asks;
     try {
-      [d, words] = await Promise.all([api("admin/overview"), api("admin/words")]);
+      [d, words, asks] = await Promise.all([api("admin/overview"), api("admin/words"), api("admin/asks")]);
       d.community = (await api("community?limit=200").catch(() => ({ articles: [] }))).articles;
     }
     catch (err) { box.innerHTML = `<p class="note">${esc(err.message)}</p>`; return; }
@@ -538,6 +538,17 @@
           : last.ok ? `Working. Last alert sent ${esc(when(last.at))} (“${esc(last.subject || "")}”).`
           : `The last alert failed (${esc(when(last.at))}): ${esc(last.error)}`}</p>
         <button class="btn ghost small-btn" type="button" id="test-email">Send a test email</button>
+      </section>
+
+      <section class="card-sec" id="asks">
+        <h2>Anonymous messages <span class="count" id="asks-count"></span></h2>
+        <p class="small">Sent from the Ask page on silverfishstone.com. Make an image to share one, ignore it, or delete it. Nothing is known about who sent them.</p>
+        <div class="row ask-tabs">
+          <button class="btn ghost small-btn ask-tab" type="button" data-view="new">New <span class="count"></span></button>
+          <button class="btn ghost small-btn ask-tab" type="button" data-view="posted">Posted <span class="count"></span></button>
+          <button class="btn ghost small-btn ask-tab" type="button" data-view="ignored">Ignored <span class="count"></span></button>
+        </div>
+        <div id="asks-list"></div>
       </section>
 
       <section class="card-sec" id="review">
@@ -616,6 +627,7 @@
       </section>`;
 
     box.addEventListener("click", adminClick);
+    mountAsks(box, asks.asks);
     $("#test-email", box).addEventListener("click", (e) => busy(e.target, "Sending…", async () => {
       const note = $("#email-status", box);
       try {
@@ -637,6 +649,190 @@
     $("#user-search", box).addEventListener("submit", (e) => { e.preventDefault(); listUsers(e.target.q.value); });
     listUsers("");
     if (location.hash) setTimeout(() => $(location.hash)?.scrollIntoView({ block: "start" }), 50);
+  }
+
+  /* ───────── anonymous messages: ignore, delete, or turn one into a picture to share ───────── */
+  const PALETTES = {
+    sunset: { name: "Sunset", bg: ["#ff7a59", "#c13584"], accent: ["#ff5f6d", "#ffc371"] },
+    ocean: { name: "Ocean", bg: ["#1d6fd8", "#16a39a"], accent: ["#0f4cc9", "#17c3b2"] },
+    violet: { name: "Violet", bg: ["#7b4dff", "#e251a6"], accent: ["#5b3df5", "#c850c0"] },
+    night: { name: "Night", bg: ["#10162a", "#2b3566"], accent: ["#5b6bd6", "#8ab4ff"] },
+  };
+  const SIZES = { square: { name: "Square (1080 × 1080)", w: 1080, h: 1080 }, story: { name: "Tall (1080 × 1920)", w: 1080, h: 1920 } };
+
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  // break text into lines no wider than `width` (long words are broken too)
+  function wrapLines(ctx, str, width) {
+    const lines = [];
+    for (const para of String(str).split("\n")) {
+      if (!para.trim()) { lines.push(""); continue; }
+      let line = "";
+      for (const word of para.split(/\s+/)) {
+        let w = word;
+        while (ctx.measureText(w).width > width) {
+          let n = w.length;
+          while (n > 1 && ctx.measureText(w.slice(0, n)).width > width) n--;
+          if (line) { lines.push(line); line = ""; }
+          lines.push(w.slice(0, n)); w = w.slice(n);
+        }
+        const test = line ? line + " " + w : w;
+        if (line && ctx.measureText(test).width > width) { lines.push(line); line = w; } else line = test;
+      }
+      lines.push(line);
+    }
+    return lines;
+  }
+  const FONT = '"Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif';
+
+  // paints the picture: a white card holding the message (and, if given, a reply under it) on a coloured background
+  function drawAskImage(canvas, { message, reply, size, palette, footer }) {
+    const S = SIZES[size] || SIZES.square, P = PALETTES[palette] || PALETTES.sunset;
+    const W = (canvas.width = S.w), H = (canvas.height = S.h);
+    const ctx = canvas.getContext("2d");
+    const g = ctx.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, P.bg[0]); g.addColorStop(1, P.bg[1]);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+    const cardX = 80, cardW = W - 160, pad = 56, head = 112, gap = 36, lab = 30;
+    const textW = cardW - pad * 2, room = H - 2 * 150;    // keep clear of the top and the footer
+    const layout = (fs) => {
+      ctx.font = `700 ${fs}px ${FONT}`;
+      const mLines = wrapLines(ctx, message, textW), mLH = Math.round(fs * 1.28);
+      const rfs = Math.round(fs * 0.82);
+      let rLines = [], rLH = 0;
+      if (reply) { ctx.font = `600 ${rfs}px ${FONT}`; rLines = wrapLines(ctx, reply, textW); rLH = Math.round(rfs * 1.3); }
+      const cardH = head + pad + mLines.length * mLH + pad;
+      const replyH = reply ? gap + pad * 0.75 + lab + 18 + rLines.length * rLH + pad * 0.75 : 0;
+      return { fs, rfs, mLines, mLH, rLines, rLH, cardH, replyH, total: cardH + replyH };
+    };
+    let L = layout(72);
+    for (let fs = 72; fs >= 28; fs -= 2) { L = layout(fs); if (L.total <= room) break; }
+
+    let y = Math.round((H - L.total) / 2) - 10;
+    // the message card
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,.28)"; ctx.shadowBlur = 50; ctx.shadowOffsetY = 18;
+    roundRect(ctx, cardX, y, cardW, L.cardH, 44); ctx.fillStyle = "#fff"; ctx.fill();
+    ctx.restore();
+    ctx.save();
+    roundRect(ctx, cardX, y, cardW, L.cardH, 44); ctx.clip();
+    const hg = ctx.createLinearGradient(cardX, 0, cardX + cardW, 0);
+    hg.addColorStop(0, P.accent[0]); hg.addColorStop(1, P.accent[1]);
+    ctx.fillStyle = hg; ctx.fillRect(cardX, y, cardW, head);
+    ctx.restore();
+    ctx.fillStyle = "#fff"; ctx.textBaseline = "middle"; ctx.textAlign = "center";
+    ctx.font = `700 38px ${FONT}`;
+    ctx.fillText("anonymous message", W / 2, y + head / 2 + 2);
+    ctx.textBaseline = "top"; ctx.textAlign = "left";
+    ctx.font = `700 ${L.fs}px ${FONT}`; ctx.fillStyle = "#14161c";
+    let ty = y + head + pad;
+    for (const line of L.mLines) { ctx.fillText(line, cardX + pad, ty); ty += L.mLH; }
+    y += L.cardH;
+
+    // the reply card
+    if (reply) {
+      y += gap;
+      ctx.save();
+      roundRect(ctx, cardX, y, cardW, L.replyH, 40); ctx.fillStyle = "rgba(10,12,24,.55)"; ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = "rgba(255,255,255,.72)"; ctx.font = `700 ${lab}px ${FONT}`;
+      ctx.fillText("MY REPLY", cardX + pad, y + pad * 0.75);
+      ctx.fillStyle = "#fff"; ctx.font = `600 ${L.rfs}px ${FONT}`;
+      let ry = y + pad * 0.75 + lab + 18;
+      for (const line of L.rLines) { ctx.fillText(line, cardX + pad, ry); ry += L.rLH; }
+    }
+    // footer
+    ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = "rgba(255,255,255,.88)"; ctx.font = `600 34px ${FONT}`;
+    ctx.fillText(footer, W / 2, H - 74);
+  }
+
+  function mountAsks(box, asks) {
+    const host = $("#asks-list", box);
+    const tabs = [...box.querySelectorAll(".ask-tab")];
+    let view = "new";
+    const count = (s) => asks.filter((a) => a.status === s).length;
+    const draw = () => {
+      for (const t of tabs) { t.dataset.on = String(t.dataset.view === view); t.querySelector(".count").textContent = count(t.dataset.view); }
+      $("#asks-count", box).textContent = count("new") || "";
+      const list = asks.filter((a) => a.status === view);
+      host.innerHTML = list.length ? list.map((a) => `
+        <article class="held-item ask-item" data-ask="${a.id}">
+          <div class="comment-body">${paragraphs(a.body)}</div>
+          <span class="meta">${esc(when(a.created))}</span>
+          <div class="row">
+            ${view === "new" ? `<button class="btn small-btn" type="button" data-act="image">Make image</button><button class="btn ghost small-btn" type="button" data-act="ignore">Ignore</button>`
+              : `<button class="btn ghost small-btn" type="button" data-act="image">Make image</button><button class="btn ghost small-btn" type="button" data-act="restore">Move back to New</button>`}
+            <button class="btn danger small-btn" type="button" data-act="delete">Delete</button>
+          </div>
+          <div class="ask-image"></div>
+        </article>`).join("") : `<p class="small">${view === "new" ? "No new messages." : view === "posted" ? "Nothing marked as posted yet." : "Nothing ignored."}</p>`;
+    };
+    const setStatus = async (a, act) => {
+      const r = await api(`admin/asks/${a.id}`, { action: act });
+      a.status = r.status; draw(); loadMe(true);
+    };
+    for (const t of tabs) t.addEventListener("click", () => { view = t.dataset.view; draw(); });
+    host.addEventListener("click", async (e) => {
+      const b = e.target.closest("button[data-act]"), item = b && b.closest("[data-ask]");
+      if (!b || !item) return;
+      const a = asks.find((x) => x.id === Number(item.dataset.ask));
+      try {
+        if (b.dataset.act === "ignore" || b.dataset.act === "restore") await setStatus(a, b.dataset.act);
+        else if (b.dataset.act === "delete") {
+          if (!confirm("Delete this message for good?")) return;
+          await api(`admin/asks/${a.id}`, { action: "delete" });
+          asks.splice(asks.indexOf(a), 1); draw(); loadMe(true);
+        } else if (b.dataset.act === "image") openAskImage(item.querySelector(".ask-image"), a, () => setStatus(a, "posted"));
+      } catch (err) { alert(err.message); }
+    });
+    draw();
+  }
+
+  function openAskImage(host, ask, markPosted) {
+    if (host.firstElementChild) { host.innerHTML = ""; return; }   // the button toggles it
+    const footer = (typeof ATK !== "undefined" && ATK.personalSite ? ATK.personalSite.replace(/^https?:\/\//, "") : "silverfishstone.com") + "/#ask";
+    host.innerHTML = `
+      <div class="ask-maker">
+        <div class="row ask-opts">
+          <label>Colours <select name="palette">${Object.entries(PALETTES).map(([k, p]) => `<option value="${k}">${esc(p.name)}</option>`).join("")}</select></label>
+          <label>Shape <select name="size">${Object.entries(SIZES).map(([k, s]) => `<option value="${k}">${esc(s.name)}</option>`).join("")}</select></label>
+        </div>
+        <label class="review-note">Your reply (optional, shown under the message)
+          <textarea name="reply" rows="3" maxlength="600" placeholder="Leave empty to show just the message…"></textarea></label>
+        <canvas class="ask-canvas" aria-label="Preview of the picture"></canvas>
+        <div class="row">
+          <button class="btn small-btn" type="button" data-do="download">Download picture</button>
+          <button class="btn ghost small-btn" type="button" data-do="copy">Copy picture</button>
+          <button class="btn ghost small-btn" type="button" data-do="posted">Mark as posted</button>
+        </div>
+        <p class="form-note"></p>
+      </div>`;
+    const canvas = $("canvas", host), note = $(".form-note", host);
+    const val = (n) => host.querySelector(`[name=${n}]`).value;
+    const paint = () => drawAskImage(canvas, { message: ask.body, reply: val("reply").trim(), size: val("size"), palette: val("palette"), footer });
+    host.querySelectorAll("select, textarea").forEach((el) => el.addEventListener("input", paint));
+    paint();
+    const toBlob = () => new Promise((res) => canvas.toBlob(res, "image/png"));
+    $(".ask-maker", host).addEventListener("click", async (e) => {
+      const b = e.target.closest("button[data-do]");
+      if (!b) return;
+      try {
+        if (b.dataset.do === "download") {
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(await toBlob()); a.download = `anonymous-message-${ask.id}.png`;
+          document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+          say(note, "Downloaded. Use “Mark as posted” once you've shared it.", "ok");
+        } else if (b.dataset.do === "copy") {
+          await navigator.clipboard.write([new ClipboardItem({ "image/png": toBlob() })]);
+          say(note, "Copied. Paste it into a post.", "ok");
+        } else if (b.dataset.do === "posted") await markPosted();
+      } catch (err) { say(note, b.dataset.do === "copy" ? "This browser wouldn't copy the picture. Use Download instead." : err.message); }
+    });
   }
 
   async function adminClick(e) {

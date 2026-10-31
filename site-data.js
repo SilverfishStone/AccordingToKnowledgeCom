@@ -8,6 +8,11 @@ const SITE = {
   name: "SilverfishStone",
   author: "Silver",
 
+  /* ASK page: where anonymous messages are sent (the articles site's server keeps them; read them
+     and make pictures to share in its /admin). Optional: a Cloudflare Turnstile site key. */
+  askUrl: "https://accordingtoknowledge.com/api/ask",
+  turnstileSiteKey: "",
+
   /* LEFT PANEL — tools.
      embed: true  -> opens on its own page (tool.html) with a "Back to main site"
                      button. The url must be a page on this site.

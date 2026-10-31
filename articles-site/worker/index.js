@@ -24,6 +24,7 @@ const LIMITS = {
   username: [3, 24],
   comment: 3000,
   message: 4000,
+  ask: 500,         // an anonymous message from the Ask page
   picture: 120000,   // characters of the data: URL (a 128 px square is ~10–40 k)
 };
 const USERNAME_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{2,23}$/;
@@ -44,6 +45,7 @@ export default {
       }
       return env.ASSETS.fetch(request);
     }
+    if (url.pathname === "/api/ask") return askRequest(request, env, ctx, url);
     try {
       if (!env.DB) throw new HttpError(503, "Accounts aren't switched on yet.");
       await ensureSchema(env);
@@ -77,6 +79,8 @@ const ROUTES = [
   ["POST", /^\/api\/messages$/, sendMessage],
   ["GET", /^\/api\/admin\/overview$/, adminOverview],
   ["POST", /^\/api\/admin\/test-email$/, adminTestEmail],
+  ["GET", /^\/api\/admin\/asks$/, adminAsks],
+  ["POST", /^\/api\/admin\/asks\/(\d+)$/, adminAsk],
   ["POST", /^\/api\/admin\/comments\/(\d+)$/, adminComment],
   ["POST", /^\/api\/admin\/pictures\/(\d+)$/, adminPicture],
   ["GET", /^\/api\/admin\/messages\/(\d+)$/, adminThread],
@@ -198,6 +202,12 @@ const MIGRATIONS = [
       PRIMARY KEY (user_id, slug))`,
     `CREATE INDEX quiz_results_shared ON quiz_results (user_id, shared, taken_at)`,
     `CREATE TABLE quiz_images (id INTEGER PRIMARY KEY, data TEXT NOT NULL, created_at INTEGER NOT NULL)`,
+  ],
+  [
+    // anonymous messages from the Ask page on silverfishstone.com: nothing is kept about the sender.
+    // status is 'new', 'ignored' or 'posted'
+    `CREATE TABLE asks (id INTEGER PRIMARY KEY, body TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'new', created_at INTEGER NOT NULL)`,
+    `CREATE INDEX asks_status ON asks (status, created_at)`,
   ],
 ];
 let schemaReady = null;
@@ -436,7 +446,7 @@ async function me(c) {
     : await one(c.env, "SELECT COUNT(*) AS n FROM messages WHERE user_id = ?1 AND from_admin = 1 AND read_at IS NULL", c.user.id);
   const out = { user: publicUser(c.user), unread: unread ? unread.n : 0 };
   if (c.user.role === "admin") {
-    const p = await one(c.env, "SELECT (SELECT COUNT(*) FROM comments WHERE status = 'pending') AS comments, (SELECT COUNT(*) FROM pictures WHERE pending IS NOT NULL) AS pictures");
+    const p = await one(c.env, "SELECT (SELECT COUNT(*) FROM comments WHERE status = 'pending') AS comments, (SELECT COUNT(*) FROM pictures WHERE pending IS NOT NULL) AS pictures, (SELECT COUNT(*) FROM asks WHERE status = 'new') AS asks");
     out.pending = p;
   }
   // their own picture: approved (so they can switch back to it) and/or waiting for approval
@@ -665,6 +675,62 @@ async function sendMessage(c) {
   const row = await one(c.env, "INSERT INTO messages (user_id, from_admin, body, created_at) VALUES (?1, 0, ?2, ?3) RETURNING *", u.id, body, Date.now());
   notify(c, `Message from ${u.username}`, [`${u.username} sent you a message:`, "", excerpt(body, 1500)]);
   return json({ message: messageRow(row) });
+}
+
+/* ───────── anonymous messages (the Ask page on silverfishstone.com) ─────────
+   The only address that answers other websites. The sender needs no account and nothing about
+   them is kept (the rate limit stores a hashed address for an hour, like sign-up does). */
+const ASK_ORIGINS = ["https://silverfishstone.com", "https://www.silverfishstone.com", "http://localhost:8080"];
+
+async function askRequest(request, env, ctx, url) {
+  const origin = request.headers.get("Origin");
+  const allowed = !!origin && ASK_ORIGINS.includes(origin);
+  const cors = allowed
+    ? { "Access-Control-Allow-Origin": origin, "Access-Control-Allow-Methods": "POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Max-Age": "86400", Vary: "Origin" }
+    : { Vary: "Origin" };
+  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+  try {
+    if (request.method !== "POST") throw new HttpError(405, "Send a message from the Ask page.");
+    if (origin && !allowed && origin !== url.origin) throw new HttpError(403, "Not allowed from another site.");
+    if (!env.DB) throw new HttpError(503, "Messages aren't switched on yet.");
+    await ensureSchema(env);
+    const body = await request.json().catch(() => { throw new HttpError(400, "That request wasn't valid JSON."); });
+    return await sendAsk({ request, env, ctx, url, body, user: null, cors });
+  } catch (e) {
+    if (e instanceof HttpError) return json({ error: e.message, ...(e.extra || {}) }, e.status, cors);
+    console.error(e && e.stack || e);
+    return json({ error: "Something went wrong on the server. Try again in a moment." }, 500, cors);
+  }
+}
+
+async function sendAsk(c) {
+  const b = c.body && typeof c.body === "object" ? c.body : {};
+  if (typeof b.website === "string" && b.website) return json({ ok: true }, 200, c.cors);   // a hidden field only bots fill in
+  const body = text(b.body, "Your message", LIMITS.ask);
+  await limit(c, "ask", 5, 3600);
+  await limit(c, "ask-day", 15, 86400);
+  await turnstile(c, b.turnstile);
+  await run(c.env, "INSERT INTO asks (body, status, created_at) VALUES (?1, 'new', ?2)", body, Date.now());
+  notify(c, "New anonymous message", ["Someone sent you an anonymous message:", "", excerpt(body, 1500)]);
+  return json({ ok: true }, 200, c.cors);
+}
+
+const askRow = (r) => ({ id: r.id, body: r.body, status: r.status, created: r.created_at });
+async function adminAsks(c) {
+  need(c, true);
+  return json({ asks: (await all(c.env, "SELECT * FROM asks ORDER BY created_at DESC LIMIT 500")).map(askRow) });
+}
+async function adminAsk(c) {
+  need(c, true);
+  const id = Number(c.params[0]), act = c.body && c.body.action;
+  if (act === "delete") {
+    await run(c.env, "DELETE FROM asks WHERE id = ?1", id);
+    return json({ ok: true });
+  }
+  const status = { ignore: "ignored", posted: "posted", restore: "new" }[act];
+  if (!status) throw new HttpError(400, "That isn't something I can do to a message.");
+  await run(c.env, "UPDATE asks SET status = ?1 WHERE id = ?2", status, id);
+  return json({ ok: true, status });
 }
 
 /* ───────── admin ───────── */

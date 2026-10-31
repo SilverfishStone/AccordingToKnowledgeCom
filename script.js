@@ -548,13 +548,49 @@
     tellGameFullscreen();
   });
 
+  /* ───────── ask: anonymous messages (kept by the articles site's server) ───────── */
+  const askForm = $("#ask-form"), askNote = $("#ask-note"), askText = $("#ask-text"), askCount = $("#ask-count");
+  let tsWidget = null;
+  function mountTurnstile() {
+    const el = $("#ask-turnstile");
+    if (!SITE.turnstileSiteKey || tsWidget !== null) return;
+    const draw = () => { tsWidget = window.turnstile.render(el, { sitekey: SITE.turnstileSiteKey, theme: "dark" }); };
+    if (window.turnstile) { draw(); return; }
+    const s = document.createElement("script");
+    s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"; s.async = true; s.onload = draw;
+    document.head.appendChild(s);
+  }
+  const askSay = (msg, kind) => { askNote.textContent = msg; askNote.dataset.kind = kind || ""; };
+  askText.addEventListener("input", () => { askCount.textContent = `${askText.value.length} / 500`; });
+  askForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const body = askText.value.trim(), btn = askForm.querySelector(".ask-send");
+    if (!body) { askSay("Write something first.", "err"); return; }
+    btn.disabled = true; askSay("Sending…");
+    try {
+      const r = await fetch(SITE.askUrl, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body, website: askForm.website.value, turnstile: window.turnstile && tsWidget !== null ? window.turnstile.getResponse(tsWidget) : undefined }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "That didn't send. Try again in a moment.");
+      askForm.reset(); askCount.textContent = "0 / 500";
+      askSay("Sent! Thank you. It's anonymous: I can't see who you are.", "ok");
+    } catch (err) {
+      askSay(err instanceof TypeError ? "Couldn't reach the server. Check your connection and try again." : err.message, "err");
+    } finally {
+      btn.disabled = false;
+      if (window.turnstile && tsWidget !== null) window.turnstile.reset(tsWidget);
+    }
+  });
+
   /* ───────── middle: hash router ───────── */
   const views = $$(".view");
   const keys = $$(".key");
   if (SITE.whyNotTab) $("#key-whynot").hidden = false;
   const notFound = $("#not-found");
-  const TAB = { home: "home", games: "games", stories: "stories", story: "stories", series: "stories", gallery: "gallery", image: "gallery", contact: "contact", "why-not": "why-not" };
-  const TITLE = { home: "Home", games: "Games", stories: "Stories", gallery: "Gallery", contact: "Contact", story: "Story", series: "Series", image: "Image", "why-not": "Why am I not…", secret: "Shh…" };
+  const TAB = { home: "home", games: "games", ask: "ask", stories: "stories", story: "stories", series: "stories", gallery: "gallery", image: "gallery", contact: "contact", "why-not": "why-not" };
+  const TITLE = { home: "Home", games: "Games", ask: "Ask", stories: "Stories", gallery: "Gallery", contact: "Contact", story: "Story", series: "Series", image: "Image", "why-not": "Why am I not…", secret: "Shh…" };
 
   function route() {
     const raw = location.hash.replace(/^#\/?/, "");
@@ -567,6 +603,7 @@
     else if (!raw || (["home", "about", "goals"].includes(a) && !b)) view = "home";
     else if (a === "secret" && !b) view = "secret";
     else if (a === "games" && !b) view = "games";
+    else if (a === "ask" && !b) view = "ask";
     else if (a === "articles") {
       // the article list lives on accordingtoknowledge.com now; old links to it go there
       location.replace("https://accordingtoknowledge.com/" + (b === "category" && c ? "?category=" + c + "#articles" : ""));
@@ -596,6 +633,7 @@
     document.body.classList.toggle("hide-right", reading && SITE.readingHides === "right");
 
     if (view === "home") showHome();
+    if (view === "ask") mountTurnstile();
     if (view === "gallery") showGallery(arg, arg2);
     if (view === "why-not") showWhyNot(arg);
     if (view === "image") showImage(arg);

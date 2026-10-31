@@ -28,6 +28,7 @@
         <a class="key" href="#games" data-tab="games"><i class="led" aria-hidden="true"></i><span>Games</span></a>
         <a class="key" href="#stories" data-tab="stories"><i class="led" aria-hidden="true"></i><span>Stories</span></a>
         <a class="key" href="#gallery" data-tab="gallery"><i class="led" aria-hidden="true"></i><span>Gallery</span></a>
+        <a class="key" href="#ask" data-tab="ask"><i class="led" aria-hidden="true"></i><span>Ask</span></a>
         <a class="key" href="#contact" data-tab="contact"><i class="led" aria-hidden="true"></i><span>Contact</span></a>
         <a class="key" id="key-whynot" href="#why-not" data-tab="why-not" hidden><i class="led" aria-hidden="true"></i><span>Why not</span></a>
       </nav>
@@ -146,6 +147,24 @@
           <select id="wn-select"></select>
         </label>
         <article class="wn-detail" id="wn-detail" aria-live="polite"></article>
+      </section>
+
+      <!-- ASK (anonymous messages) -->
+      <section class="view page" data-view="ask" aria-labelledby="h-ask" hidden>
+        <h1 class="page-title" id="h-ask">Ask me anything</h1>
+        <p class="page-sub">Send me an anonymous message. No account, no name, no email: I can't see who you are.</p>
+        <form class="ask-form" id="ask-form" novalidate>
+          <label class="visually-hidden" for="ask-text">Your message</label>
+          <textarea id="ask-text" name="body" rows="6" maxlength="500" placeholder="Send me an anonymous message…" required></textarea>
+          <input class="ask-hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
+          <div id="ask-turnstile"></div>
+          <div class="ask-row">
+            <span class="ask-count" id="ask-count">0 / 500</span>
+            <button class="ask-send" type="submit">Send</button>
+          </div>
+          <p class="ask-note" id="ask-note" role="status" aria-live="polite"></p>
+        </form>
+        <p class="ask-fine">I may share some messages (never with a name) along with my reply. Please be kind. Your internet address is only used briefly, in scrambled form, to stop spam.</p>
       </section>
 
       <!-- CONTACT -->
