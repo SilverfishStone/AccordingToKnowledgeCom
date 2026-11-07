@@ -6,10 +6,12 @@
      /dictionary/groups           fix a group's details, or remove one nothing uses
    Words:
      term         "Salvation". Shared by every group that uses it.
-     alternates   other ways of saying a term ("On fire for the Lord" for "On fire for God"): listed and searched like terms, same page
+     synonyms     other ways of saying a term ("On fire for the Lord" for "On fire for God"): searched, and shown under the term as "Also:"
      group        who uses it: a religion (blank = Trinitarian Christian), a tradition (Baptist, Pentecostal, Catholic),
                   optionally the exact denomination (PCUSA, RCC) and a location. One of the first three is required.
-     meaning      one group's understanding of a term, with its plain explanation ("entry" in the code)
+     meaning      the understanding of a term shared by one or more groups, with its plain explanation ("entry" in the code).
+                  A group has at most one meaning of a term. The add and edit forms take several groups at once, or
+                  "all traditions except…" (worked out into the explicit list when saved, so the term shows who uses it)
      translation  that meaning explained in another group's terms, so a reader can read it their own way
    A group written for a whole tradition ("Baptist") applies to every denomination inside it, and a reader who picks a more
    exact group sees the most exact meaning and explanation that fits them.
@@ -46,8 +48,12 @@
 
   let box = null, data = null, admin = false, flash = "";
   const groupOf = (id) => data.sects.find((s) => s.id === id) || blank();
-  const entryOf = (term, group) => term.entries.find((e) => sameGroup(groupOf(e.sect), group));
-  // a term by its name or by one of its alternates
+  const entryGroups = (e) => e.groups.map(groupOf).sort((x, y) => label(x).localeCompare(label(y)));
+  const entryFull = (e) => entryGroups(e).map(label).join("; ");
+  // a chip's name: the first few groups by their short names, then how many more
+  const entryChip = (e) => { const n = entryGroups(e).map(short); return n.length > 3 ? n.slice(0, 3).join(", ") + ` +${n.length - 3}` : n.join(", "); };
+  const entryOf = (term, group) => term.entries.find((e) => entryGroups(e).some((g) => sameGroup(g, group)));
+  // a term by its name or by one of its synonyms
   const termByName = (name) => data.terms.find((t) => same(t.term, name) || (t.aliases || []).some((a) => same(a, name)));
   const load = async () => { data = await L().api("dict"); return data; };
   const paragraphs = (s) => L().paragraphs(s);
@@ -59,7 +65,12 @@
     for (const it of items) { const g = getGroup(it); if (applies(g, reader) && specificity(g) > score) { top = it; score = specificity(g); } }
     return top;
   };
-  const bestEntry = (term, reader) => best(term.entries, (e) => groupOf(e.sect), reader);
+  // the meaning whose most exact group fits the reader best
+  const bestEntry = (term, reader) => {
+    let top = null, score = -1;
+    for (const e of term.entries) for (const g of entryGroups(e)) if (applies(g, reader) && specificity(g) > score) { top = e; score = specificity(g); }
+    return top;
+  };
   const bestTr = (entry, reader) => best(entry.tr, (t) => groupOf(t.sect), reader);
 
   // every group a reader can say they are: each one in the data, and the broader groups inside which they sit
@@ -138,7 +149,7 @@
       terms = terms.map((t) => {
         const names = [t.term, ...(t.aliases || [])].map(fold);
         const head = names.find((n) => words.every((w) => n.includes(w))) || names[0];
-        const rest = fold(t.entries.map((e) => label(groupOf(e.sect)) + " " + e.definition + " " + e.tr.map((x) => label(groupOf(x.sect)) + " " + x.body).join(" ")).join(" "));
+        const rest = fold(t.entries.map((e) => entryGroups(e).map(label).join(" ") + " " + e.definition + " " + e.tr.map((x) => label(groupOf(x.sect)) + " " + x.body).join(" ")).join(" "));
         if (!words.every((w) => head.includes(w) || rest.includes(w))) return null;
         return { t, rank: head === words.join(" ") ? 0 : head.startsWith(words[0]) ? 1 : words.every((w) => head.includes(w)) ? 2 : 3 };
       }).filter(Boolean).sort((a, b) => a.rank - b.rank || a.t.term.localeCompare(b.t.term)).map((x) => x.t);
@@ -149,13 +160,12 @@
       return;
     }
     const row = (t) => {
-      const groups = t.entries.map((e) => short(groupOf(e.sect)));
+      const groups = [...new Set(t.entries.flatMap((e) => entryGroups(e).map(short)))];
       const snip = clip(explanationFor(t, reader), 150);
       return `<a class="item" href="dictionary/${t.id}" data-link><span class="item-title">${esc(t.term)}</span>
         <span class="meta">${groups.length ? esc(groups.join(" · ")) : "Nobody uses it yet"}</span>${t.aliases && t.aliases.length ? `<span class="meta dict-also">Also: ${esc(t.aliases.join(" · "))}</span>` : ""}${snip ? `<p>${esc(snip)}</p>` : ""}</a>`;
     };
-    // each alternate is listed in its own place in the A–Z list and opens the same page
-    const aliasRow = (t, name) => `<a class="item" href="dictionary/${t.id}" data-link><span class="item-title">${esc(name)}</span><span class="meta">Same as <b>${esc(t.term)}</b></span></a>`;
+
     if (words.length) { az.innerHTML = ""; list.innerHTML = `<div class="article-list">${terms.map(row).join("")}</div>`; return; }
     const groups = new Map();
     const place = (name, html) => {
@@ -164,7 +174,7 @@
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push({ name: fold(name), html });
     };
-    for (const t of terms) { place(t.term, row(t)); for (const a of t.aliases || []) place(a, aliasRow(t, a)); }
+    for (const t of terms) place(t.term, row(t));
     const keys = [...groups.keys()].sort((a, b) => (a === "#") - (b === "#") || a.localeCompare(b));
     az.innerHTML = keys.map((k) => `<a href="#dict-${k === "#" ? "num" : k}" data-jump>${k}</a>`).join("");
     az.onclick = (e) => { const a = e.target.closest("[data-jump]"); if (!a) return; e.preventDefault(); $(a.getAttribute("href"), box)?.scrollIntoView({ block: "start" }); };
@@ -189,25 +199,22 @@
       const body = entry ? (tr ? tr.body : entry.definition) : "";
       const lacking = mine && entry && lang === "plain" && !bestTr(entry, mine)
         ? `<p class="meta dict-lack">No version in ${esc(label(mine))} terms yet, so this is the plain explanation.</p>` : "";
-      // two groups can share a short name (Baptist in two places): then the whole name is shown
-      const shorts = term.entries.map((e) => short(groupOf(e.sect)));
-      const chipName = (e) => (shorts.filter((s) => s === short(groupOf(e.sect))).length > 1 ? label(groupOf(e.sect)) : short(groupOf(e.sect)));
       box.innerHTML = `
         <p class="dict-back">${link("dictionary", "← All terms")}</p>
         <h1 class="page-h">${esc(term.term)}</h1>
-        ${term.aliases && term.aliases.length ? `<p class="center dict-also">Also said: ${esc(term.aliases.join(" · "))}</p>` : ""}
+        ${term.aliases && term.aliases.length ? `<p class="center dict-also">Also: ${esc(term.aliases.join(" · "))}</p>` : ""}
         ${entry ? `
         <div class="dict-pick"><span class="dict-pick-label">As understood by</span>
-          ${term.entries.map((e) => `<button type="button" class="dict-chip" data-entry="${e.id}" title="${esc(label(groupOf(e.sect)))}" aria-pressed="${e === entry}">${esc(chipName(e))}</button>`).join("")}</div>
+          ${term.entries.map((e) => `<button type="button" class="dict-chip" data-entry="${e.id}" title="${esc(entryFull(e))}" aria-pressed="${e === entry}">${esc(entryChip(e))}</button>`).join("")}</div>
         <div class="dict-pick"><span class="dict-pick-label">Explained in</span>
           ${langs.map((l) => `<button type="button" class="dict-chip" data-lang="${l.key}" title="${esc(l.full)}" aria-pressed="${l.key === lang}">${esc(l.label)}</button>`).join("")}</div>
         <article class="dict-card">
-          <h2>${esc(label(groupOf(entry.sect)))}${lang === "plain" ? "" : ` <small>in ${esc(label(groupOf(lang)))} terms</small>`}</h2>
+          <h2>${esc(entryFull(entry))}${lang === "plain" ? "" : ` <small>in ${esc(label(groupOf(lang)))} terms</small>`}</h2>
           ${body ? paragraphs(body) : `<p class="note">${lang === "plain" ? "No plain explanation written yet." : "Nothing written yet."}</p>`}
         </article>${lacking}` : `<p class="note">Nobody uses this term yet.</p>`}
         ${admin ? `<p class="row dict-admin">
           ${entry ? link("dictionary/edit/" + entry.id, "Edit this meaning", "btn ghost small-btn") : ""}
-          ${link("dictionary/add?term=" + encodeURIComponent(term.term), "Add another group's meaning", "btn ghost small-btn")}</p>` : ""}`;
+          ${link("dictionary/add?term=" + encodeURIComponent(term.term), "Add a meaning for other groups", "btn ghost small-btn")}</p>` : ""}`;
     };
     box.onclick = (e) => {
       const b = e.target.closest("button");
@@ -234,6 +241,78 @@
   const groupOk = (g) => !!(g.religion || g.tradition || g.denomination);
   const NEED_GROUP = "Say the tradition or denomination (or the religion, if it isn't Christian).";
 
+  /* ───────── who a meaning belongs to ─────────
+     Rows of groups (Baptist, Pentecostal, Methodist…), or "all traditions except…": every tradition the dictionary
+     already knows inside a religion, minus the ones listed. Either way what is saved is the explicit list. */
+  const prow = (g) => `<div class="dict-prow">${groupInputs(g, { small: true })}<button class="link-btn" type="button" data-pick="remove">Remove</button></div>`;
+  function pickerHtml(groups) {
+    return `<fieldset class="dict-fieldset dict-picker"><legend>Who says it</legend>
+      <p class="dict-modes">
+        <label><input type="radio" name="dict-mode" value="list" checked /> These groups</label>
+        <label><input type="radio" name="dict-mode" value="except" /> All traditions except…</label></p>
+      <div class="dict-plist">
+        <p class="meta">One row for each group that uses it this way. A tradition on its own (just “Baptist”) covers every denomination inside it.</p>
+        <div class="dict-prows">${(groups.length ? groups : [blank()]).map(prow).join("")}</div>
+        <p><button class="btn ghost small-btn" type="button" data-pick="add">+ Add another group</button></p>
+      </div>
+      <div class="dict-pexcept" hidden>
+        <label>Within the religion <span class="meta">(blank = Trinitarian Christian)</span><input data-except="religion" list="${listId("religion")}" maxlength="60" autocomplete="off" /></label>
+        <label>Leave out these traditions <span class="meta">(one per line; the rest of the known traditions are included)</span><textarea data-except="out" rows="3" placeholder="Catholic&#10;Eastern Orthodox"></textarea></label>
+        <p class="meta dict-ppreview" aria-live="polite"></p>
+      </div></fieldset>`;
+  }
+  const traditionPool = (religion) => {
+    const m = new Map();
+    for (const g of data.sects) if (g.tradition && same(g.religion, religion)) m.set(g.tradition.toLowerCase(), g.tradition);
+    return [...m.values()].sort((x, y) => x.localeCompare(y));
+  };
+  function exceptResult(root) {
+    const religion = String(root.querySelector("[data-except=religion]").value || "").replace(/\s+/g, " ").trim();
+    const out = root.querySelector("[data-except=out]").value.split("\n").map((x) => x.replace(/\s+/g, " ").trim()).filter(Boolean);
+    const pool = traditionPool(religion), skip = new Set(out.map((x) => x.toLowerCase()));
+    return {
+      pool,
+      groups: pool.filter((t) => !skip.has(t.toLowerCase())).map((t) => ({ ...blank(), religion, tradition: t })),
+      unknown: out.filter((x) => !pool.some((p) => p.toLowerCase() === x.toLowerCase())),
+    };
+  }
+  const pickerMode = (root) => root.querySelector("[name=dict-mode]:checked").value;
+  // { groups: the finished groups, rows: every row as typed, bad: a row has something in it but isn't a usable group }
+  function readPicker(root) {
+    if (pickerMode(root) === "except") { const r = exceptResult(root); return { groups: r.groups, rows: r.groups, bad: false }; }
+    const rows = [...root.querySelectorAll(".dict-prow")].map(readGroup);
+    const filled = rows.filter((g) => FIELDS.some((f) => g[f]));
+    const seen = new Set();
+    const groups = filled.filter((g) => groupOk(g) && !seen.has(gkey(g)) && seen.add(gkey(g)));
+    return { groups, rows, bad: filled.some((g) => !groupOk(g)) };
+  }
+  function bindPicker(root, onChange) {
+    const sync = () => {
+      const except = pickerMode(root) === "except";
+      root.querySelector(".dict-plist").hidden = except;
+      root.querySelector(".dict-pexcept").hidden = !except;
+      if (except) {
+        const r = exceptResult(root);
+        root.querySelector(".dict-ppreview").textContent = !r.pool.length ? "No traditions to choose from yet. Add some meanings first."
+          : !r.groups.length ? "That leaves out every tradition."
+          : `Applies to ${r.groups.length} tradition${r.groups.length === 1 ? "" : "s"}: ${r.groups.map((g) => g.tradition).join(", ")}.${r.unknown.length ? " Not a known tradition (ignored): " + r.unknown.join(", ") + "." : ""}`;
+      }
+      if (onChange) onChange();
+    };
+    root.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-pick]");
+      if (!b) return;
+      const rows = root.querySelector(".dict-prows");
+      if (b.dataset.pick === "add") { rows.insertAdjacentHTML("beforeend", prow(blank())); rows.lastElementChild.querySelector("input")?.focus(); }
+      else if (rows.children.length > 1) b.closest(".dict-prow").remove();
+      else b.closest(".dict-prow").querySelectorAll("input").forEach((i) => { i.value = ""; });
+      sync();
+    });
+    root.addEventListener("input", sync);
+    root.addEventListener("change", sync);
+    sync();
+  }
+
   /* ───────── add a term ───────── */
   function addForm() {
     dictionary.site.setTitle("Add a term", "");
@@ -241,35 +320,37 @@
     box.innerHTML = `
       <p class="dict-back">${link("dictionary", "← All terms")}</p>
       <h1 class="page-h">Add a term</h1>
-      <p class="lead center">Type what you heard and who said it. Terms, traditions and denominations that already exist are suggested as you type.</p>
+      <p class="lead center">Type what you heard and who says it. If several groups use it the same way, add them all here. Terms, traditions and denominations that already exist are suggested as you type.</p>
       <form class="form dict-form" id="dict-add" autocomplete="off">
         <label>Term or phrase<input name="term" maxlength="120" required list="dl-terms" value="${esc(params.get("term") || "")}" placeholder="Salvation, washed in the blood, theosis…" /></label>
-        <fieldset class="dict-fieldset"><legend>Who says it</legend>${groupInputs(blank())}</fieldset>
+        ${pickerHtml([blank()])}
         <label>Explanation <span class="meta">(optional, in plain terms; you can add more later)</span><textarea name="definition" rows="5" maxlength="4000"></textarea></label>
         <p class="form-note" id="dict-hint"></p>
         <button class="btn" type="submit">Add it</button>
       </form>
       <datalist id="dl-terms">${data.terms.flatMap((t) => [t.term, ...(t.aliases || [])]).map((n) => `<option value="${esc(n)}"></option>`).join("")}</datalist>${groupDatalists()}`;
-    const f = $("#dict-add", box), hint = $("#dict-hint", box), submit = f.querySelector("button[type=submit]"), gbox = $(".dict-group", f);
+    const f = $("#dict-add", box), hint = $("#dict-hint", box), submit = f.querySelector("button[type=submit]"), picker = $(".dict-picker", f);
+    const names = (groups) => groups.map(short).join(", ");
     const check = () => {
-      const t = termByName(f.term.value), g = readGroup(gbox);
-      const have = t && groupOk(g) ? entryOf(t, g) : null;
-      submit.textContent = have ? "Open it to edit" : "Add it";
-      if (have) hint.innerHTML = `<b>${esc(t.term)}</b> is already in the dictionary for ${esc(label(g))}. It will open to edit instead of adding a copy.`;
-      else if (t && !same(t.term, f.term.value) && t.entries.length) hint.innerHTML = `“${esc(f.term.value.trim())}” is another way of saying <b>${esc(t.term)}</b> (${esc(t.entries.map((e) => short(groupOf(e.sect))).join(", "))}). This adds ${groupOk(g) ? esc(label(g)) + "'s" : "another group's"} meaning to that term.`;
-      else if (t && t.entries.length) hint.innerHTML = `<b>${esc(t.term)}</b> is already a term (${esc(t.entries.map((e) => short(groupOf(e.sect))).join(", "))}). This adds ${groupOk(g) ? esc(label(g)) + "'s" : "another group's"} meaning to it.`;
+      const t = termByName(f.term.value), { groups } = readPicker(picker);
+      const hits = t ? groups.filter((g) => entryOf(t, g)) : [];
+      submit.textContent = hits.length ? "Open it to edit" : "Add it";
+      const via = t && !same(t.term, f.term.value) ? `“${esc(f.term.value.trim())}” is a synonym of <b>${esc(t.term)}</b>. ` : "";
+      if (hits.length) hint.innerHTML = `${via}<b>${esc(t.term)}</b> already has a meaning for ${esc(names(hits))}. It will open to edit instead of adding a copy; nothing is changed.`;
+      else if (t && t.entries.length) hint.innerHTML = `${via || `<b>${esc(t.term)}</b> is already a term. `}It's used by ${esc([...new Set(t.entries.flatMap((e) => entryGroups(e).map(short)))].join(", "))}. This adds ${groups.length ? esc(names(groups)) + "'s" : "another meaning"} to it.`;
       else hint.textContent = "";
       hint.className = "form-note" + (hint.textContent ? " ok" : "");
     };
-    f.addEventListener("input", check);
+    bindPicker(picker, check);
+    f.term.addEventListener("input", check);
     check();
     f.addEventListener("submit", (e) => {
       e.preventDefault();
-      const g = readGroup(gbox);
-      if (!groupOk(g)) { L().say(hint, NEED_GROUP); return; }
+      const { groups, bad } = readPicker(picker);
+      if (bad || !groups.length) { L().say(hint, NEED_GROUP); return; }
       L().busy(submit, "Saving…", async () => {
         try {
-          const r = await L().api("admin/dict/entries", { term: f.term.value, group: g, definition: f.definition.value });
+          const r = await L().api("admin/dict/entries", { term: f.term.value, groups, definition: f.definition.value });
           flash = r.existed ? "It was already here, so this is that entry to edit. Nothing was changed." : "Added. You can add explanations in other groups' terms below.";
           await load();
           dictionary.site.go("/dictionary/edit/" + r.id);
@@ -289,8 +370,9 @@
     if (!found) { box.innerHTML = `<h1 class="page-h">Not found</h1><p class="center">${link("dictionary", "Back to the dictionary")}</p>`; return; }
     const { term, entry } = found;
     dictionary.site.setTitle("Edit " + term.term, "");
-    const who = label(groupOf(entry.sect));
+    const who = entryFull(entry);
     let rows = entry.tr.map((t) => ({ group: { ...groupOf(t.sect) }, body: t.body }));
+    let picked = entryGroups(entry).map((g) => ({ ...g }));   // who uses this meaning, kept while the page is redrawn
     const note = flash; flash = "";
     const draw = () => {
       box.innerHTML = `
@@ -299,8 +381,9 @@
         ${note ? `<p class="form-note ok">${esc(note)}</p>` : ""}
         <form class="form dict-form" id="dict-edit">
           <label>Term <span class="meta">(renames it for every group)</span><input name="term" maxlength="120" required value="${esc(term.term)}" /></label>
-          <label>Other ways of saying it <span class="meta">(one per line, for every group; each is listed and searched like a term and opens this page)</span><textarea name="aliases" rows="3" maxlength="3000" placeholder="On fire for the Lord…">${esc((term.aliases || []).join("\n"))}</textarea></label>
-          <label>What ${esc(who)} means by it, in plain terms<textarea name="definition" rows="6" maxlength="4000">${esc(entry.definition)}</textarea></label>
+          <label>Synonyms <span class="meta">(one per line, for every group; they're searchable and shown under the term as “Also”)</span><textarea name="aliases" rows="3" maxlength="3000" placeholder="One synonym per line…">${esc((term.aliases || []).join("\n"))}</textarea></label>
+          ${pickerHtml(picked)}
+          <label>What they mean by it, in plain terms<textarea name="definition" rows="6" maxlength="4000">${esc(entry.definition)}</textarea></label>
           <h2 class="dict-sub">The same meaning, explained in another group's terms</h2>
           <p class="lead">Write it the way someone from that tradition or denomination would understand it. A tradition on its own (just “Baptist”) covers every Baptist denomination. They pick “Explained in” on the term's page to read it.</p>
           <div id="dict-rows">${rows.map((r, i) => `
@@ -315,9 +398,11 @@
           <p class="row"><button class="btn" type="submit">Save</button>
             <button class="btn danger" type="button" data-act="delete">Delete this meaning</button></p>
         </form>`;
+      bindPicker($(".dict-picker", box));
     };
     const collect = () => {
       rows = [...box.querySelectorAll(".dict-row")].map((r) => ({ group: readGroup(r), body: r.querySelector("[data-f=body]").value }));
+      picked = readPicker($(".dict-picker", box)).rows;
     };
     draw();
     box.onclick = async (e) => {
@@ -327,7 +412,7 @@
       else if (b.dataset.act === "remove") { collect(); rows.splice(Number(b.closest(".dict-row").dataset.i), 1); draw(); }
       else if (b.dataset.act === "delete") {
         const sure = await L().confirmBox({ title: "Delete this meaning?", yes: "Delete it", danger: true,
-          text: `${who}'s meaning of “${term.term}” and its explanations will be deleted. ${term.entries.length === 1 ? "It's the only one, so the term goes too." : "The other groups' meanings stay."}` });
+          text: `The meaning of “${term.term}” for ${who}, and its explanations, will be deleted. ${term.entries.length === 1 ? "It's the only one, so the term goes too." : "The other groups' meanings stay."}` });
         if (!sure) return;
         try { await L().api(`admin/dict/entries/${id}/delete`, {}); await load(); dictionary.site.go("/dictionary"); }
         catch (err) { L().say($("#dict-note", box), err.message); }
@@ -336,16 +421,18 @@
     box.onsubmit = (e) => {
       e.preventDefault();
       const f = $("#dict-edit", box), noteEl = $("#dict-note", box);
+      const { groups, bad } = readPicker($(".dict-picker", box));
+      if (bad || !groups.length) { L().say(noteEl, NEED_GROUP); return; }
       collect();
       L().busy(f.querySelector("button[type=submit]"), "Saving…", async () => {
         try {
-          await L().api(`admin/dict/entries/${id}`, { term: f.term.value, aliases: f.aliases.value.split("\n"), definition: f.definition.value, translations: rows });
+          await L().api(`admin/dict/entries/${id}`, { term: f.term.value, aliases: f.aliases.value.split("\n"), groups, definition: f.definition.value, translations: rows });
           await load();
           const again = findEntry(id);
-          if (again) { term.aliases = again.term.aliases; term.term = again.term.term; }
+          if (again) { term.aliases = again.term.aliases; term.term = again.term.term; entry.groups = again.entry.groups; }
           L().say(noteEl, "Saved.", "ok");
           dictionary.site.setTitle("Edit " + f.term.value, "");
-          const h = box.querySelector("h1"); if (h) h.firstChild.textContent = f.term.value + " ";
+          const h = box.querySelector("h1"); if (h) { h.firstChild.textContent = f.term.value + " "; const sm = h.querySelector("small"); if (sm) sm.textContent = entryFull(entry); }
         } catch (err) { L().say(noteEl, err.message); }
       });
     };
@@ -356,7 +443,7 @@
     dictionary.site.setTitle("Traditions & denominations", "");
     const uses = (s) => {
       let meanings = 0, explanations = 0;
-      for (const t of data.terms) for (const e of t.entries) { if (e.sect === s.id) meanings++; explanations += e.tr.filter((x) => x.sect === s.id).length; }
+      for (const t of data.terms) for (const e of t.entries) { if (e.groups.includes(s.id)) meanings++; explanations += e.tr.filter((x) => x.sect === s.id).length; }
       return { meanings, explanations };
     };
     box.innerHTML = `

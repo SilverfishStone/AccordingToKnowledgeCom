@@ -580,3 +580,9 @@ button.item { width: 100%; border: 0; background: none; color: inherit; font: in
 @media (max-width: 520px) { .dict-group { grid-template-columns: 1fr; } }
 .dict-also { margin: 2px 0 8px; font-size: 14px; font-weight: 600; color: var(--ink-soft); }
 .item .dict-also { display: block; }
+.dict-modes { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0 0 8px; }
+.dict-modes label { display: inline-flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; }
+.dict-prow { display: grid; gap: 4px; margin: 0 0 10px; padding: 8px 10px; border: 1px dashed var(--ink-soft); border-radius: 10px; }
+.dict-prow .link-btn { justify-self: end; }
+.dict-pexcept { display: grid; gap: 10px; }
+.dict-ppreview { margin: 0; font-weight: 600; }
