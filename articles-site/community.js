@@ -142,6 +142,7 @@
     const pending = state.pending ? (state.pending.comments || 0) + (state.pending.pictures || 0) + (state.pending.writing || 0) + (state.pending.asks || 0) : 0;
     nav.innerHTML = `
       ${u.role === "admin" ? `<a class="nav-link" href="admin" data-link>Admin${pending || state.unread ? ` <span class="dot">${pending + state.unread}</span>` : ""}</a>` : ""}
+      ${u.role === "admin" ? `<a class="nav-link" href="dictionary" data-link>Dictionary</a>` : ""}
       ${u.role === "admin" || u.role === "writer" ? `<a class="nav-link" href="write" data-link>Write</a>` : ""}
       ${u.role !== "admin" ? `<a class="nav-link" href="messages" data-link aria-label="Messages${state.unread ? `, ${state.unread} new` : ""}">Messages${state.unread ? ` <span class="dot">${state.unread}</span>` : ""}</a>` : ""}
       <a class="nav-me" href="account" data-link title="Your account">${avatarImg(u, 30)}<span>${esc(u.username)}</span></a>`;

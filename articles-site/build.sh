@@ -12,7 +12,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 rm -rf dist
 mkdir -p dist/assets/avatars
-cp index.html site.css site.js community.js writing.js quiz-core.js quiz.js quiz-maker.js config.js robots.txt dist/
+cp index.html site.css site.js community.js writing.js quiz-core.js quiz.js quiz-maker.js dictionary.js config.js robots.txt dist/
 cp assets/*.png dist/assets/
 # the backgrounds for the anonymous-message pictures: every picture in the folder is offered in /admin
 # (index.json is the list; names starting with _ or holding odd characters are left out)

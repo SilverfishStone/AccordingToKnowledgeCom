@@ -81,6 +81,11 @@ const ROUTES = [
   ["POST", /^\/api\/admin\/test-email$/, adminTestEmail],
   ["GET", /^\/api\/admin\/asks$/, adminAsks],
   ["POST", /^\/api\/admin\/asks\/(\d+)$/, adminAsk],
+  ["GET", /^\/api\/dict$/, dictAll],
+  ["POST", /^\/api\/admin\/dict\/entries$/, adminDictAdd],
+  ["POST", /^\/api\/admin\/dict\/entries\/(\d+)$/, adminDictSave],
+  ["POST", /^\/api\/admin\/dict\/entries\/(\d+)\/delete$/, adminDictDelete],
+  ["POST", /^\/api\/admin\/dict\/sects\/(\d+)$/, adminDictSect],
   ["POST", /^\/api\/admin\/comments\/(\d+)$/, adminComment],
   ["POST", /^\/api\/admin\/pictures\/(\d+)$/, adminPicture],
   ["GET", /^\/api\/admin\/messages\/(\d+)$/, adminThread],
@@ -208,6 +213,23 @@ const MIGRATIONS = [
     // status is 'new', 'ignored' or 'posted'
     `CREATE TABLE asks (id INTEGER PRIMARY KEY, body TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'new', created_at INTEGER NOT NULL)`,
     `CREATE INDEX asks_status ON asks (status, created_at)`,
+  ],
+  [
+    // the religiolect dictionary: a term is shared by every denomination that uses it; an entry is one group's
+    // meaning of it (its plain explanation); a translation is that meaning explained in another group's terms
+    // a group is who uses a term: a religion (blank = Trinitarian Christian), a tradition (Baptist, Pentecostal, Catholic),
+    // optionally the exact denomination (PCUSA, RCC) and a location. Any of the last three can be left out of a group
+    `CREATE TABLE dict_sects (
+      id INTEGER PRIMARY KEY,
+      religion TEXT NOT NULL DEFAULT '' COLLATE NOCASE, tradition TEXT NOT NULL DEFAULT '' COLLATE NOCASE,
+      denomination TEXT NOT NULL DEFAULT '' COLLATE NOCASE, location TEXT NOT NULL DEFAULT '' COLLATE NOCASE,
+      created_at INTEGER NOT NULL, UNIQUE (religion, tradition, denomination, location))`,
+    `CREATE TABLE dict_terms (id INTEGER PRIMARY KEY, term TEXT NOT NULL UNIQUE COLLATE NOCASE, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
+    `CREATE TABLE dict_entries (
+      id INTEGER PRIMARY KEY, term_id INTEGER NOT NULL, sect_id INTEGER NOT NULL, definition TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, UNIQUE (term_id, sect_id))`,
+    `CREATE INDEX dict_entries_sect ON dict_entries (sect_id)`,
+    `CREATE TABLE dict_translations (entry_id INTEGER NOT NULL, sect_id INTEGER NOT NULL, body TEXT NOT NULL, PRIMARY KEY (entry_id, sect_id))`,
   ],
 ];
 let schemaReady = null;
@@ -731,6 +753,133 @@ async function adminAsk(c) {
   if (!status) throw new HttpError(400, "That isn't something I can do to a message.");
   await run(c.env, "UPDATE asks SET status = ?1 WHERE id = ?2", status, id);
   return json({ ok: true, status });
+}
+
+/* ───────── the religiolect dictionary ─────────
+   Private for now: reading it needs the admin account unless the variable DICTIONARY_PUBLIC is "true".
+   Writing is always the admin only.
+   A "group" (table dict_sects) is who uses a term or whose terms an explanation is written in: a religion (blank means
+   Trinitarian Christian), a tradition, optionally an exact denomination, and optionally a location. */
+const DICT = { term: 120, part: 60, text: 4000, translations: 60 };
+const GROUP_FIELDS = ["religion", "tradition", "denomination", "location"];
+const dictOpen = (c) => c.env.DICTIONARY_PUBLIC === "true" || (c.user && c.user.role === "admin");
+const oneLine = (v, name, max) => text(typeof v === "string" ? v.replace(/\s+/g, " ") : "", name, max);
+const optLine = (v, name, max) => (typeof v === "string" && v.trim() ? oneLine(v, name, max) : "");
+
+// a group from what the form sent: each part tidied, and at least one of religion, tradition or denomination given
+function cleanGroup(g) {
+  g = g && typeof g === "object" ? g : {};
+  const out = {};
+  for (const f of GROUP_FIELDS) out[f] = optLine(g[f], f[0].toUpperCase() + f.slice(1), DICT.part);
+  if (!out.religion && !out.tradition && !out.denomination) throw new HttpError(400, "Say the tradition or denomination (or the religion, if it isn't Christian).");
+  return out;
+}
+const groupKey = (g) => GROUP_FIELDS.map((f) => g[f].toLowerCase()).join("|");
+
+async function dictAll(c) {
+  if (!dictOpen(c)) throw new HttpError(c.user ? 403 : 401, "The dictionary isn't open yet.");
+  const [sects, terms, entries, trs] = await Promise.all([
+    all(c.env, "SELECT id, religion, tradition, denomination, location FROM dict_sects ORDER BY religion, tradition, denomination, location"),
+    all(c.env, "SELECT id, term FROM dict_terms ORDER BY term COLLATE NOCASE"),
+    all(c.env, "SELECT id, term_id, sect_id, definition FROM dict_entries ORDER BY id"),
+    all(c.env, "SELECT entry_id, sect_id, body FROM dict_translations"),
+  ]);
+  const byEntry = new Map(entries.map((e) => [e.id, { id: e.id, sect: e.sect_id, definition: e.definition, tr: [] }]));
+  for (const t of trs) { const e = byEntry.get(t.entry_id); if (e) e.tr.push({ sect: t.sect_id, body: t.body }); }
+  const byTerm = new Map(terms.map((t) => [t.id, { id: t.id, term: t.term, entries: [] }]));
+  for (const e of entries) { const t = byTerm.get(e.term_id); if (t) t.entries.push(byEntry.get(e.id)); }
+  return json({ public: c.env.DICTIONARY_PUBLIC === "true", sects, terms: [...byTerm.values()] });
+}
+
+// the id of the group with these parts, making it if it's new
+async function dictSect(env, g) {
+  await run(env, "INSERT INTO dict_sects (religion, tradition, denomination, location, created_at) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT DO NOTHING", g.religion, g.tradition, g.denomination, g.location, Date.now());
+  return (await one(env, "SELECT id FROM dict_sects WHERE religion = ?1 AND tradition = ?2 AND denomination = ?3 AND location = ?4", g.religion, g.tradition, g.denomination, g.location)).id;
+}
+async function dictTerm(env, term) {
+  const now = Date.now();
+  await run(env, "INSERT INTO dict_terms (term, created_at, updated_at) VALUES (?1, ?2, ?2) ON CONFLICT (term) DO NOTHING", term, now);
+  return (await one(env, "SELECT id FROM dict_terms WHERE term = ?1", term)).id;
+}
+
+// add a term for a group; one that's already there is left alone and opened for editing instead
+async function adminDictAdd(c) {
+  need(c, true);
+  const b = c.body || {};
+  const term = oneLine(b.term, "The term", DICT.term), group = cleanGroup(b.group);
+  const definition = typeof b.definition === "string" ? text(b.definition, "The explanation", DICT.text, 0) : "";
+  const sectId = await dictSect(c.env, group), termId = await dictTerm(c.env, term);
+  const have = await one(c.env, "SELECT id FROM dict_entries WHERE term_id = ?1 AND sect_id = ?2", termId, sectId);
+  if (have) return json({ id: have.id, existed: true });
+  const now = Date.now();
+  const row = await one(c.env, "INSERT INTO dict_entries (term_id, sect_id, definition, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?4) RETURNING id", termId, sectId, definition, now);
+  return json({ id: row.id, existed: false });
+}
+
+async function adminDictSave(c) {
+  need(c, true);
+  const id = Number(c.params[0]), b = c.body || {};
+  const entry = await one(c.env, "SELECT e.id, e.term_id, t.term FROM dict_entries e JOIN dict_terms t ON t.id = e.term_id WHERE e.id = ?1", id);
+  if (!entry) throw new HttpError(404, "That entry doesn't exist any more.");
+  const term = oneLine(b.term, "The term", DICT.term);
+  const definition = typeof b.definition === "string" ? text(b.definition, "The explanation", DICT.text, 0) : "";
+  const list = Array.isArray(b.translations) ? b.translations : [];
+  if (list.length > DICT.translations) throw new HttpError(400, "That's too many explanations for one entry.");
+  const seen = new Set(), rows = [];
+  for (const t of list) {
+    const group = cleanGroup(t && t.group);
+    const name = [group.religion, group.tradition, group.denomination].filter(Boolean).join(" ");
+    const body = text(t && t.body, `The explanation for ${name}`, DICT.text);
+    if (seen.has(groupKey(group))) throw new HttpError(400, `There are two explanations for ${name}. Keep one.`);
+    seen.add(groupKey(group));
+    rows.push([group, body]);
+  }
+  if (term.toLowerCase() !== entry.term.toLowerCase()) {
+    const clash = await one(c.env, "SELECT id FROM dict_terms WHERE term = ?1 AND id != ?2", term, entry.term_id);
+    if (clash) throw new HttpError(409, `“${term}” is already a term of its own. Open it from the list to add this group there.`);
+  }
+  const sectIds = [];
+  for (const [group] of rows) sectIds.push(await dictSect(c.env, group));
+  const now = Date.now();
+  await c.env.DB.batch([
+    c.env.DB.prepare("UPDATE dict_terms SET term = ?1, updated_at = ?2 WHERE id = ?3").bind(term, now, entry.term_id),
+    c.env.DB.prepare("UPDATE dict_entries SET definition = ?1, updated_at = ?2 WHERE id = ?3").bind(definition, now, id),
+    c.env.DB.prepare("DELETE FROM dict_translations WHERE entry_id = ?1").bind(id),
+    ...rows.map(([, body], i) => c.env.DB.prepare("INSERT INTO dict_translations (entry_id, sect_id, body) VALUES (?1, ?2, ?3)").bind(id, sectIds[i], body)),
+  ]);
+  return json({ ok: true });
+}
+
+async function adminDictDelete(c) {
+  need(c, true);
+  const id = Number(c.params[0]);
+  const entry = await one(c.env, "SELECT term_id FROM dict_entries WHERE id = ?1", id);
+  if (!entry) return json({ ok: true });
+  await c.env.DB.batch([
+    c.env.DB.prepare("DELETE FROM dict_translations WHERE entry_id = ?1").bind(id),
+    c.env.DB.prepare("DELETE FROM dict_entries WHERE id = ?1").bind(id),
+    c.env.DB.prepare("DELETE FROM dict_terms WHERE id = ?1 AND NOT EXISTS (SELECT 1 FROM dict_entries WHERE term_id = ?1)").bind(entry.term_id),
+  ]);
+  return json({ ok: true });
+}
+
+// change a group's parts (fix a typo, add a location), or remove a group nothing uses
+async function adminDictSect(c) {
+  need(c, true);
+  const id = Number(c.params[0]), b = c.body || {};
+  const sect = await one(c.env, "SELECT id FROM dict_sects WHERE id = ?1", id);
+  if (!sect) throw new HttpError(404, "That group doesn't exist any more.");
+  if (b.action === "delete") {
+    const used = await one(c.env, "SELECT (SELECT COUNT(*) FROM dict_entries WHERE sect_id = ?1) + (SELECT COUNT(*) FROM dict_translations WHERE sect_id = ?1) AS n", id);
+    if (used.n) throw new HttpError(409, "That group is still used by a meaning or an explanation.");
+    await run(c.env, "DELETE FROM dict_sects WHERE id = ?1", id);
+    return json({ ok: true });
+  }
+  const g = cleanGroup(b.group);
+  const clash = await one(c.env, "SELECT id FROM dict_sects WHERE religion = ?1 AND tradition = ?2 AND denomination = ?3 AND location = ?4 AND id != ?5", g.religion, g.tradition, g.denomination, g.location, id);
+  if (clash) throw new HttpError(409, "There is already a group with exactly those details.");
+  await run(c.env, "UPDATE dict_sects SET religion = ?1, tradition = ?2, denomination = ?3, location = ?4 WHERE id = ?5", g.religion, g.tradition, g.denomination, g.location, id);
+  return json({ ok: true });
 }
 
 /* ───────── admin ───────── */
