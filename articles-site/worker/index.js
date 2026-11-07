@@ -231,6 +231,11 @@ const MIGRATIONS = [
     `CREATE INDEX dict_entries_sect ON dict_entries (sect_id)`,
     `CREATE TABLE dict_translations (entry_id INTEGER NOT NULL, sect_id INTEGER NOT NULL, body TEXT NOT NULL, PRIMARY KEY (entry_id, sect_id))`,
   ],
+  [
+    // other ways of saying a term ("On fire for the Lord" for "On fire for God"): listed and searched like terms, and open the same page
+    `CREATE TABLE dict_aliases (id INTEGER PRIMARY KEY, term_id INTEGER NOT NULL, alias TEXT NOT NULL UNIQUE COLLATE NOCASE)`,
+    `CREATE INDEX dict_aliases_term ON dict_aliases (term_id)`,
+  ],
 ];
 let schemaReady = null;
 function ensureSchema(env) {
@@ -760,7 +765,7 @@ async function adminAsk(c) {
    Writing is always the admin only.
    A "group" (table dict_sects) is who uses a term or whose terms an explanation is written in: a religion (blank means
    Trinitarian Christian), a tradition, optionally an exact denomination, and optionally a location. */
-const DICT = { term: 120, part: 60, text: 4000, translations: 60 };
+const DICT = { term: 120, part: 60, text: 4000, translations: 60, aliases: 30 };
 const GROUP_FIELDS = ["religion", "tradition", "denomination", "location"];
 const dictOpen = (c) => c.env.DICTIONARY_PUBLIC === "true" || (c.user && c.user.role === "admin");
 const oneLine = (v, name, max) => text(typeof v === "string" ? v.replace(/\s+/g, " ") : "", name, max);
@@ -778,15 +783,17 @@ const groupKey = (g) => GROUP_FIELDS.map((f) => g[f].toLowerCase()).join("|");
 
 async function dictAll(c) {
   if (!dictOpen(c)) throw new HttpError(c.user ? 403 : 401, "The dictionary isn't open yet.");
-  const [sects, terms, entries, trs] = await Promise.all([
+  const [sects, terms, entries, trs, aliases] = await Promise.all([
     all(c.env, "SELECT id, religion, tradition, denomination, location FROM dict_sects ORDER BY religion, tradition, denomination, location"),
     all(c.env, "SELECT id, term FROM dict_terms ORDER BY term COLLATE NOCASE"),
     all(c.env, "SELECT id, term_id, sect_id, definition FROM dict_entries ORDER BY id"),
     all(c.env, "SELECT entry_id, sect_id, body FROM dict_translations"),
+    all(c.env, "SELECT term_id, alias FROM dict_aliases ORDER BY alias COLLATE NOCASE"),
   ]);
   const byEntry = new Map(entries.map((e) => [e.id, { id: e.id, sect: e.sect_id, definition: e.definition, tr: [] }]));
   for (const t of trs) { const e = byEntry.get(t.entry_id); if (e) e.tr.push({ sect: t.sect_id, body: t.body }); }
-  const byTerm = new Map(terms.map((t) => [t.id, { id: t.id, term: t.term, entries: [] }]));
+  const byTerm = new Map(terms.map((t) => [t.id, { id: t.id, term: t.term, aliases: [], entries: [] }]));
+  for (const a of aliases) { const t = byTerm.get(a.term_id); if (t) t.aliases.push(a.alias); }
   for (const e of entries) { const t = byTerm.get(e.term_id); if (t) t.entries.push(byEntry.get(e.id)); }
   return json({ public: c.env.DICTIONARY_PUBLIC === "true", sects, terms: [...byTerm.values()] });
 }
@@ -795,6 +802,11 @@ async function dictAll(c) {
 async function dictSect(env, g) {
   await run(env, "INSERT INTO dict_sects (religion, tradition, denomination, location, created_at) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT DO NOTHING", g.religion, g.tradition, g.denomination, g.location, Date.now());
   return (await one(env, "SELECT id FROM dict_sects WHERE religion = ?1 AND tradition = ?2 AND denomination = ?3 AND location = ?4", g.religion, g.tradition, g.denomination, g.location)).id;
+}
+// a name can't be an alternate of one term and a way of saying another: refuse if a different term already claims it
+async function dictAliasFree(env, name, termId) {
+  const taken = await one(env, "SELECT t.term FROM dict_aliases a JOIN dict_terms t ON t.id = a.term_id WHERE a.alias = ?1 AND a.term_id != ?2", name, termId);
+  if (taken) throw new HttpError(409, `“${name}” is already another way of saying “${taken.term}”.`);
 }
 async function dictTerm(env, term) {
   const now = Date.now();
@@ -808,7 +820,9 @@ async function adminDictAdd(c) {
   const b = c.body || {};
   const term = oneLine(b.term, "The term", DICT.term), group = cleanGroup(b.group);
   const definition = typeof b.definition === "string" ? text(b.definition, "The explanation", DICT.text, 0) : "";
-  const sectId = await dictSect(c.env, group), termId = await dictTerm(c.env, term);
+  const sectId = await dictSect(c.env, group);
+  const viaAlias = await one(c.env, "SELECT term_id FROM dict_aliases WHERE alias = ?1", term);   // an alternate wording of a term that's already here
+  const termId = viaAlias ? viaAlias.term_id : await dictTerm(c.env, term);
   const have = await one(c.env, "SELECT id FROM dict_entries WHERE term_id = ?1 AND sect_id = ?2", termId, sectId);
   if (have) return json({ id: have.id, existed: true });
   const now = Date.now();
@@ -837,6 +851,20 @@ async function adminDictSave(c) {
   if (term.toLowerCase() !== entry.term.toLowerCase()) {
     const clash = await one(c.env, "SELECT id FROM dict_terms WHERE term = ?1 AND id != ?2", term, entry.term_id);
     if (clash) throw new HttpError(409, `“${term}” is already a term of its own. Open it from the list to add this group there.`);
+    await dictAliasFree(c.env, term, entry.term_id);
+  }
+  // other ways of saying it: tidy, drop repeats and the term itself, and check none is already taken
+  const aliasList = Array.isArray(b.aliases) ? b.aliases : [];
+  if (aliasList.length > DICT.aliases) throw new HttpError(400, "That's too many alternate terms for one term.");
+  const seenAlias = new Set([term.toLowerCase()]), aliases = [];
+  for (const a of aliasList) {
+    const v = optLine(a, "An alternate term", DICT.term);
+    if (!v || seenAlias.has(v.toLowerCase())) continue;
+    seenAlias.add(v.toLowerCase());
+    const other = await one(c.env, "SELECT id FROM dict_terms WHERE term = ?1 AND id != ?2", v, entry.term_id);
+    if (other) throw new HttpError(409, `“${v}” is already a term of its own, so it can't be an alternate wording here.`);
+    await dictAliasFree(c.env, v, entry.term_id);
+    aliases.push(v);
   }
   const sectIds = [];
   for (const [group] of rows) sectIds.push(await dictSect(c.env, group));
@@ -844,6 +872,8 @@ async function adminDictSave(c) {
   await c.env.DB.batch([
     c.env.DB.prepare("UPDATE dict_terms SET term = ?1, updated_at = ?2 WHERE id = ?3").bind(term, now, entry.term_id),
     c.env.DB.prepare("UPDATE dict_entries SET definition = ?1, updated_at = ?2 WHERE id = ?3").bind(definition, now, id),
+    c.env.DB.prepare("DELETE FROM dict_aliases WHERE term_id = ?1").bind(entry.term_id),
+    ...aliases.map((v) => c.env.DB.prepare("INSERT INTO dict_aliases (term_id, alias) VALUES (?1, ?2)").bind(entry.term_id, v)),
     c.env.DB.prepare("DELETE FROM dict_translations WHERE entry_id = ?1").bind(id),
     ...rows.map(([, body], i) => c.env.DB.prepare("INSERT INTO dict_translations (entry_id, sect_id, body) VALUES (?1, ?2, ?3)").bind(id, sectIds[i], body)),
   ]);
@@ -858,6 +888,7 @@ async function adminDictDelete(c) {
   await c.env.DB.batch([
     c.env.DB.prepare("DELETE FROM dict_translations WHERE entry_id = ?1").bind(id),
     c.env.DB.prepare("DELETE FROM dict_entries WHERE id = ?1").bind(id),
+    c.env.DB.prepare("DELETE FROM dict_aliases WHERE term_id = ?1 AND NOT EXISTS (SELECT 1 FROM dict_entries WHERE term_id = ?1)").bind(entry.term_id),
     c.env.DB.prepare("DELETE FROM dict_terms WHERE id = ?1 AND NOT EXISTS (SELECT 1 FROM dict_entries WHERE term_id = ?1)").bind(entry.term_id),
   ]);
   return json({ ok: true });

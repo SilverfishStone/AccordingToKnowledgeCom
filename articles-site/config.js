@@ -27,11 +27,11 @@ const ATK = {
     "Every belief is somehow reasonable, or no one would believe it.",
     "A belief system that has existed for more than 50 years has heard every rebuttal or disproof you could imagine.",
     "Nobody thinks they are wrong, or they would change their mind.",
-    "Nobody lies about what they believe. Nobody lies about what they think you believe.",
-    "The few who knowingly lie about what they believe are grifters and shysters to begin with. They are a tiny minority.",
-    "What people claim to believe is always what they **want** to believe. When people lie to themselves subconciously, there is not intent or subterfuge behind it.",
+    "Nobody lies about what they believe. Nobody lies about what they think you believe. (The few who knowingly lie about what they believe are grifters and shysters to begin with. They are a tiny minority.) (What people claim to believe is always what they **want** to believe. When people lie to themselves subconsciously, there is no intent or subterfuge behind it.)",
     "People don't usually settle on the system that answers their questions best, they settle on the system that answers their questions first.",
     "Smart people are the people most likely to convert to another religion, because they are the most likely to question what they believe in to begin with.",
+    "People who look down on a belief tend to assume that it is more different from their own than it actually is.",
+    "People who care more about unity tend to assume that every belief is more similar to each other than they actually are.",
   ],
 
   /* CONTACT PAGE — every link. `label` is shown small above the link. */

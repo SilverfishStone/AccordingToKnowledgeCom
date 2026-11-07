@@ -578,3 +578,5 @@ button.item { width: 100%; border: 0; background: none; color: inherit; font: in
 .dict-group input { width: 100%; padding: 8px 10px; border: 1.5px solid var(--ink-soft); border-radius: 8px; background: rgba(255, 249, 228, .7); font: 400 16px var(--ui); color: var(--ink); box-sizing: border-box; }
 .dict-group input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 @media (max-width: 520px) { .dict-group { grid-template-columns: 1fr; } }
+.dict-also { margin: 2px 0 8px; font-size: 14px; font-weight: 600; color: var(--ink-soft); }
+.item .dict-also { display: block; }
