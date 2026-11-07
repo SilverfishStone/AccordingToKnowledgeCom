@@ -778,7 +778,8 @@ async function adminAsk(c) {
    Private for now: reading it needs the admin account unless the variable DICTIONARY_PUBLIC is "true".
    Writing is always the admin only.
    A "group" (table dict_sects) is who uses a term or whose terms an explanation is written in: a religion (blank means
-   Trinitarian Christian), a tradition, optionally an exact denomination, and optionally a location. */
+   Trinitarian Christian), a tradition, optionally an exact denomination, and optionally a location. A group with all four
+   left empty is "every Trinitarian Christian". */
 const DICT = { term: 120, part: 60, text: 4000, translations: 60, aliases: 30, groups: 60 };
 const GROUP_FIELDS = ["religion", "tradition", "denomination", "location"];
 const dictOpen = (c) => c.env.DICTIONARY_PUBLIC === "true" || (c.user && c.user.role === "admin");
@@ -790,11 +791,12 @@ function cleanGroup(g) {
   g = g && typeof g === "object" ? g : {};
   const out = {};
   for (const f of GROUP_FIELDS) out[f] = optLine(g[f], f[0].toUpperCase() + f.slice(1), DICT.part);
-  if (!out.religion && !out.tradition && !out.denomination) throw new HttpError(400, "Say the tradition or denomination (or the religion, if it isn't Christian).");
+  // a group with nothing in it means "every Trinitarian Christian", which has to be asked for on purpose (all: true)
+  if (!out.religion && !out.tradition && !out.denomination && g.all !== true) throw new HttpError(400, "Say the tradition or denomination (or the religion, if it isn't Christian).");
   return out;
 }
 const groupKey = (g) => GROUP_FIELDS.map((f) => g[f].toLowerCase()).join("|");
-const groupName = (g) => [g.religion, g.tradition, g.denomination].filter(Boolean).join(" › ") + (g.location ? ` (${g.location})` : "");
+const groupName = (g) => ([g.religion, g.tradition, g.denomination].filter(Boolean).join(" › ") || "all Trinitarian Christians") + (g.location ? ` (${g.location})` : "");
 // the groups a meaning belongs to: one to sixty, each tidied, repeats dropped
 function cleanGroupList(list) {
   if (!Array.isArray(list) || !list.length) throw new HttpError(400, "Say who uses it: add at least one tradition or denomination.");

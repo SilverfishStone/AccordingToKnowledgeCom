@@ -586,3 +586,6 @@ button.item { width: 100%; border: 0; background: none; color: inherit; font: in
 .dict-prow .link-btn { justify-self: end; }
 .dict-pexcept { display: grid; gap: 10px; }
 .dict-ppreview { margin: 0; font-weight: 600; }
+.dict-all { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 6px; font-size: 15px; font-weight: 600; }
+.dict-all input { margin-top: 5px; }
+.dict-allname { font-size: 16px; }

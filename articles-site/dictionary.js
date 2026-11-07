@@ -8,10 +8,11 @@
      term         "Salvation". Shared by every group that uses it.
      synonyms     other ways of saying a term ("On fire for the Lord" for "On fire for God"): searched, and shown under the term as "Also:"
      group        who uses it: a religion (blank = Trinitarian Christian), a tradition (Baptist, Pentecostal, Catholic),
-                  optionally the exact denomination (PCUSA, RCC) and a location. One of the first three is required.
+                  optionally the exact denomination (PCUSA, RCC) and a location. A group with nothing in it is
+                  "every Trinitarian Christian"; a religion on its own covers everyone in that religion.
      meaning      the understanding of a term shared by one or more groups, with its plain explanation ("entry" in the code).
-                  A group has at most one meaning of a term. The add and edit forms take several groups at once, or
-                  "all traditions except…" (worked out into the explicit list when saved, so the term shows who uses it)
+                  A group has at most one meaning of a term. The add and edit forms take several groups at once, and
+                  "all traditions except…" fills in the rows (so the term shows who uses it, not who was left out)
      translation  that meaning explained in another group's terms, so a reader can read it their own way
    A group written for a whole tradition ("Baptist") applies to every denomination inside it, and a reader who picks a more
    exact group sees the most exact meaning and explanation that fits them.
@@ -36,11 +37,12 @@
   const sameGroup = (a, b) => gkey(a) === gkey(b);
   const specificity = (g) => FIELDS.filter((f) => g[f]).length;
   // a group written for a whole tradition applies to everyone in it: every part it names must match the reader's
-  const applies = (g, reader) => !!reader && FIELDS.every((f) => !g[f] || same(g[f], reader[f]));
+  // (the religion has to match exactly: blank means Trinitarian Christian, not "any religion")
+  const applies = (g, reader) => !!reader && same(g.religion, reader.religion) && FIELDS.every((f) => f === "religion" || !g[f] || same(g[f], reader[f]));
   // "Religion › Tradition › Denomination (Location)"
-  const label = (g) => [g.religion, g.tradition, g.denomination].filter(Boolean).join(" › ") + (g.location ? ` (${g.location})` : "");
+  const label = (g) => ([g.religion, g.tradition, g.denomination].filter(Boolean).join(" › ") || "All Trinitarian Christians") + (g.location ? ` (${g.location})` : "");
   // the short name for a chip: the most exact part
-  const short = (g) => (g.denomination || g.tradition || g.religion) + (g.location ? ` (${g.location})` : "");
+  const short = (g) => (g.denomination || g.tradition || g.religion || "Trinitarian Christians") + (g.location ? ` (${g.location})` : "");
 
   const MINE_KEY = "atk_dict_me";
   const getMine = () => { try { const g = JSON.parse(localStorage.getItem(MINE_KEY)); return g ? tidy(g) : null; } catch { return null; } };
@@ -76,6 +78,7 @@
   // every group a reader can say they are: each one in the data, and the broader groups inside which they sit
   function readerOptions() {
     const map = new Map();
+    if (data.sects.some((s) => !s.religion)) map.set(gkey(blank()), blank());   // a Trinitarian Christian who hasn't said which tradition
     for (const s of data.sects) {
       const g = blank();
       for (const f of FIELDS) {
@@ -128,7 +131,7 @@
       <div class="dict-bar">
         <input type="search" id="dict-q" placeholder="Search terms and explanations" autocomplete="off" aria-label="Search the dictionary" />
         <label class="dict-me">I am
-          <select id="dict-me"><option value="">Not chosen</option>${options.map((g, i) => `<option value="${i}"${mine && sameGroup(g, mine) ? " selected" : ""}>${esc(label(g))}</option>`).join("")}</select></label>
+          <select id="dict-me"><option value="">Not chosen</option>${options.map((g, i) => `<option value="${i}"${mine && sameGroup(g, mine) ? " selected" : ""}>${esc(FIELDS.some((f) => g[f]) ? label(g) : "Trinitarian Christian (no tradition given)")}</option>`).join("")}</select></label>
       </div>
       ${admin ? `<p class="row dict-admin">${link("dictionary/add", "Add a term", "btn")} ${link("dictionary/groups", "Traditions &amp; denominations", "btn ghost")}</p>` : ""}
       <div id="dict-az" class="dict-az"></div>
@@ -242,23 +245,24 @@
   const NEED_GROUP = "Say the tradition or denomination (or the religion, if it isn't Christian).";
 
   /* ───────── who a meaning belongs to ─────────
-     Rows of groups (Baptist, Pentecostal, Methodist…), or "all traditions except…": every tradition the dictionary
-     already knows inside a religion, minus the ones listed. Either way what is saved is the explicit list. */
+     "Every Trinitarian Christian" (an empty group, which covers every tradition, now and later), and any number of rows:
+     a tradition (Baptist), an exact denomination, or a whole religion by itself (Latter-day Saints). "All traditions
+     except…" fills in a row for each tradition the dictionary knows now, minus the ones left out, and the rows can be
+     edited after. What is saved is the explicit list. */
   const prow = (g) => `<div class="dict-prow">${groupInputs(g, { small: true })}<button class="link-btn" type="button" data-pick="remove">Remove</button></div>`;
-  function pickerHtml(groups) {
+  function pickerHtml(rows, all) {
     return `<fieldset class="dict-fieldset dict-picker"><legend>Who says it</legend>
-      <p class="dict-modes">
-        <label><input type="radio" name="dict-mode" value="list" checked /> These groups</label>
-        <label><input type="radio" name="dict-mode" value="except" /> All traditions except…</label></p>
-      <div class="dict-plist">
-        <p class="meta">One row for each group that uses it this way. A tradition on its own (just “Baptist”) covers every denomination inside it.</p>
-        <div class="dict-prows">${(groups.length ? groups : [blank()]).map(prow).join("")}</div>
-        <p><button class="btn ghost small-btn" type="button" data-pick="add">+ Add another group</button></p>
-      </div>
+      <label class="dict-all"><input type="checkbox" data-pick-all${all ? " checked" : ""} /> <span>Every Trinitarian Christian <span class="meta">(all traditions, now and any added later)</span></span></label>
+      <p class="meta">Then add each other group that uses it this way. A tradition on its own (just “Baptist”) covers every denomination inside it, and a religion on its own (just “Latter-day Saints”) covers everyone in that religion.</p>
+      <div class="dict-prows">${(rows.length ? rows : [blank()]).map(prow).join("")}</div>
+      <p class="row"><button class="btn ghost small-btn" type="button" data-pick="add">+ Add another group</button>
+        <button class="btn ghost small-btn" type="button" data-pick="except-open">+ All traditions except…</button></p>
       <div class="dict-pexcept" hidden>
         <label>Within the religion <span class="meta">(blank = Trinitarian Christian)</span><input data-except="religion" list="${listId("religion")}" maxlength="60" autocomplete="off" /></label>
-        <label>Leave out these traditions <span class="meta">(one per line; the rest of the known traditions are included)</span><textarea data-except="out" rows="3" placeholder="Catholic&#10;Eastern Orthodox"></textarea></label>
+        <label>Leave out these traditions <span class="meta">(one per line)</span><textarea data-except="out" rows="3" placeholder="Catholic&#10;Eastern Orthodox"></textarea></label>
         <p class="meta dict-ppreview" aria-live="polite"></p>
+        <p class="row"><button class="btn small-btn" type="button" data-pick="except-apply">Add these as groups</button>
+          <button class="btn ghost small-btn" type="button" data-pick="except-close">Cancel</button></p>
       </div></fieldset>`;
   }
   const traditionPool = (religion) => {
@@ -276,41 +280,51 @@
       unknown: out.filter((x) => !pool.some((p) => p.toLowerCase() === x.toLowerCase())),
     };
   }
-  const pickerMode = (root) => root.querySelector("[name=dict-mode]:checked").value;
-  // { groups: the finished groups, rows: every row as typed, bad: a row has something in it but isn't a usable group }
+  // { groups: the finished groups to save, rows: every row as typed, all: the "every Trinitarian Christian" box, bad: a row has something in it but isn't a usable group }
   function readPicker(root) {
-    if (pickerMode(root) === "except") { const r = exceptResult(root); return { groups: r.groups, rows: r.groups, bad: false }; }
+    const all = root.querySelector("[data-pick-all]").checked;
     const rows = [...root.querySelectorAll(".dict-prow")].map(readGroup);
     const filled = rows.filter((g) => FIELDS.some((f) => g[f]));
-    const seen = new Set();
-    const groups = filled.filter((g) => groupOk(g) && !seen.has(gkey(g)) && seen.add(gkey(g)));
-    return { groups, rows, bad: filled.some((g) => !groupOk(g)) };
+    const seen = new Set(), groups = [];
+    const take = (g) => { const k = gkey(g); if (!seen.has(k)) { seen.add(k); groups.push(g); } };
+    if (all) take({ ...blank(), all: true });
+    for (const g of filled) if (groupOk(g)) take(g);
+    return { groups, rows, all, bad: filled.some((g) => !groupOk(g)) };
   }
   function bindPicker(root, onChange) {
-    const sync = () => {
-      const except = pickerMode(root) === "except";
-      root.querySelector(".dict-plist").hidden = except;
-      root.querySelector(".dict-pexcept").hidden = !except;
-      if (except) {
-        const r = exceptResult(root);
-        root.querySelector(".dict-ppreview").textContent = !r.pool.length ? "No traditions to choose from yet. Add some meanings first."
-          : !r.groups.length ? "That leaves out every tradition."
-          : `Applies to ${r.groups.length} tradition${r.groups.length === 1 ? "" : "s"}: ${r.groups.map((g) => g.tradition).join(", ")}.${r.unknown.length ? " Not a known tradition (ignored): " + r.unknown.join(", ") + "." : ""}`;
-      }
-      if (onChange) onChange();
+    const rowsEl = root.querySelector(".dict-prows"), panel = root.querySelector(".dict-pexcept");
+    const preview = () => {
+      const r = exceptResult(root);
+      root.querySelector(".dict-ppreview").textContent = !r.pool.length ? "No traditions to choose from yet. Add some meanings first."
+        : !r.groups.length ? "That leaves out every tradition."
+        : `Adds ${r.groups.length} group${r.groups.length === 1 ? "" : "s"}: ${r.groups.map((g) => g.tradition).join(", ")}. These are the traditions the dictionary knows now; for every tradition, including ones added later, tick “Every Trinitarian Christian” instead.${r.unknown.length ? " Not a known tradition (ignored): " + r.unknown.join(", ") + "." : ""}`;
+      return r;
     };
     root.addEventListener("click", (e) => {
       const b = e.target.closest("[data-pick]");
       if (!b) return;
-      const rows = root.querySelector(".dict-prows");
-      if (b.dataset.pick === "add") { rows.insertAdjacentHTML("beforeend", prow(blank())); rows.lastElementChild.querySelector("input")?.focus(); }
-      else if (rows.children.length > 1) b.closest(".dict-prow").remove();
-      else b.closest(".dict-prow").querySelectorAll("input").forEach((i) => { i.value = ""; });
-      sync();
+      const act = b.dataset.pick;
+      if (act === "add") { rowsEl.insertAdjacentHTML("beforeend", prow(blank())); rowsEl.lastElementChild.querySelector("input")?.focus(); }
+      else if (act === "remove") {
+        if (rowsEl.children.length > 1) b.closest(".dict-prow").remove();
+        else b.closest(".dict-prow").querySelectorAll("input").forEach((i) => { i.value = ""; });
+      } else if (act === "except-open") { panel.hidden = false; preview(); panel.querySelector("input").focus(); }
+      else if (act === "except-close") panel.hidden = true;
+      else if (act === "except-apply") {
+        const r = preview();
+        if (!r.groups.length) return;
+        const have = new Set(readPicker(root).rows.map(gkey));
+        [...rowsEl.querySelectorAll(".dict-prow")].filter((x) => !FIELDS.some((f) => readGroup(x)[f])).forEach((x) => x.remove());
+        for (const g of r.groups) if (!have.has(gkey(g))) rowsEl.insertAdjacentHTML("beforeend", prow(g));
+        panel.hidden = true;
+        panel.querySelectorAll("input, textarea").forEach((i) => { i.value = ""; });
+      }
+      if (onChange) onChange();
     });
-    root.addEventListener("input", sync);
-    root.addEventListener("change", sync);
-    sync();
+    const changed = () => { if (!panel.hidden) preview(); if (onChange) onChange(); };
+    root.addEventListener("input", changed);
+    root.addEventListener("change", changed);
+    if (onChange) onChange();
   }
 
   /* ───────── add a term ───────── */
@@ -323,7 +337,7 @@
       <p class="lead center">Type what you heard and who says it. If several groups use it the same way, add them all here. Terms, traditions and denominations that already exist are suggested as you type.</p>
       <form class="form dict-form" id="dict-add" autocomplete="off">
         <label>Term or phrase<input name="term" maxlength="120" required list="dl-terms" value="${esc(params.get("term") || "")}" placeholder="Salvation, washed in the blood, theosis…" /></label>
-        ${pickerHtml([blank()])}
+        ${pickerHtml([blank()], false)}
         <label>Explanation <span class="meta">(optional, in plain terms; you can add more later)</span><textarea name="definition" rows="5" maxlength="4000"></textarea></label>
         <p class="form-note" id="dict-hint"></p>
         <button class="btn" type="submit">Add it</button>
@@ -372,7 +386,8 @@
     dictionary.site.setTitle("Edit " + term.term, "");
     const who = entryFull(entry);
     let rows = entry.tr.map((t) => ({ group: { ...groupOf(t.sect) }, body: t.body }));
-    let picked = entryGroups(entry).map((g) => ({ ...g }));   // who uses this meaning, kept while the page is redrawn
+    // who uses this meaning, kept while the page is redrawn
+    let picked = { all: entryGroups(entry).some((g) => !FIELDS.some((f) => g[f])), rows: entryGroups(entry).filter((g) => FIELDS.some((f) => g[f])).map((g) => ({ ...g })) };
     const note = flash; flash = "";
     const draw = () => {
       box.innerHTML = `
@@ -382,7 +397,7 @@
         <form class="form dict-form" id="dict-edit">
           <label>Term <span class="meta">(renames it for every group)</span><input name="term" maxlength="120" required value="${esc(term.term)}" /></label>
           <label>Synonyms <span class="meta">(one per line, for every group; they're searchable and shown under the term as “Also”)</span><textarea name="aliases" rows="3" maxlength="3000" placeholder="One synonym per line…">${esc((term.aliases || []).join("\n"))}</textarea></label>
-          ${pickerHtml(picked)}
+          ${pickerHtml(picked.rows, picked.all)}
           <label>What they mean by it, in plain terms<textarea name="definition" rows="6" maxlength="4000">${esc(entry.definition)}</textarea></label>
           <h2 class="dict-sub">The same meaning, explained in another group's terms</h2>
           <p class="lead">Write it the way someone from that tradition or denomination would understand it. A tradition on its own (just “Baptist”) covers every Baptist denomination. They pick “Explained in” on the term's page to read it.</p>
@@ -402,7 +417,7 @@
     };
     const collect = () => {
       rows = [...box.querySelectorAll(".dict-row")].map((r) => ({ group: readGroup(r), body: r.querySelector("[data-f=body]").value }));
-      picked = readPicker($(".dict-picker", box)).rows;
+      { const r = readPicker($(".dict-picker", box)); picked = { all: r.all, rows: r.rows }; }
     };
     draw();
     box.onclick = async (e) => {
@@ -452,9 +467,9 @@
       <p class="lead center">Fix a spelling, add a location, or remove a group nothing uses. A change shows everywhere the group appears.</p>
       <div class="dict-sects">${data.sects.map((s) => { const u = uses(s); return `
         <div class="dict-sect-row" data-id="${s.id}">
-          ${groupInputs(s, { small: true })}
+          ${FIELDS.some((f) => s[f]) ? groupInputs(s, { small: true }) : `<b class="dict-allname">${esc(label(s))}</b>`}
           <span class="meta">${u.meanings} meaning${u.meanings === 1 ? "" : "s"} · ${u.explanations} explanation${u.explanations === 1 ? "" : "s"} written in its terms</span>
-          <span class="row"><button class="btn ghost small-btn" type="button" data-act="save">Save</button>
+          <span class="row">${FIELDS.some((f) => s[f]) ? `<button class="btn ghost small-btn" type="button" data-act="save">Save</button>` : ""}
           ${u.meanings + u.explanations ? "" : `<button class="btn danger small-btn" type="button" data-act="delete">Remove</button>`}</span>
           <span class="form-note"></span>
         </div>`; }).join("") || `<p class="note">None yet. They're added when you add a term.</p>`}</div>
