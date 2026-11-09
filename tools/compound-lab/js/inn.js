@@ -7,7 +7,7 @@ const MID = ["ba", "ca", "da", "fe", "ga", "la", "li", "ma", "mo", "na", "ne", "
 const INFIX = { F: "flu", Cl: "clo", Br: "bro", I: "io" };
 const STEM_BY_CORE = {
   imidazole: "azole", pyrazole: "azole", oxazole: "azole", thiazole: "azole", triazole: "conazole",
-  indole: "dole", benzimidazole: "mizole", quinoline: "quine", piperazine: "zine", piperidine: "pidine",
+  indole: "dole", xanthine: "phylline", benzimidazole: "mizole", quinoline: "quine", piperazine: "zine", piperidine: "pidine",
   morpholine: "moline", pyridine: "pyridine", pyrimidine: "rimidine", pyrazine: "pyrazine", pyridazine: "dazine",
   pyrrole: "role", furan: "furan", thiophene: "thiene", naphthalene: "naft", pyrrolidine: "rolidine", oxolane: "olane",
   cyclohexane: "hexane", cyclopentane: "pentane", benzene: "",

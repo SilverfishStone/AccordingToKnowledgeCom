@@ -80,9 +80,15 @@ export function formatDay(d) {
 }
 
 /* a chart: one bar per effect, the consequences as dots, and the collapse as a red line */
+export const timelineSpan = (tl) => Math.max(10, tl.collapse ? tl.collapse.day * 1.12 : 0, ...tl.events.map((e) => e.day * 1.05));
+// where a day falls on the chart (x in the chart's own units), and the chart's height
+export function timelineGeometry(tl, w = 320) {
+  const rowH = 17, top = 16, left = 8, right = 8, last = timelineSpan(tl);
+  return { last, top, h: top + (tl.items.length + 1) * rowH + 18, X: (d) => left + (Math.min(d, last) / last) * (w - left - right) };
+}
 export function timelineSvg(tl, w = 320) {
   const rowH = 17, top = 16, left = 8, right = 8;
-  const last = Math.max(10, tl.collapse ? tl.collapse.day * 1.12 : 0, ...tl.events.map((e) => e.day * 1.05));
+  const last = timelineSpan(tl);
   const step = [1, 2, 5, 10, 20, 50, 100].find((x) => last / x <= 7) || 200;
   const X = (d) => left + (Math.min(d, last) / last) * (w - left - right);
   const rows = tl.items.length + 1, h = top + rows * rowH + 18;

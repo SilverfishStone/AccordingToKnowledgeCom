@@ -22,21 +22,23 @@ const atomCount = (smi) => (smi.match(/\[[^\]]+\]|Br|Cl|[BCNOSPFIcnosp]/g) || []
    `map[i]` is the position of core atom i in the finished molecule's atom list. */
 export function assemble(core, placed) {
   const at = new Map();
-  for (const p of placed) { if (!at.has(p.atom)) at.set(p.atom, []); at.get(p.atom).push(p.sub); }
+  for (const p of placed) { if (!at.has(p.atom)) at.set(p.atom, []); at.get(p.atom).push(p); }
   let smi = "", n = 0, ring = 0;
-  const map = [];
+  const map = [], parts = [];   // parts: for each group, which atoms of the finished molecule it is made of
   core.tokens.forEach((tok, i) => {
     const subs = at.get(i) || [];
     smi += subs.length && core.alt && core.alt[i] ? core.alt[i] : tok;
     map[i] = n++;
-    for (const s of subs) {
+    for (const p of subs) {
+      const s = p.sub;
+      parts.push({ placed: p, attach: map[i], atoms: Array.from({ length: atomCount(s.smi) }, (_, k) => n + k) });
       // a group that is itself a ring closes it with its own number, so it can't clash with the core's
       const label = {};
       smi += `(${s.order === 2 ? "=" : ""}${s.smi.replace(/\d/g, (d) => (label[d] ??= "%" + (20 + ring++)))})`;
       n += atomCount(s.smi);
     }
   });
-  return { smiles: smi, map };
+  return { smiles: smi, map, parts };
 }
 
 const used = (placed, atom) => placed.reduce((t, p) => t + (p.atom === atom ? (p.sub.order || 1) : 0), 0);

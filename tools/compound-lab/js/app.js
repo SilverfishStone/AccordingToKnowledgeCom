@@ -11,6 +11,7 @@ import { profile } from "./chem.js";
 import { fitOf, fitLabel, featuresOf, featureMatch, blockedReason, hazard, topEffects, harmReport, antidoteTargets, antidoteTime } from "./predict.js";
 import { findCandidates, findVariants, findBlockers, buildPool, neutralisers, flushers, cureTimes } from "./search.js";
 import { buildTimeline, timelineSvg, formatDay, TONES, START_CHOICES, END_CHOICES } from "./timeline.js";
+import { openTour } from "./tour.js";
 import { ROUTES, ONSETS, BUILDS, DURATIONS, TIME_NOTES, DEFAULT_TIME, estimateTime, timeMatch, timeIsSet, formatMinutes, requestCurve, estimateCurve, curveSvg } from "./timecourse.js";
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -504,6 +505,10 @@ function bind() {
     if (!r) return;
     state.custom = null; state.coreId = r.d.core.id; state.placed = r.d.placed.map((p) => ({ atom: p.atom, sub: p.sub })); state.active = null;
     rebuild(); window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+  $("#tour-open").addEventListener("click", () => {
+    if (!info) return;
+    openTour({ info, coords, core: state.custom ? null : core(), placed: state.placed, custom: !!state.custom, effects: state.effects, time: state.time, rescue: state.rescue, name: state.custom ? null : nameCompound(core(), state.placed), formula: hillHtml(info.formula, info.charge) });
   });
   $("#more-names").addEventListener("click", () => { state.round++; renderResults(); });
   $("#style").addEventListener("change", (e) => viewer.setStyle(e.target.value));

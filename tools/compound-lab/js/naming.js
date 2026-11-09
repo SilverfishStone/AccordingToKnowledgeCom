@@ -79,7 +79,7 @@ export function nameCompound(core, placed) {
   // the ending group: the highest-ranking kind that is on a carbon
   let principal = null;
   for (const p of placed) {
-    if (!p.sub.suffix || core.atoms[p.atom] !== "C") continue;
+    if (core.noSuffix || !p.sub.suffix || core.atoms[p.atom] !== "C") continue;
     const rank = SUFFIX[p.sub.suffix].rank;
     if (!principal || rank < principal.rank) principal = { type: p.sub.suffix, rank, items: [] };
   }

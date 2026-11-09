@@ -64,6 +64,11 @@ export const CORES = [
     bonds: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8], [8, 9], [0, 9], [4, 9]],
     tokens: ["n1", "c", "c", "c", "c2", "c", "c", "c", "c", "c12"],
     labels: ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"], hs: [0, 1, 1, 1, 0, 1, 1, 1, 1, 0] },
+  { id: "xanthine", name: "Xanthine (caffeine core)", group: "Fused rings", parent: "xanthine", noSuffix: true,
+    atoms: ["O", "C", "NH", "C", "O", "C", "NH", "C", "N", "C", "NH"],
+    bonds: [[0, 1], [1, 2], [2, 3], [3, 4], [3, 5], [5, 6], [6, 7], [7, 8], [8, 9], [9, 5], [9, 10], [10, 1]],
+    tokens: ["O", "=c1", "[nH]", "c", "(=O)", "c2", "[nH]", "c", "n", "c2", "[nH]1"], alt: { 2: "n", 6: "n", 10: "n1" },
+    labels: ["O2", "2", "1", "6", "O6", "5", "7", "8", "9", "4", "3"], hs: [0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 1] },
   { id: "cyclohexane", name: "Cyclohexane", group: "Saturated rings", parent: "cyclohexane", homogeneous: true,
     atoms: ["C", "C", "C", "C", "C", "C"], bonds: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 0]],
     tokens: ["C1", "C", "C", "C", "C", "C1"], labels: ["1", "2", "3", "4", "5", "6"], hs: [2, 2, 2, 2, 2, 2] },
@@ -135,6 +140,14 @@ export const SUBS = [
   { id: "etoh", label: "CH₂CH₂OH", group: "Chains", prefix: "2-hydroxyethyl", smi: "CCO", paren: true, sortKey: "hydroxyethyl" },
   { id: "etnh2", label: "CH₂CH₂NH₂", group: "Chains", prefix: "2-aminoethyl", smi: "CCN", paren: true, sortKey: "aminoethyl" },
   { id: "prnh2", label: "CH₂CH(CH₃)NH₂", group: "Chains", prefix: "2-aminopropyl", smi: "CC(C)N", paren: true, sortKey: "aminopropyl" },
+
+  // side chains with the shapes real drug families share (anti-inflammatory acids, beta blockers, local anaesthetics, mood drugs)
+  { id: "ch2cooh", label: "CH₂COOH", group: "Side chains", prefix: "carboxymethyl", smi: "CC(=O)O", paren: true, tags: ["acid"] },
+  { id: "chmecooh", label: "CH(CH₃)COOH", group: "Side chains", prefix: "1-carboxyethyl", smi: "C(C)C(=O)O", paren: true, sortKey: "carboxyethyl", tags: ["acid"] },
+  { id: "nhcoch2net2", label: "NHC(O)CH₂NEt₂", group: "Side chains", prefix: "2-(diethylamino)acetamido", smi: "NC(=O)CN(CC)CC", paren: true, sortKey: "diethylaminoacetamido", tags: ["amide"] },
+  { id: "cooch2ch2net2", label: "COOCH₂CH₂NEt₂", group: "Side chains", prefix: "[2-(diethylamino)ethoxy]carbonyl", smi: "C(=O)OCCN(CC)CC", paren: true, sortKey: "diethylaminoethoxycarbonyl" },
+  { id: "opr3nme2", label: "O(CH₂)₃NMe₂", group: "Side chains", prefix: "3-(dimethylamino)propoxy", smi: "OCCCN(C)C", paren: true, sortKey: "dimethylaminopropoxy" },
+  { id: "obblocker", label: "OCH₂CH(OH)CH₂NH-iPr", group: "Side chains", prefix: "2-hydroxy-3-(propan-2-ylamino)propoxy", smi: "OCC(O)CNC(C)C", paren: true, sortKey: "hydroxypropanylaminopropoxy" },
 
   { id: "ph", label: "phenyl", group: "Rings as groups", prefix: "phenyl", smi: "c1ccccc1", tags: ["aryl"] },
   { id: "py3", label: "3-pyridyl", group: "Rings as groups", prefix: "pyridin-3-yl", smi: "c1cccnc1", paren: true, sortKey: "pyridin-3-yl", tags: ["aryl"] },
