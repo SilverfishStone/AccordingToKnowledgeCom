@@ -204,3 +204,70 @@ export function cureTimes(est, bind, flush) {
     flush: flush == null ? null : natural / (1 + 3 * flush) * (slow ? 1.5 : 1),
   };
 }
+
+/* ───────── tuning a compound ─────────
+   Start from the compound in the builder and change its groups a little (never its ring) to raise some effects while keeping
+   the others. Each chosen effect has a goal: "keep" (it must not fall), "raise" (the more it rises the better) or "drop"
+   (don't care). Groups marked locked stay. `maxChanges` counts a swap as one change. */
+export async function findVariants(base, spec, opts, onProgress, seed = 23) {
+  const rand = rng(seed + spec.effects.length * 7), res = spec.effects.map(resolve), maxChanges = opts.maxChanges || 2;
+  const keyOf = (p) => `${p.atom}:${p.sub.id}`;
+  const k0 = new Set(base.placed.map(keyOf)), locked = base.placed.filter((p) => p.locked).map(keyOf);
+  const diff = (d) => {
+    const k = new Set(d.placed.map(keyOf));
+    let added = 0, removed = 0;
+    for (const x of k) if (!k0.has(x)) added++;
+    for (const x of k0) if (!k.has(x)) removed++;
+    return Math.max(added, removed);
+  };
+  const baseSmiles = assemble(base.core, base.placed).smiles, baseProf = profile(baseSmiles);
+  const baseFits = res.map((e) => fitOf(e, baseProf).fit);
+  const goalIdx = (g) => spec.effects.map((x, i) => (spec.goals[x.id] === g ? i : -1)).filter((i) => i >= 0);
+  const raise = goalIdx("raise"), keep = goalIdx("keep");
+  const seen = new Map();
+
+  const evaluate = (d) => {
+    if (d.placed.length > 5) return null;
+    const keys = new Set(d.placed.map(keyOf));
+    if (locked.some((k) => !keys.has(k)) || diff(d) > maxChanges) return null;
+    const { smiles } = assemble(d.core, d.placed);
+    if (smiles === baseSmiles) return null;
+    if (seen.has(smiles)) return seen.get(smiles);
+    const prof = profile(smiles);
+    let r = null;
+    if (prof) {
+      const fits = res.map((e) => fitOf(e, prof).fit);
+      const gain = raise.length ? raise.reduce((t, i) => t + (fits[i] - baseFits[i]), 0) / raise.length : 0;
+      const keepFactor = keep.reduce((t, i) => t * Math.exp(-Math.max(0, baseFits[i] - fits[i] - 0.03) / 0.12), 1);
+      r = { d, smiles, prof, fits, gain, keepFactor, score: (gain + 0.02) * keepFactor };
+    }
+    seen.set(smiles, r);
+    return r;
+  };
+
+  const pool = [];
+  for (let i = 0; i < 450; i++) {
+    let d = base;
+    for (let k = 1 + Math.floor(rand() * maxChanges); k > 0; k--) d = mutate(d, rand);
+    const r = evaluate(d);
+    if (r) pool.push(r);
+    if (i % 40 === 0) { onProgress && onProgress(i / 600); await new Promise((res2) => setTimeout(res2, 0)); }
+  }
+  let top = pool.sort((a, b) => b.score - a.score).slice(0, 10);
+  for (let round = 0; round < 3; round++) {
+    const next = [];
+    for (const t of top) for (let k = 0; k < 8; k++) { const r = evaluate(mutate(t.d, rand)); if (r) next.push(r); }
+    top = [...new Map([...top, ...next].sort((a, b) => b.score - a.score).map((r) => [r.smiles, r])).values()].slice(0, 10);
+    onProgress && onProgress(0.75 + ((round + 1) / 3) * 0.25);
+    await new Promise((res2) => setTimeout(res2, 0));
+  }
+  const label = (p) => `${p.sub.prefix} at position ${base.core.labels[p.atom]}`;
+  return top.filter((r) => (raise.length ? r.gain > 0.01 : true)).slice(0, 6).map((r) => {
+    const keys = new Set(r.d.placed.map(keyOf));
+    return {
+      ...r, name: nameCompound(r.d.core, r.d.placed), baseFits,
+      added: r.d.placed.filter((p) => !k0.has(keyOf(p))).map(label),
+      removed: base.placed.filter((p) => !keys.has(keyOf(p))).map(label),
+    };
+  });
+}

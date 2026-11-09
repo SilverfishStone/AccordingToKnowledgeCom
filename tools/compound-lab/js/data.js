@@ -140,6 +140,8 @@ export const SUBS = [
   { id: "py3", label: "3-pyridyl", group: "Rings as groups", prefix: "pyridin-3-yl", smi: "c1cccnc1", paren: true, sortKey: "pyridin-3-yl", tags: ["aryl"] },
   { id: "py4", label: "4-pyridyl", group: "Rings as groups", prefix: "pyridin-4-yl", smi: "c1ccncc1", paren: true, sortKey: "pyridin-4-yl", tags: ["aryl"] },
   { id: "th2", label: "2-thienyl", group: "Rings as groups", prefix: "thiophen-2-yl", smi: "c1cccs1", paren: true, sortKey: "thiophen-2-yl", tags: ["aryl"] },
+  { id: "im1", label: "1-imidazolyl", group: "Rings as groups", prefix: "1H-imidazol-1-yl", smi: "n1ccnc1", paren: true, sortKey: "imidazol-1-yl", tags: ["aryl"] },
+  { id: "im4", label: "4-imidazolyl", group: "Rings as groups", prefix: "1H-imidazol-4-yl", smi: "c1c[nH]cn1", paren: true, sortKey: "imidazol-4-yl", tags: ["aryl"] },
   { id: "fu2", label: "2-furyl", group: "Rings as groups", prefix: "furan-2-yl", smi: "c1ccco1", paren: true, sortKey: "furan-2-yl", tags: ["aryl"] },
 ];
 

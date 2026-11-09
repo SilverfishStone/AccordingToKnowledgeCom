@@ -171,3 +171,15 @@ button, select, input { font: inherit; color: inherit; }
 .rescue select { padding: 2px 6px; border: 1px solid var(--line); border-radius: 6px; background: #151a22; }
 .collapse.averted { border-color: #2d6b4c; background: rgba(127, 227, 176, .08); }
 @media (max-width: 1000px) { .pairs { grid-template-columns: 1fr; } }
+
+/* locks and tuning */
+.chip-wrap { display: inline-flex; align-items: center; gap: 2px; }
+.lock { padding: 0 3px; border: 0; background: none; font-size: 12px; cursor: pointer; opacity: .6; }
+.lock[aria-pressed="true"], .lock:hover { opacity: 1; }
+.tune-goals { display: grid; gap: 4px; margin-bottom: 8px; }
+.goal { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
+.goal select { padding: 2px 6px; border: 1px solid var(--line); border-radius: 6px; background: #151a22; }
+.tune-out h4 { margin: 10px 0 4px; font-size: 14px; }
+.delta { font-size: 12px; font-weight: 600; color: var(--dim); }
+.delta.up { color: var(--ok); }
+.delta.down { color: var(--bad); }

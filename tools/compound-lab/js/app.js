@@ -9,21 +9,21 @@ import { createViewer } from "./viewer.js";
 import { EFFECTS, EFFECT_BY_ID, EFFECT_GROUPS, STATUS_NOTE, LEVELS, FEATURES, KIND_INFO, resolve } from "./effects.js";
 import { profile } from "./chem.js";
 import { fitOf, fitLabel, featuresOf, featureMatch, blockedReason, hazard, topEffects, harmReport, antidoteTargets, antidoteTime } from "./predict.js";
-import { findCandidates, findBlockers, buildPool, neutralisers, flushers, cureTimes } from "./search.js";
+import { findCandidates, findVariants, findBlockers, buildPool, neutralisers, flushers, cureTimes } from "./search.js";
 import { buildTimeline, timelineSvg, formatDay, TONES, START_CHOICES, END_CHOICES } from "./timeline.js";
 import { ROUTES, ONSETS, BUILDS, DURATIONS, TIME_NOTES, DEFAULT_TIME, estimateTime, timeMatch, timeIsSet, formatMinutes, requestCurve, estimateCurve, curveSvg } from "./timecourse.js";
 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
-const state = { coreId: "benzene", placed: [], active: null, round: 0, custom: null, hover: null, effects: [], features: { form: "any", colour: "any", solubility: "any" }, time: { ...DEFAULT_TIME }, view: "substance", rescue: null, cure: { neutralise: true, flush: true, block: false, reverse: true } };
+const state = { coreId: "benzene", placed: [], active: null, round: 0, custom: null, hover: null, effects: [], features: { form: "any", colour: "any", solubility: "any" }, time: { ...DEFAULT_TIME }, view: "substance", rescue: null, cure: { neutralise: true, flush: true, block: false, reverse: true }, goals: {} };
 let info = null, coords = null, viewer = null, current = null;
 
 /* ───────── the address keeps the design, so it can be shared ───────── */
 // which cure types are switched on, as letters (neutralise, flush, block, reverse)
 const cureCode = () => [["neutralise", "n"], ["flush", "f"], ["block", "b"], ["reverse", "r"]].filter(([k]) => state.cure[k]).map(([, c]) => c).join("");
 function saveHash() {
-  const g = state.placed.map((p) => `${p.atom}:${p.sub.id}`).join(",");
+  const g = state.placed.map((p) => `${p.atom}:${p.sub.id}${p.locked ? "!" : ""}`).join(",");
   const e = state.effects.map((x) => `${x.id}:${x.level}:${x.mode || ""}${(x.onset && x.onset !== "inherit") || (x.duration && x.duration !== "inherit") ? ":" + (x.onset || "inherit") + ":" + (x.duration || "inherit") : ""}`).join(","), f = Object.values(state.features).join("."), t = [state.time.route, state.time.onset, state.time.build, state.time.duration].join(".");
   const h = (state.custom ? "#smiles=" + encodeURIComponent(state.custom) : `#core=${state.coreId}${g ? "&g=" + g : ""}`) + (e ? "&e=" + e : "") + (f !== "any.any.any" ? "&f=" + f : "") + (t !== "oral.any.any.any" ? "&t=" + t : "") + (state.view !== "substance" ? "&v=" + state.view : "") + (state.rescue != null ? "&r=" + state.rescue : "") + (cureCode() !== "nfr" ? "&c=" + (cureCode() || "-") : "");
   try { history.replaceState(null, "", h); } catch { /* embedded */ }
@@ -52,8 +52,8 @@ function loadHash() {
     state.coreId = p.get("core");
     const core = CORE_BY_ID[state.coreId];
     for (const part of (p.get("g") || "").split(",").filter(Boolean)) {
-      const [a, id] = part.split(":"), atom = Number(a), sub = SUB_BY_ID[id];
-      if (sub && Number.isInteger(atom) && core.hs[atom] != null && canAttach(core, state.placed, atom, sub).ok) state.placed.push({ atom, sub });
+      const [a, raw] = part.split(":"), atom = Number(a), id = (raw || "").replace("!", ""), sub = SUB_BY_ID[id];
+      if (sub && Number.isInteger(atom) && core.hs[atom] != null && canAttach(core, state.placed, atom, sub).ok) state.placed.push({ atom, sub, locked: (raw || "").endsWith("!") });
     }
   }
 }
@@ -79,7 +79,7 @@ function renderPositions() {
     if (c.hs[i] === 0) return `<div class="pos blank" data-atom="${i}" title="No hydrogen here to replace."><span class="pos-name">${esc(label)}</span><span class="pos-note">no free site</span></div>`;
     return `<div class="pos${state.active === i ? " active" : ""}" data-atom="${i}">
       <span class="pos-name">${esc(label)}</span>
-      <span class="chips">${here.map((p) => `<button type="button" class="chip" data-remove="${p.idx}" title="Remove ${esc(p.sub.prefix)}">${esc(p.sub.label)} ×</button>`).join("")}</span>
+      <span class="chips">${here.map((p) => `<span class="chip-wrap"><button type="button" class="chip" data-remove="${p.idx}" title="Remove ${esc(p.sub.prefix)}">${esc(p.sub.label)} ×</button><button type="button" class="lock" data-lock="${p.idx}" aria-pressed="${!!p.locked}" title="${p.locked ? "Locked: tuning keeps this group" : "Lock this group so tuning keeps it"}">${p.locked ? "🔒" : "🔓"}</button></span>`).join("")}</span>
       <button type="button" class="add" data-add="${i}" ${free > 0 ? "" : "disabled"} title="${free > 0 ? "Add a group here" : "This atom is full."}">${free > 0 ? "+ add" : "full"}</button>
     </div>`;
   }).join("");
@@ -181,6 +181,7 @@ function renderDesign() {
 
   $("#features").innerHTML = Object.entries(FEATURES).map(([k, f]) => `<label>${esc(f.label)} <select data-feature="${k}">${f.options.map(([v, t]) => `<option value="${v}"${state.features[k] === v ? " selected" : ""}>${esc(t)}</option>`).join("")}</select></label>`).join("");
 
+  renderTuneGoals();
   $("#time").innerHTML = [["route", "Taken", ROUTES], ["onset", "Starts", ONSETS], ["build", "Builds as", BUILDS], ["duration", "Lasts", DURATIONS]]
     .map(([k, label, opts]) => `<label>${esc(label)} <select data-time="${k}">${opts.map((o) => `<option value="${o.id}"${state.time[k] === o.id ? " selected" : ""}>${esc(o.label)}</option>`).join("")}</select></label>`).join("");
   const req = requestCurve(state.time);
@@ -202,6 +203,46 @@ function renderTimeline() {
     ${tl.events.length ? `<ul class="events">${tl.events.map((ev) => `<li><i class="dot" style="background:${TONES[ev.tone] || "#ccc"}"></i><b>${esc(formatDay(ev.day))}</b> ${esc(ev.text)} <span class="why">${esc(ev.source)}</span></li>`).join("")}</ul>` : `<p class="hint">Nothing here goes wrong over time.</p>`}
     ${tl.collapse ? `<p class="collapse${tl.collapse.averted ? " averted" : ""}"><b>${esc(formatDay(tl.collapse.day))}:</b> ${esc(tl.collapse.text)}${tl.collapse.notes.length ? ` (${esc(tl.collapse.notes.join("; "))})` : ""}. Caused by: ${esc(tl.collapse.causes.join(", "))}.${tl.collapse.averted ? " <b>The cure comes in time: the collapse is averted.</b>" : ""}</p>` : ""}
     <p class="hint">Days are rough rule-of-thumb figures. Each effect can start and end on its own schedule (set it under the effect).</p>`;
+}
+
+/* ───────── tuning ───────── */
+const GOALS = [["keep", "Keep"], ["raise", "Raise"], ["drop", "Allow to drop"]];
+// effects the compound already suits stay as they are; ones it suits poorly (new features) are raised, unless chosen otherwise
+const goalFor = (x, prof) => state.goals[x.id] || (prof && fitOf(resolve(x), prof).fit < 0.55 ? "raise" : "keep");
+function renderTuneGoals() {
+  const host = $("#tune-goals");
+  if (!state.effects.length) { host.innerHTML = `<p class="hint">Choose effects above first.</p>`; return; }
+  const prof = info && !state.custom ? profile(info.smiles) : null;
+  host.innerHTML = state.effects.map((x) => {
+    const e = resolve(x), g = goalFor(x, prof), fit = prof ? fitOf(e, prof).fit : null;
+    return `<label class="goal"><span>${esc(effectTitle(e))}${fit != null ? ` <span class="fit-label">${pct(fit)} now</span>` : ""}</span>
+      <select data-goal="${x.id}">${GOALS.map(([v, t]) => `<option value="${v}"${g === v ? " selected" : ""}>${t}</option>`).join("")}</select></label>`;
+  }).join("");
+}
+
+let tuning = false;
+async function runTune() {
+  const out = $("#tune-out"), prog = $("#progress"), btn = $("#tune");
+  if (tuning || finding) return;
+  if (state.custom) { out.innerHTML = `<p class="hint">Tuning works on ring-and-group designs. Open one in the builder first.</p>`; return; }
+  if (!state.effects.length) { out.innerHTML = `<p class="hint">Choose at least one effect first.</p>`; return; }
+  const prof = profile(info.smiles);
+  const goals = Object.fromEntries(state.effects.map((x) => [x.id, goalFor(x, prof)]));
+  tuning = true; btn.disabled = true; prog.hidden = false; out.innerHTML = "";
+  try {
+    const results = await findVariants({ core: core(), placed: state.placed }, { effects: state.effects, goals }, { maxChanges: Number($("#tune-change").value) }, (f) => { prog.firstElementChild.style.width = pct(Math.min(1, f)); });
+    out._results = results;
+    const raised = state.effects.filter((x) => goals[x.id] === "raise");
+    out.innerHTML = results.length ? `<h4>Tuned versions</h4><div class="cand-grid">${results.map((r, i) => `
+      <article class="cand">
+        <h4>${esc(r.name)}</h4>
+        <p class="score">${raised.length ? `raises ${raised.map((x) => esc(effectTitle(resolve(x)))).join(", ")} by ${pct(r.gain)} on average` : "keeps everything close"}</p>
+        <p class="meta">${[...r.added.map((a) => "+ " + a), ...r.removed.map((a) => "− " + a)].map(esc).join("<br>")}</p>
+        <ul class="fits">${state.effects.map((x, k) => { const d = r.fits[k] - r.baseFits[k]; return `<li>${esc(effectTitle(resolve(x)))} <span class="fit-label">${pct(r.baseFits[k])} → ${pct(r.fits[k])}</span> <span class="delta ${d > 0.02 ? "up" : d < -0.02 ? "down" : ""}">${d > 0.005 ? "+" : ""}${Math.round(d * 100)}%</span></li>`; }).join("")}</ul>
+        <p class="meta"><code>${esc(r.prof.canonical)}</code></p>
+        <button type="button" class="open" data-tune-open="${i}">Open in the builder</button>
+      </article>`).join("")}</div>` : `<p class="hint">No small change raises those effects without dropping the ones to keep. Try allowing a larger change, letting some effects drop, or unlocking a group.</p>`;
+  } finally { tuning = false; btn.disabled = false; prog.hidden = true; }
 }
 
 function renderProfile() {
@@ -359,8 +400,9 @@ function bind() {
     rebuild();
   });
   $("#positions").addEventListener("click", (e) => {
-    const rm = e.target.closest("[data-remove]"), add = e.target.closest("[data-add]");
-    if (rm) { state.placed.splice(Number(rm.dataset.remove), 1); rebuild(); }
+    const rm = e.target.closest("[data-remove]"), add = e.target.closest("[data-add]"), lk = e.target.closest("[data-lock]");
+    if (lk) { const q = state.placed[Number(lk.dataset.lock)]; q.locked = !q.locked; renderPositions(); saveHash(); }
+    else if (rm) { state.placed.splice(Number(rm.dataset.remove), 1); rebuild(); }
     else if (add) { state.active = state.active === Number(add.dataset.add) ? null : Number(add.dataset.add); renderPositions(); renderPalette(); if (state.active != null) $("#palette").scrollIntoView({ block: "nearest", behavior: "smooth" }); }
   });
   $("#positions").addEventListener("pointerover", (e) => {
@@ -426,6 +468,17 @@ function bind() {
   $("#timeline").addEventListener("change", (e) => {
     const sel = e.target.closest("[data-rescue]");
     if (sel) { state.rescue = sel.value ? Number(sel.value) : null; renderTimeline(); saveHash(); }
+  });
+  $("#tune-goals").addEventListener("change", (e) => {
+    const sel = e.target.closest("[data-goal]");
+    if (sel) state.goals[sel.dataset.goal] = sel.value;
+  });
+  $("#tune").addEventListener("click", () => runTune());
+  $("#tune-out").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-tune-open]"), r = b && $("#tune-out")._results[Number(b.dataset.tuneOpen)];
+    if (!r) return;
+    state.placed = r.d.placed.map((p) => ({ atom: p.atom, sub: p.sub, locked: !!p.locked })); state.active = null;
+    rebuild(); window.scrollTo({ top: 0, behavior: "smooth" });
   });
   $("#features").addEventListener("change", (e) => {
     const sel = e.target.closest("[data-feature]");
