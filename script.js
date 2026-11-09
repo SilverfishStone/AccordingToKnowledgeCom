@@ -7,6 +7,7 @@
     compass: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',
     rocket:  '<path d="M12 3c3.2 2.2 5 5.4 5 9.2l-2.2 3.3H9.2L7 12.2C7 8.4 8.800 5.200 12 3z"/><circle cx="12" cy="10" r="1.6"/><path d="M9 15.500l-2.500 3.500 3.200-.8M15 15.500l2.500 3.500-3.200-.8M12 17.500v3"/>',
     tool:    '<path d="M14.7 6.3a4 4 0 0 0-5 5L3 18l3 3 6.7-6.7a4 4 0 0 0 5-5l-2.4 2.4-2.6-.6-.6-2.6z"/>',
+    flask:   '<path d="M9 3h6M10 3v6L4.800 18a2 2 0 0 0 1.800 3h10.800a2 2 0 0 0 1.800-3L14 9V3"/><path d="M7.500 14h9"/>',
     ext:     '<path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
   };
   const svg = (name) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ICONS.tool}</svg>`;

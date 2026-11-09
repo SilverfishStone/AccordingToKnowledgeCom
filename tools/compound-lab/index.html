@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Compound Lab</title>
+  <meta name="description" content="Build a theoretical compound from rings and groups and see its formula, name and 3D model." />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    } }
+  </script>
+</head>
+<body>
+  <header class="top">
+    <h1>Compound Lab</h1>
+    <p>Build a theoretical compound. Choices that break the rules of chemistry are greyed out. For fiction and worldbuilding: the geometry is approximate and nothing here says a substance would exist, work or be safe.</p>
+  </header>
+  <p id="status" class="status">Loading the chemistry library…</p>
+
+  <main class="lab">
+    <section class="panel build" aria-label="Build">
+      <h2>1. Choose a ring</h2>
+      <div id="cores"></div>
+
+      <h2>2. Add groups</h2>
+      <p class="hint">Pick a position, then a group. Positions with nothing to replace are shown but can't be used.</p>
+      <div id="positions" class="positions"></div>
+      <div id="palette" class="palette" hidden>
+        <div class="palette-head"><h3 id="palette-title"></h3><button type="button" id="palette-close" class="link">Close</button></div>
+        <div id="palette-groups"></div>
+      </div>
+      <p><button type="button" id="clear" class="link">Start over</button></p>
+
+      <details class="adv">
+        <summary>Advanced: open a structure from SMILES</summary>
+        <form id="smiles-form">
+          <label class="visually-hidden" for="smiles-in">SMILES</label>
+          <input id="smiles-in" placeholder="e.g. CC(=O)Nc1ccc(O)cc1" autocomplete="off" spellcheck="false" />
+          <button type="submit">Open</button>
+        </form>
+        <p id="smiles-note" role="status"></p>
+        <p class="hint">Any structure that passes the bonding rules works here. Systematic names are only made for ring-and-group designs.</p>
+      </details>
+      <p id="custom-note" class="custom-note" hidden>Showing a structure from SMILES. <button type="button" id="back-to-builder" class="link">Back to the builder</button></p>
+    </section>
+
+    <section class="panel model" aria-label="Model">
+      <div class="toolbar">
+        <label>Style <select id="style"><option value="ballstick">Ball and stick</option><option value="sticks">Sticks</option><option value="spacefill">Space-filling</option></select></label>
+        <label class="check"><input type="checkbox" id="hydrogens" checked /> Hydrogens</label>
+        <label class="check"><input type="checkbox" id="spin" /> Spin</label>
+        <button type="button" id="reset" class="link">Reset view</button>
+        <button type="button" id="png" class="link">Save picture</button>
+      </div>
+      <div id="viewer" class="viewer"><div id="tip" class="tip" hidden></div></div>
+      <p class="hint">Drag to turn, scroll to zoom, right-drag to move. Hover an atom to name it.</p>
+      <div id="flat" class="flat" aria-label="Flat structure diagram"></div>
+    </section>
+
+    <section class="panel results" aria-label="Results">
+      <div id="results">
+        <h2>Formula</h2>
+        <p id="formula" class="formula"></p>
+        <h2>Chemical name</h2>
+        <p id="name" class="name"></p>
+        <h2>Pharmaceutical-style names</h2>
+        <ul id="inn" class="inn"></ul>
+        <p class="hint">Invented, in the style of generic drug names. Not checked against registered names or trade marks. <button type="button" id="more-names" class="link">Suggest others</button></p>
+        <div id="warnings" class="warnings"></div>
+        <h2>Properties</h2>
+        <dl id="facts" class="facts"></dl>
+        <h2>Likely effects (rough)</h2>
+        <div id="profile" class="profile"></div>
+        <h2>Structure</h2>
+        <p class="smiles"><code id="smiles"></code></p>
+        <p class="actions">
+          <button type="button" id="copy-smiles" class="link">Copy SMILES</button>
+          <button type="button" id="dl-mol" class="link">Download .mol</button>
+          <button type="button" id="dl-xyz" class="link">Download .xyz</button>
+          <button type="button" id="copy-link" class="link">Copy link</button>
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <section class="panel design" id="design" aria-label="Design by effects and features">
+    <h2>Design by effects and features</h2>
+    <p class="hint">Choose what the substance should do. Each effect is tied to a mechanism in the body, and choices that can't be combined are greyed out with the reason. Results are theoretical: structures are rated on how well their size, polarity and groups suit the mechanism, and each effect says whether the mechanism is established, plausible or only a hypothesis. Nothing here says a substance would work, be safe, or be makeable.</p>
+    <div class="design-grid">
+      <div id="effects-pick"></div>
+      <div>
+        <h3>Chosen effects</h3>
+        <div id="effects-chosen" class="chosen"></div>
+        <div id="hazard" class="hazard" hidden></div>
+        <h3>Features</h3>
+        <div id="features" class="features"></div>
+        <h3>Time course</h3>
+        <div id="time" class="features"></div>
+        <div id="time-chart" class="time-chart"></div>
+        <p id="time-note" class="hint"></p>
+        <h3>Timeline</h3>
+        <div id="timeline" class="timeline"></div>
+        <fieldset class="views" id="views"><legend>Show</legend>
+          <label><input type="radio" name="view" value="substance" /> The substance</label>
+          <label><input type="radio" name="view" value="antidote" /> Its antidote instead</label>
+          <label><input type="radio" name="view" value="both" /> Both, side by side</label>
+        </fieldset>
+        <fieldset class="views" id="cure-how"><legend>How the cure works</legend>
+          <label><input type="checkbox" name="cure" value="neutralise" /> Neutralise it (bind or react with it)</label>
+          <label><input type="checkbox" name="cure" value="flush" /> Flush it out (clear it faster)</label>
+          <label><input type="checkbox" name="cure" value="block" /> Block it (sit where it sits, so it can't act)</label>
+          <label><input type="checkbox" name="cure" value="reverse" /> Reverse the effects (opposite effects and repair)</label>
+        </fieldset>
+        <p class="actions"><button type="button" id="find" class="primary">Find compounds</button> <button type="button" id="clear-effects" class="link">Clear choices</button></p>
+        <div id="progress" class="progress" hidden><div></div></div>
+        <p class="hint">Structures of controlled or dangerous drug families are rated and suggested like any other, with how that family acts and its risks shown.</p>
+      </div>
+    </div>
+    <div id="candidates" class="candidates"></div>
+  </section>
+
+  <footer class="foot">The 3D shape is a geometric relaxation, not a quantum calculation. Names of the drug-style kind are made up. Effects are rated from mechanism-level reasoning, not from tests: treat everything as fiction.</footer>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

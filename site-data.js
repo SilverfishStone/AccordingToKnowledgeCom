@@ -36,6 +36,15 @@ const SITE = {
       icon: "rocket",
       embed: true,
     },
+    {
+      id: "compound-lab",
+      title: "Compound Lab",
+      desc: "Build theoretical compounds from rings and groups. Impossible bonds are blocked; see the formula, name and a 3D model.",
+      url: "tools/compound-lab/index.html",
+      icon: "flask",
+      embed: true,
+      wip: true,
+    },
     // Copy a block above to add another tool.
   ],
 

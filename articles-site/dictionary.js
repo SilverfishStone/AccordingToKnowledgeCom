@@ -41,8 +41,15 @@
   const applies = (g, reader) => !!reader && same(g.religion, reader.religion) && FIELDS.every((f) => f === "religion" || !g[f] || same(g[f], reader[f]));
   // "Religion › Tradition › Denomination (Location)"
   const label = (g) => ([g.religion, g.tradition, g.denomination].filter(Boolean).join(" › ") || "All Trinitarian Christians") + (g.location ? ` (${g.location})` : "");
-  // the short name for a chip: the most exact part
-  const short = (g) => (g.denomination || g.tradition || g.religion || "Trinitarian Christians") + (g.location ? ` (${g.location})` : "");
+  // the short name for a chip or the list: the most exact part ("Christianity" for the group with nothing in it); the forms spell it out
+  const shortName = (g, none) => (g.denomination || g.tradition || g.religion || none) + (g.location ? ` (${g.location})` : "");
+  const short = (g) => shortName(g, "Christianity");
+  const shortFull = (g) => shortName(g, "Trinitarian Christians");
+
+  const SORT_KEY = "atk_dict_sort";
+  const SORTS = { alpha: "Alphabetical", religion: "Religion", tradition: "Tradition", denomination: "Denomination", location: "Location" };
+  const getSort = () => { try { const v = localStorage.getItem(SORT_KEY); return SORTS[v] ? v : "alpha"; } catch { return "alpha"; } };
+  const setSort = (v) => { try { localStorage.setItem(SORT_KEY, v); } catch { /* private mode */ } };
 
   const MINE_KEY = "atk_dict_me";
   const getMine = () => { try { const g = JSON.parse(localStorage.getItem(MINE_KEY)); return g ? tidy(g) : null; } catch { return null; } };
@@ -132,19 +139,23 @@
         <input type="search" id="dict-q" placeholder="Search terms and explanations" autocomplete="off" aria-label="Search the dictionary" />
         <label class="dict-me">I am
           <select id="dict-me"><option value="">Not chosen</option>${options.map((g, i) => `<option value="${i}"${mine && sameGroup(g, mine) ? " selected" : ""}>${esc(FIELDS.some((f) => g[f]) ? label(g) : "Trinitarian Christian (no tradition given)")}</option>`).join("")}</select></label>
+        <label class="dict-me">Sort by
+          <select id="dict-sort">${Object.entries(SORTS).map(([k, v]) => `<option value="${k}"${k === getSort() ? " selected" : ""}>${v}</option>`).join("")}</select></label>
       </div>
       ${admin ? `<p class="row dict-admin">${link("dictionary/add", "Add a term", "btn")} ${link("dictionary/groups", "Traditions &amp; denominations", "btn ghost")}</p>` : ""}
       <div id="dict-az" class="dict-az"></div>
       <div id="dict-list"></div>`;
-    const q = $("#dict-q", box), me = $("#dict-me", box);
+    const q = $("#dict-q", box), me = $("#dict-me", box), sort = $("#dict-sort", box);
     const reader = () => (me.value === "" ? null : options[Number(me.value)]);
-    const draw = () => drawList(q.value, reader());
+    const draw = () => drawList(q.value, reader(), sort.value);
     q.addEventListener("input", draw);
+    sort.addEventListener("change", () => { setSort(sort.value); draw(); });
     me.addEventListener("change", () => { setMine(reader()); draw(); });
     draw();
   }
 
-  function drawList(query, reader) {
+  // `sort`: "alpha", or the part of a group to arrange the terms under (a term used by several groups appears under each)
+  function drawList(query, reader, sort) {
     const list = $("#dict-list", box), az = $("#dict-az", box);
     const words = fold(query).split(/\s+/).filter(Boolean);
     let terms = data.terms;
@@ -169,7 +180,23 @@
         <span class="meta">${groups.length ? esc(groups.join(" · ")) : "Nobody uses it yet"}</span>${t.aliases && t.aliases.length ? `<span class="meta dict-also">Also: ${esc(t.aliases.join(" · "))}</span>` : ""}${snip ? `<p>${esc(snip)}</p>` : ""}</a>`;
     };
 
-    if (words.length) { az.innerHTML = ""; list.innerHTML = `<div class="article-list">${terms.map(row).join("")}</div>`; return; }
+    if (words.length) { az.innerHTML = ""; list.innerHTML = `<div class="article-list">${terms.map(row).join("")}</div>`; return; }   // a search is ranked, not sorted
+    if (sort && sort !== "alpha") {
+      const part = {
+        religion: (g) => g.religion || "Christianity", tradition: (g) => g.tradition || "No tradition given",
+        denomination: (g) => g.denomination || "No denomination given", location: (g) => g.location || "No location given",
+      }[sort];
+      const sections = new Map();
+      for (const t of terms) for (const name of new Set(t.entries.flatMap((e) => entryGroups(e).map(part)))) {
+        if (!sections.has(name)) sections.set(name, []);
+        sections.get(name).push(t);
+      }
+      const names = [...sections.keys()].sort((a, b) => /^No /.test(a) - /^No /.test(b) || a.localeCompare(b));
+      az.innerHTML = names.map((n, i) => `<a href="#dict-s${i}" data-jump>${esc(n)}</a>`).join("");
+      az.onclick = (e) => { const a = e.target.closest("[data-jump]"); if (!a) return; e.preventDefault(); $(a.getAttribute("href"), box)?.scrollIntoView({ block: "start" }); };
+      list.innerHTML = names.map((n, i) => `<h2 class="dict-letter" id="dict-s${i}">${esc(n)}</h2><div class="article-list">${sections.get(n).sort((a, b) => a.term.localeCompare(b.term)).map(row).join("")}</div>`).join("");
+      return;
+    }
     const groups = new Map();
     const place = (name, html) => {
       const ch = fold(name).replace(/[^a-z0-9]/g, "").charAt(0).toUpperCase();
@@ -344,14 +371,14 @@
       </form>
       <datalist id="dl-terms">${data.terms.flatMap((t) => [t.term, ...(t.aliases || [])]).map((n) => `<option value="${esc(n)}"></option>`).join("")}</datalist>${groupDatalists()}`;
     const f = $("#dict-add", box), hint = $("#dict-hint", box), submit = f.querySelector("button[type=submit]"), picker = $(".dict-picker", f);
-    const names = (groups) => groups.map(short).join(", ");
+    const names = (groups) => groups.map(shortFull).join(", ");
     const check = () => {
       const t = termByName(f.term.value), { groups } = readPicker(picker);
       const hits = t ? groups.filter((g) => entryOf(t, g)) : [];
       submit.textContent = hits.length ? "Open it to edit" : "Add it";
       const via = t && !same(t.term, f.term.value) ? `“${esc(f.term.value.trim())}” is a synonym of <b>${esc(t.term)}</b>. ` : "";
       if (hits.length) hint.innerHTML = `${via}<b>${esc(t.term)}</b> already has a meaning for ${esc(names(hits))}. It will open to edit instead of adding a copy; nothing is changed.`;
-      else if (t && t.entries.length) hint.innerHTML = `${via || `<b>${esc(t.term)}</b> is already a term. `}It's used by ${esc([...new Set(t.entries.flatMap((e) => entryGroups(e).map(short)))].join(", "))}. This adds ${groups.length ? esc(names(groups)) + "'s" : "another meaning"} to it.`;
+      else if (t && t.entries.length) hint.innerHTML = `${via || `<b>${esc(t.term)}</b> is already a term. `}It's used by ${esc([...new Set(t.entries.flatMap((e) => entryGroups(e).map(shortFull)))].join(", "))}. This adds ${groups.length ? esc(names(groups)) + "'s" : "another meaning"} to it.`;
       else hint.textContent = "";
       hint.className = "form-note" + (hint.textContent ? " ok" : "");
     };
