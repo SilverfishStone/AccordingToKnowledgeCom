@@ -45,6 +45,15 @@ const SITE = {
       embed: true,
       wip: true,
     },
+    {
+      id: "procrastination",
+      title: "Procrastination",
+      desc: "A card game about billable hours. Play, sabotage and out-log three AI coworkers before closing time. Saves stay in your browser.",
+      url: "tools/procrastination/index.html",
+      icon: "cards",
+      embed: true,
+      wip: true,
+    },
     // Copy a block above to add another tool.
   ],
 
