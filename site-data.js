@@ -45,6 +45,14 @@ const SITE = {
       embed: true,
       wip: true,
     },
+    {
+      id: "animator",
+      title: "Animator",
+      desc: "Draw in layers and animate them with keyframes. Templates for snakes, ropes, bouncing balls and hyperspace; turn a photo of a drawing into a pencil layer; export MP4 or GIF. Saves in your browser.",
+      url: "tools/animator/index.html",
+      icon: "brush",
+      embed: true,
+    },
     // Copy a block above to add another tool.
   ],
 

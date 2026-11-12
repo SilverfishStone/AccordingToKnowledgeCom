@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Animator – Editor</title>
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/editor.css">
+</head>
+<body class="editor">
+<header id="menubar">
+  <a href="index.html" class="home" title="Back to your projects">◂ Projects</a>
+  <nav id="menus" aria-label="Menu bar"></nav>
+  <div id="modeSeg" role="group" aria-label="Editing mode"></div>
+  <span id="docName"></span>
+  <span id="saveState" role="status"></span>
+</header>
+<div id="options" aria-label="Tool options"></div>
+<div id="main">
+  <div id="toolbar" role="toolbar" aria-label="Tools"></div>
+  <div id="viewport">
+    <canvas id="stage"></canvas>
+    <canvas id="overlay"></canvas>
+    <div id="loading">Loading…</div>
+  </div>
+  <div id="sideSplit" class="splitter v" role="separator" aria-orientation="vertical" aria-label="Resize the side panels" title="Drag to resize"></div>
+  <aside id="side">
+    <section class="panel" data-panel="colors"><h4>Colours</h4><div id="colors" class="pbody"></div></section>
+    <section class="panel" data-panel="layers"><h4>Layers</h4><div id="layers" class="pbody"></div></section>
+    <section class="panel" data-panel="props"><h4>Animate layer</h4><div id="props" class="pbody"></div></section>
+  </aside>
+</div>
+<div id="tlSplit" class="splitter h" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" title="Drag to resize"></div>
+<footer id="bottom">
+  <div id="transport"></div>
+  <canvas id="timeline"></canvas>
+</footer>
+<div id="statusbar"><span id="status"></span><span id="undoInfo"></span><span id="posInfo"></span><span id="zoomInfo"></span></div>
+<div id="toasts"></div>
+<script type="module" src="js/editor/main.js"></script>
+</body>
+</html>
