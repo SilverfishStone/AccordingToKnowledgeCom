@@ -1,4 +1,5 @@
 import { api, esc, timeAgo, authCard, preparePhoto, mediaUrl, backend } from './api.js';
+import { cloudActive, cloudUser, cloudSignOut, cloudAuthCard, cloudSiteName, cloudSiteUrl } from './cloud.js';
 
 const root = document.getElementById('root');
 let user = null;
@@ -22,7 +23,14 @@ async function boot() {
 }
 
 async function renderHome() {
-  const local = await backend() === 'local';
+  const local = await backend() === 'local', cloud = local && cloudActive();
+  const account = local ? (cloud
+    ? `<div class="card account"><div class="row" style="justify-content:space-between">
+        <span>Photos are kept on your <b>${esc(cloudSiteName)}</b> account <b>${esc(cloudUser()?.username || '')}</b>. <span class="muted">Projects stay in this browser.</span></span>
+        <span class="row"><a class="btn" href="phone.html">Phone upload page</a><button id="cloudOut">Sign out</button></span></div></div>`
+    : `<div class="card account"><div class="row" style="justify-content:space-between">
+        <span>Want to send photos from your phone? <span class="muted">Link your <a href="${esc(cloudSiteUrl())}" target="_blank" rel="noopener">${esc(cloudSiteName)}</a> account.</span></span>
+        <button id="cloudIn">Sign in</button></div><div id="cloudBox"></div></div>`) : '';
   root.innerHTML = `
     <div class="topbar">
       <h1>Animator</h1>
@@ -31,6 +39,7 @@ async function renderHome() {
       <a class="btn" href="phone.html">Phone upload page</a>
       <button id="logout">Sign out</button>`}
     </div>
+    ${account}
 
     <div class="card">
       <h2>New project</h2>
@@ -61,13 +70,18 @@ async function renderHome() {
           <input type="file" id="inboxFile" accept="image/*" multiple hidden>
         </div>
       </div>
-      <p class="muted">${local ? 'Photos of drawings you add here' : 'Photos of drawings you send from your phone'} land here. Open a project and use
+      <p class="muted">${cloud ? 'Photos you send from your phone, or add here, are kept on your account and' : local ? 'Photos of drawings you add here' : 'Photos of drawings you send from your phone'} land here. Open a project and use
         <b>File → Import photo as pencil sketch</b> to turn one into a clean pencil layer.</p>
       <p id="phoneHelp" class="muted"></p>
       <div class="grid" id="inbox"></div>
     </div>`;
 
   root.querySelector('#logout')?.addEventListener('click', async () => { await api('POST', 'api/logout'); location.reload(); });
+  root.querySelector('#cloudOut')?.addEventListener('click', async () => { await cloudSignOut(); renderHome(); });
+  root.querySelector('#cloudIn')?.addEventListener('click', e => {
+    e.currentTarget.hidden = true;
+    cloudAuthCard(root.querySelector('#cloudBox'), () => { toast('Signed in'); renderHome(); });
+  });
   root.querySelector('#newForm').onsubmit = async e => {
     e.preventDefault();
     const v = id => root.querySelector('#' + id).value;
@@ -91,7 +105,8 @@ async function renderHome() {
   };
 
   loadProjects(); loadInbox();
-  if (local) root.querySelector('#phoneHelp').textContent = 'On a phone, “Upload from this device” can open the camera.';
+  if (cloud) root.querySelector('#phoneHelp').innerHTML = `On your phone open <span class="url">${esc(new URL('phone.html', location.href).href)}</span> and sign in with the same account.`;
+  else if (local) root.querySelector('#phoneHelp').textContent = 'On a phone, “Upload from this device” can open the camera.';
   else api('GET', 'api/info').then(info => {
     const help = root.querySelector('#phoneHelp');
     if (!help) return;
@@ -143,7 +158,9 @@ async function loadProjects() {
 
 async function loadInbox() {
   const box = root.querySelector('#inbox');
-  const { items } = await api('GET', 'api/inbox');
+  let items;
+  try { ({ items } = await api('GET', 'api/inbox')); }
+  catch (err) { box.innerHTML = `<span class="muted">${esc(err.message)}</span>`; if (err.status === 401) renderHome(); return; }
   box.innerHTML = items.length ? '' : '<span class="muted">Nothing here yet.</span>';
   for (const it of items) {
     const tile = document.createElement('div');

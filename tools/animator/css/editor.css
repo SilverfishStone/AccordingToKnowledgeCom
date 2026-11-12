@@ -145,6 +145,13 @@ kbd { background: var(--bg); border: 1px solid var(--line); border-radius: 3px; 
 .tpl-right { flex: 1 1 340px; max-height: 68vh; overflow: auto; padding-right: 4px; }
 .tpl-right .form { grid-template-columns: 150px 1fr auto; }
 .tpl-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.tpl-bg { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.bg-swatch { width: 26px; height: 26px; padding: 0 !important; border-radius: 6px !important; font-size: 11px; font-weight: 700; color: #111; }
+.bg-swatch.project { background: #fff; }
+.bg-swatch.checker { background: repeating-conic-gradient(#c9ccd3 0% 25%, #f2f3f5 0% 50%) 50% / 12px 12px; }
+.bg-swatch[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 1px; }
+.bg-custom { width: 30px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; cursor: pointer; }
+.bg-custom.on { outline: 2px solid var(--accent); outline-offset: 1px; }
 .tpl-info { font-variant-numeric: tabular-nums; }
 .tpl-lib { width: min(860px, 90vw); }
 .tpl-lib h4 { margin: 14px 0 6px; }
@@ -152,6 +159,15 @@ kbd { background: var(--bg); border: 1px solid var(--line); border-radius: 3px; 
 .tpl-card { display: flex !important; flex-direction: column; align-items: flex-start !important; gap: 4px; text-align: left; padding: 10px !important; min-height: 90px; }
 .tpl-card .tpl-icon { font-size: 22px; }
 .tpl-card .muted { font-size: 11.5px; }
+
+/* replace a layer's picture */
+.replace { display: flex; flex-direction: column; gap: 10px; width: min(620px, 88vw); }
+.replace-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; max-height: 38vh; overflow: auto; }
+.replace-item { display: flex !important; flex-direction: column; align-items: stretch !important; gap: 4px; padding: 5px !important; text-align: left; }
+.replace-item .thumb { width: 100%; height: auto; border-radius: 4px; background: repeating-conic-gradient(#555 0% 25%, #777 0% 50%) 50% / 12px 12px; }
+.replace-item .lname { font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.replace-item[aria-selected="true"], .replace-file.picked { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+.replace-file { align-self: flex-start; }
 
 /* progress bar */
 .progress-box { width: min(440px, 92vw); }

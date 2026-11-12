@@ -46,6 +46,7 @@ export default {
       return env.ASSETS.fetch(request);
     }
     if (url.pathname === "/api/ask") return askRequest(request, env, ctx, url);
+    if (url.pathname.startsWith("/api/animator/")) return animatorRequest(request, env, ctx, url);
     try {
       if (!env.DB) throw new HttpError(503, "Accounts aren't switched on yet.");
       await ensureSchema(env);
@@ -249,6 +250,14 @@ const MIGRATIONS = [
     `DROP TABLE dict_entries`,
     `ALTER TABLE dict_entries_new RENAME TO dict_entries`,
     `CREATE INDEX dict_entries_term ON dict_entries (term_id)`,
+  ],
+  [
+    // photos kept for the 2D animator on silverfishstone.com (sent from a phone, used in the editor on a computer), and the
+    // sign-in tokens it holds. A photo is stored as base64 text, the same way pictures are
+    `CREATE TABLE animator_tokens (token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL)`,
+    `CREATE INDEX animator_tokens_user ON animator_tokens (user_id)`,
+    `CREATE TABLE animator_photos (id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, name TEXT NOT NULL, type TEXT NOT NULL, size INTEGER NOT NULL, data TEXT NOT NULL, created_at INTEGER NOT NULL)`,
+    `CREATE INDEX animator_photos_user ON animator_photos (user_id, created_at)`,
   ],
 ];
 let schemaReady = null;
@@ -625,6 +634,8 @@ async function removeUser(env, id) {
     env.DB.prepare("DELETE FROM community WHERE user_id = ?1").bind(id),
     env.DB.prepare("DELETE FROM writer_requests WHERE user_id = ?1").bind(id),
     env.DB.prepare("DELETE FROM quiz_results WHERE user_id = ?1").bind(id),
+    env.DB.prepare("DELETE FROM animator_tokens WHERE user_id = ?1").bind(id),
+    env.DB.prepare("DELETE FROM animator_photos WHERE user_id = ?1").bind(id),
     env.DB.prepare("DELETE FROM users WHERE id = ?1").bind(id),
   ]);
 }
@@ -754,6 +765,119 @@ async function sendAsk(c) {
   await run(c.env, "INSERT INTO asks (body, status, created_at) VALUES (?1, 'new', ?2)", body, Date.now());
   notify(c, "New anonymous message", ["Someone sent you an anonymous message:", "", excerpt(body, 1500)]);
   return json({ ok: true }, 200, c.cors);
+}
+
+/* ───────── Animator photos ─────────
+   The 2D animator on silverfishstone.com can keep photos on an account here, so a photo taken on a phone is waiting in the
+   editor on a computer. It's another website, so the browser's cookie isn't sent: signing in returns a token that the animator
+   keeps and sends as "Authorization: Bearer …" (only its hash is stored here, and it can be revoked without touching the
+   account's other sign-ins). Only the admin, and anyone listed in ANIMATOR_USERS (comma-separated usernames), can use it,
+   because every photo is kept in the database. A photo travels and is kept as base64 text so this Worker never has to decode it. */
+const ANIMATOR_ORIGINS = ASK_ORIGINS;
+const ANIMATOR_TOKEN_DAYS = 90;
+const ANIMATOR_PHOTO_BYTES = 1300000;            // one photo (a database row can hold about 2 MB, and base64 is a third bigger)
+const ANIMATOR_MAX_PHOTOS = 40, ANIMATOR_MAX_BYTES = 40 * 1024 * 1024;
+const ANIMATOR_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+const animatorAllowed = (env, u) => u.role === "admin" || String(env.ANIMATOR_USERS || "").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean).includes(u.username.toLowerCase());
+const animatorQuota = async (env, userId) => {
+  const r = await one(env, "SELECT COUNT(*) AS n, COALESCE(SUM(size), 0) AS bytes FROM animator_photos WHERE user_id = ?1", userId);
+  return { count: r.n, bytes: r.bytes, maxCount: ANIMATOR_MAX_PHOTOS, maxBytes: ANIMATOR_MAX_BYTES, maxPhoto: ANIMATOR_PHOTO_BYTES };
+};
+
+async function animatorRequest(request, env, ctx, url) {
+  const origin = request.headers.get("Origin");
+  const allowed = !!origin && ANIMATOR_ORIGINS.includes(origin);
+  const cors = allowed
+    ? { "Access-Control-Allow-Origin": origin, "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, Authorization", "Access-Control-Max-Age": "86400", Vary: "Origin" }
+    : { Vary: "Origin" };
+  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+  try {
+    if (origin && !allowed && origin !== url.origin) throw new HttpError(403, "Not allowed from another site.");
+    if (!env.DB) throw new HttpError(503, "Accounts aren't switched on yet.");
+    await ensureSchema(env);
+    const path = url.pathname.slice("/api/animator".length), method = request.method;
+    const c = { request, env, ctx, url, params: [], body: null, user: null, cors };
+    if (method === "POST") c.body = await request.json().catch(() => { throw new HttpError(400, "That request wasn't valid JSON."); });
+    if (method === "POST" && path === "/login") return await animatorLogin(c);
+    c.user = await animatorUser(c);
+    if (!c.user) throw new HttpError(401, "Sign in first.");
+    let m;
+    if (method === "GET" && path === "/me") return json({ user: { id: c.user.id, username: c.user.username }, ...(await animatorQuota(env, c.user.id)) }, 200, cors);
+    if (method === "POST" && path === "/logout") {
+      await run(env, "DELETE FROM animator_tokens WHERE token_hash = ?1", c.user.token_hash);
+      return json({ ok: true }, 200, cors);
+    }
+    if (method === "GET" && path === "/photos") {
+      const rows = await all(env, "SELECT id, name, size, created_at FROM animator_photos WHERE user_id = ?1 ORDER BY created_at DESC", c.user.id);
+      return json({ items: rows.map((r) => ({ id: r.id, name: r.name, size: r.size, created: r.created_at })) }, 200, cors);
+    }
+    if (method === "POST" && path === "/photos") return await animatorAdd(c);
+    if ((m = path.match(/^\/photos\/([a-f0-9]{16})$/))) {
+      if (method === "GET") {
+        const p = await one(env, "SELECT type, data FROM animator_photos WHERE id = ?1 AND user_id = ?2", m[1], c.user.id);
+        if (!p) throw new HttpError(404, "That photo isn't there any more.");
+        return json({ type: p.type, data: p.data }, 200, { ...cors, "Cache-Control": "private, max-age=3600" });
+      }
+      if (method === "DELETE") {
+        await run(env, "DELETE FROM animator_photos WHERE id = ?1 AND user_id = ?2", m[1], c.user.id);
+        return json({ ok: true }, 200, cors);
+      }
+    }
+    throw new HttpError(404, "No such address.");
+  } catch (e) {
+    if (e instanceof HttpError) return json({ error: e.message, ...(e.extra || {}) }, e.status, cors);
+    console.error(e && e.stack || e);
+    return json({ error: "Something went wrong on the server. Try again in a moment." }, 500, cors);
+  }
+}
+
+async function animatorUser(c) {
+  const m = (c.request.headers.get("Authorization") || "").match(/^Bearer ([A-Za-z0-9_-]{20,100})$/);
+  if (!m) return null;
+  const th = await sha256(m[1]);
+  const u = await one(c.env,
+    `SELECT u.id, u.username, u.role, u.banned, t.token_hash FROM animator_tokens t JOIN users u ON u.id = t.user_id
+     WHERE t.token_hash = ?1 AND t.expires_at > ?2`, th, Date.now());
+  if (!u || u.banned || !animatorAllowed(c.env, u)) return null;
+  return u;
+}
+
+async function animatorLogin(c) {
+  const username = String(c.body.username || "").trim();
+  await limit(c, "animator-login-ip", 30, 900);
+  await limit(c, "animator-login-user", 10, 900, username.toLowerCase().slice(0, 40));
+  const u = await one(c.env, "SELECT id, username, role, banned, pass_salt, pass_hash FROM users WHERE username = ?1", username);
+  const given = prehash(c.body.password);
+  const ok = sameHex(await hashSecret(u ? u.pass_salt : "none", given), u ? u.pass_hash : "x");   // the same work whether or not the account exists
+  if (!u || !ok) throw new HttpError(403, "That username and password don't match.");
+  if (u.banned) throw new HttpError(403, "This account has been suspended.");
+  if (!animatorAllowed(c.env, u)) throw new HttpError(403, "This account can't use the Animator's photo storage.");
+  const token = b64url(crypto.getRandomValues(new Uint8Array(32))), now = Date.now();
+  await run(c.env, "INSERT INTO animator_tokens (token_hash, user_id, created_at, expires_at) VALUES (?1, ?2, ?3, ?4)", await sha256(token), u.id, now, now + ANIMATOR_TOKEN_DAYS * DAY);
+  if (Math.random() < 0.05) await run(c.env, "DELETE FROM animator_tokens WHERE expires_at < ?1", now);
+  return json({ token, user: { id: u.id, username: u.username }, ...(await animatorQuota(c.env, u.id)) }, 200, c.cors);
+}
+
+async function animatorAdd(c) {
+  const b = c.body && typeof c.body === "object" ? c.body : {};
+  const type = String(b.type || ""), data = typeof b.data === "string" ? b.data : "";
+  if (!ANIMATOR_TYPES.includes(type)) throw new HttpError(400, "Only JPEG, PNG or WebP photos can be kept.");
+  if (data.length < 24 || !/^[A-Za-z0-9+/]+={0,2}$/.test(data)) throw new HttpError(400, "That photo wasn't sent properly.");
+  const bytes = Math.floor(data.length * 3 / 4) - (data.endsWith("==") ? 2 : data.endsWith("=") ? 1 : 0);
+  if (bytes > ANIMATOR_PHOTO_BYTES) throw new HttpError(413, `That photo is too big (${(bytes / 1e6).toFixed(1)} MB; the limit is ${(ANIMATOR_PHOTO_BYTES / 1e6).toFixed(1)} MB).`);
+  // the first bytes have to be the start of a real image of that type
+  const head = [...atob(data.slice(0, 24))].map((ch) => ch.charCodeAt(0));
+  const magic = type === "image/jpeg" ? [0xff, 0xd8, 0xff] : type === "image/png" ? [0x89, 0x50, 0x4e, 0x47] : [0x52, 0x49, 0x46, 0x46];
+  if (!magic.every((v, i) => head[i] === v) || (type === "image/webp" && String.fromCharCode(...head.slice(8, 12)) !== "WEBP")) throw new HttpError(400, "That isn't a valid photo file.");
+  await limit(c, "animator-up", 60, 3600, "u" + c.user.id);
+  const q = await animatorQuota(c.env, c.user.id);
+  if (q.count >= q.maxCount) throw new HttpError(409, `You already have ${q.maxCount} photos here. Delete some from the Animator's photo inbox first.`);
+  if (q.bytes + bytes > q.maxBytes) throw new HttpError(409, "That would use more than the photo storage allows. Delete some photos first.");
+  const id = randomHex(8);
+  let name = String(b.name || "photo").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, 100) || "photo";
+  await run(c.env, "INSERT INTO animator_photos (id, user_id, name, type, size, data, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", id, c.user.id, name, type, bytes, data, Date.now());
+  return json({ id }, 200, c.cors);
 }
 
 const askRow = (r) => ({ id: r.id, body: r.body, status: r.status, created: r.created_at });

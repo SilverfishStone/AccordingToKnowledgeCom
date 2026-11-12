@@ -46,6 +46,13 @@ function setField(node, values, key, v) {
   if (out?.classList.contains('val')) out.textContent = input.value + (out.textContent.replace(/^[-\d.]+/, '') || '');
 }
 
+/* ---- background of the preview (so a white or black item can be seen); remembered between visits ---- */
+const PREVIEW_BGS = [['project', 'Project'], ['#ffffff', 'White'], ['#c8ccd4', 'Light grey'], ['#7a808c', 'Grey'], ['#2b2f37', 'Dark grey'], ['#000000', 'Black'], ['checker', 'Checkerboard']];
+const PBG_KEY = 'animator.templatePreviewBg';
+const readPreviewBg = () => { try { return localStorage.getItem(PBG_KEY) || 'project'; } catch { return 'project'; } };
+const savePreviewBg = v => { try { localStorage.setItem(PBG_KEY, v); } catch { /* storage unavailable */ } };
+const isDark = hex => { const n = parseInt(String(hex).slice(1), 16) || 0; return 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255) < 128; };
+
 /* Open a template's dialog. preset: index into T.presets to start from. group: rebuild this template group. */
 export async function openTemplate(id, { preset = null, group = null } = {}) {
   const T = byId(id);
@@ -91,16 +98,32 @@ export async function openTemplate(id, { preset = null, group = null } = {}) {
     } catch (err) { console.error(err); info.textContent = 'Could not build with these settings: ' + err.message; }
   };
   const schedule = () => { clearTimeout(timer); timer = setTimeout(rebuild, 70); };
+  // preview background: the project's own, a plain colour, or a checkerboard
+  let pbg = readPreviewBg(), checker = null;
+  const bgColour = () => (pbg === 'project' ? doc.bg || '#ffffff' : pbg);
+  const bgIsDark = () => pbg !== 'checker' && isDark(bgColour());
+  const paintBg = () => {
+    pctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (pbg === 'checker') {
+      if (!checker) {
+        const s = Math.max(8, Math.round(12 * dpr)), t = makeCanvas(s * 2, s * 2), x = t.getContext('2d');
+        x.fillStyle = '#f2f3f5'; x.fillRect(0, 0, s * 2, s * 2); x.fillStyle = '#c9ccd3'; x.fillRect(0, 0, s, s); x.fillRect(s, s, s, s);
+        checker = pctx.createPattern(t, 'repeat');
+      }
+      pctx.fillStyle = checker;
+    } else pctx.fillStyle = bgColour();
+    pctx.fillRect(0, 0, prev.width, prev.height);
+  };
   const t0 = performance.now();
   const loop = () => {
     if (!alive) return;
     const fr = Math.floor((performance.now() - t0) / 1000 * doc.fps) % tdoc.frames;
     pctx.setTransform(1, 0, 0, 1, 0, 0);
-    pctx.fillStyle = doc.bg || '#ffffff'; pctx.fillRect(0, 0, prev.width, prev.height);
+    paintBg();
     if (built) tdoc.render(pctx, fr, { scale: prev.width / W, bg: false, clear: false });
     pctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     T.overlay?.(pctx, cleanParams(T, values), pw, ph, doc);
-    pctx.fillStyle = '#0008'; pctx.font = '11px system-ui'; pctx.fillText(`frame ${fr + 1}/${tdoc.frames}`, pw - 82, ph - 8);
+    pctx.fillStyle = bgIsDark() ? '#fffa' : '#0008'; pctx.font = '11px system-ui'; pctx.fillText(`frame ${fr + 1}/${tdoc.frames}`, pw - 82, ph - 8);
     requestAnimationFrame(loop);
   };
 
@@ -121,10 +144,27 @@ export async function openTemplate(id, { preset = null, group = null } = {}) {
     prev.addEventListener('pointerup', end); prev.addEventListener('pointercancel', end);
   }
 
+  const bgRow = el('div', { class: 'tpl-bg', role: 'group', 'aria-label': 'Preview background' }, el('span', { class: 'muted', text: 'Preview background:' }));
+  const swatches = [];
+  const syncBg = () => {
+    for (const [b, btn] of swatches) btn.setAttribute('aria-pressed', String(b === pbg));
+    custom.classList.toggle('on', !PREVIEW_BGS.some(([v]) => v === pbg));
+  };
+  const chooseBg = v => { pbg = v; savePreviewBg(v); syncBg(); };
+  for (const [v, label] of PREVIEW_BGS) {
+    const btn = el('button', { class: 'bg-swatch' + (v === 'checker' ? ' checker' : ''), title: label, 'aria-label': label + ' background', onclick: () => chooseBg(v) });
+    if (v === 'project') { btn.classList.add('project'); btn.textContent = 'P'; if (doc.bg) btn.style.background = doc.bg; }
+    else if (v !== 'checker') btn.style.background = v;
+    swatches.push([v, btn]); bgRow.append(btn);
+  }
+  const custom = el('input', { type: 'color', class: 'bg-custom', title: 'Any colour', 'aria-label': 'Custom preview background colour', value: /^#[0-9a-f]{6}$/i.test(pbg) ? pbg : '#ff00ff',
+    oninput: () => chooseBg(custom.value) });
+  bgRow.append(custom);
+  syncBg();
   const presetRow = T.presets?.length ? el('div', { class: 'tpl-presets' },
     T.presets.map(pr => el('button', { text: pr.label, onclick: () => { for (const k in pr.values) setField(f.node, values, k, pr.values[k]); schedule(); } }))) : null;
   const content = el('div', { class: 'tpl' },
-    el('div', { class: 'tpl-left' }, prev, T.hint ? el('div', { class: 'muted', text: T.hint }) : null, info, presetRow ? el('div', { class: 'muted', text: 'Start from:' }) : null, presetRow),
+    el('div', { class: 'tpl-left' }, prev, bgRow, T.hint ? el('div', { class: 'muted', text: T.hint }) : null, info, presetRow ? el('div', { class: 'muted', text: 'Start from:' }) : null, presetRow),
     el('div', { class: 'tpl-right' }, f.node));
   await rebuild();
   requestAnimationFrame(loop);

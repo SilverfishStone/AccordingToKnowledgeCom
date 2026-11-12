@@ -1,21 +1,27 @@
 import { api, esc, timeAgo, authCard, preparePhoto, mediaUrl, backend } from './api.js';
+import { cloudActive, cloudUser, cloudSignOut, cloudAuthCard, cloudSiteName } from './cloud.js';
 
 const root = document.getElementById('root');
 
 async function boot() {
-  if (await backend() === 'local') {
-    root.innerHTML = `<div class="topbar"><h1>Send a drawing</h1></div>
-      <div class="card"><p>Sending photos from a phone to a computer needs the Animator’s own server, which this website doesn’t have.</p>
-      <p class="muted">Instead, open the Animator on the device that has the photo and use <b>Upload from this device</b>, or in a project
-      <b>File → Import photo as pencil sketch</b>. On a phone that can open the camera.</p>
-      <p><a class="btn primary" href="index.html">Go to the Animator</a></p></div>`;
-    return;
-  }
-  const me = await api('GET', 'api/me');
-  if (!me.user) {
-    root.innerHTML = `<div class="topbar"><h1>Animator</h1></div><div id="auth"></div>`;
-    authCard(root.querySelector('#auth'), () => boot(), me.allowSignup);
-    return;
+  // With no server of its own, photos go to an online account (the website's own account system) so they reach the computer
+  const local = await backend() === 'local';
+  let me;
+  if (local) {
+    if (!cloudActive()) {
+      root.innerHTML = `<div class="topbar"><h1>Send a drawing</h1></div><div id="auth"></div>
+        <p class="muted" style="text-align:center"><a href="index.html">Back to the Animator</a></p>`;
+      cloudAuthCard(root.querySelector('#auth'), () => boot(), { intro: `Sign in with your <b>${esc(cloudSiteName)}</b> account to send photos to it. They’ll be waiting in the Animator on your computer, signed in to the same account.` });
+      return;
+    }
+    me = { user: cloudUser() || { username: 'your account' } };
+  } else {
+    me = await api('GET', 'api/me');
+    if (!me.user) {
+      root.innerHTML = `<div class="topbar"><h1>Animator</h1></div><div id="auth"></div>`;
+      authCard(root.querySelector('#auth'), () => boot(), me.allowSignup);
+      return;
+    }
   }
   root.innerHTML = `
     <div class="topbar">
@@ -40,10 +46,10 @@ async function boot() {
       <h3>Sent to your inbox</h3>
       <div class="grid" id="list"></div>
     </div>
-    <p class="muted">On your computer: open a project → <b>File → Import photo as pencil sketch</b>.</p>`;
+    <p class="muted">On your computer: open a project → <b>File → Import photo as pencil sketch</b>${local ? ' (signed in to the same account)' : ''}.</p>`;
 
   const q = id => root.querySelector('#' + id);
-  q('logout').onclick = async () => { await api('POST', 'api/logout'); location.reload(); };
+  q('logout').onclick = async () => { if (local) await cloudSignOut(); else await api('POST', 'api/logout'); location.reload(); };
   q('shoot').onclick = () => q('cam').click();
   q('pick').onclick = () => q('gal').click();
   const send = async input => {
@@ -56,7 +62,7 @@ async function boot() {
         const blob = await preparePhoto(f);
         await api('POST', 'api/inbox', blob, { 'X-Filename': encodeURIComponent(f.name || 'photo.jpg') });
         done++;
-      } catch (err) { q('status').textContent = 'Upload failed: ' + err.message; return; }
+      } catch (err) { q('status').textContent = 'Upload failed: ' + err.message; if (err.status === 401) boot(); return; }
     }
     if (files.length) q('status').textContent = `✓ Sent ${done} photo${done === 1 ? '' : 's'} to your inbox.`;
     list();
@@ -68,7 +74,8 @@ async function boot() {
 
 async function list() {
   const box = root.querySelector('#list');
-  const { items } = await api('GET', 'api/inbox');
+  let items;
+  try { ({ items } = await api('GET', 'api/inbox')); } catch (err) { box.innerHTML = `<span class="muted">${esc(err.message)}</span>`; return; }
   box.innerHTML = items.length ? '' : '<span class="muted">Nothing sent yet.</span>';
   for (const it of items.slice(0, 12)) {
     const d = document.createElement('div');

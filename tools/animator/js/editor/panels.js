@@ -6,6 +6,7 @@ import { TOOLS, OPTS, setTool, target, paintOnLayer } from './tools.js';
 import { clipToSelection } from './selection.js';
 import { toast, confirmDialog, contextMenu, formDialog } from './ui.js';
 import { editProp } from './timeline.js';
+import { replaceLayer, canReplace } from './replace.js';
 
 /* =============== layer operations =============== */
 /* Where a new layer goes: above the active layer in the same group, or on top inside a selected open group. */
@@ -371,6 +372,7 @@ function layerMenu(L, x, y) {
     ...(L.isGroup ? [{ label: (L.sortByDepth ? '✓ ' : '') + 'Draw by Depth (near over far)', run: () => metaCmd('Draw by depth', () => { L.sortByDepth = !L.sortByDepth; }) }] : []),
     { label: 'Add a motion…', run: () => emit('motion-dialog') },
     ...(segmentContext(L) ? [{ label: 'Copy into every segment…', run: () => copyToSegments(L) }] : []),
+    ...(canReplace(L) ? [{ label: 'Replace picture with another layer…', run: () => replaceLayer(L) }] : []),
     '-',
     { label: L.visible ? 'Hide' : 'Show', run: () => metaCmd(L.visible ? 'Hide layer' : 'Show layer', () => { L.visible = !L.visible; }) },
     { label: L.locked ? 'Unlock' : 'Lock', run: () => metaCmd(L.locked ? 'Unlock layer' : 'Lock layer', () => { L.locked = !L.locked; }) },

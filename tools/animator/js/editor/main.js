@@ -13,7 +13,8 @@ import { transformTool } from './transform.js';
 import { initLayout, setDock, dockSide, resetLayout } from './layout.js';
 import { TEMPLATE_MENU, editTemplate } from './templates.js';
 import { motionDialog } from './motions.js';
-import { importSketch } from './sketch.js';
+import { importSketch, pickPhoto } from './sketch.js';
+import { replaceLayer, canReplace } from './replace.js';
 import { buildMenubar, toast, dialog, formDialog, pickFile, progress } from './ui.js';
 import { api, getBlob } from '../api.js';
 
@@ -234,9 +235,20 @@ window.addEventListener('beforeunload', e => { if (app.unsaved) { e.preventDefau
 
 /* ---------------- commands used by menus + shortcuts ---------------- */
 async function importImage() {
-  const file = await pickFile('image/*');
-  if (!file) return;
-  try { importImageLayer(await createImageBitmap(file, { imageOrientation: 'from-image' }), file.name.replace(/\.[^.]+$/, '').slice(0, 40) || 'Image'); }
+  // photos kept in the inbox (sent from a phone) can be used here too; with none, go straight to choosing a file
+  let photos = 0;
+  try { photos = (await api('GET', '/api/inbox')).items.length; } catch { /* no inbox */ }
+  let file, name;
+  if (photos) {
+    const p = await pickPhoto({ title: 'Import image as layer', intro: 'Pick one of your photos, or choose an image file from this computer.' });
+    if (!p) return;
+    file = p.blob; name = p.name;
+  } else {
+    file = await pickFile('image/*');
+    if (!file) return;
+    name = file.name;
+  }
+  try { importImageLayer(await createImageBitmap(file, { imageOrientation: 'from-image' }), String(name || '').replace(/\.[^.]+$/, '').slice(0, 40) || 'Image'); }
   catch { toast('That file could not be read as an image'); }
 }
 async function projectSettings() {
@@ -317,6 +329,7 @@ function buildMenus() {
       { label: 'Put layer in a new group', key: 'Ctrl+G', run: groupActive },
       { label: 'Ungroup', key: 'Ctrl+Shift+G', run: ungroup, enabled: () => !!app.doc.active?.isGroup },
       { label: 'Duplicate layer', key: 'Ctrl+J', run: duplicateLayer },
+      { label: 'Replace picture with another layer…', run: () => replaceLayer(), enabled: () => canReplace(app.doc.active) },
       { label: 'Delete layer', run: deleteLayer },
       '-',
       { label: 'Raise', run: () => moveLayer(1) },

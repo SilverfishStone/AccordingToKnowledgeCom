@@ -5,6 +5,7 @@ import { app, el, makeCanvas, clamp, hexToRgb } from './state.js';
 import { dialog, form, toast, pickFile } from './ui.js';
 import { importImageLayer } from './panels.js';
 import { api, getBlob, mediaUrl, backend } from '../api.js';
+import { cloudActive } from '../cloud.js';
 
 /* ---------- geometry ---------- */
 /* 3x3 homography (row-major, h[8] = 1) taking the 4 points `from` onto the 4 points `to`. */
@@ -492,29 +493,36 @@ async function sketchDialog(blob, name) {
   toast('Pencil layer added');
 }
 
-/* Entry point: choose a photo from the phone inbox or from this computer. */
-export async function importSketch() {
+/* Choose a photo from the phone inbox (or the online account) or a file from this computer: { blob, name } or null. */
+export async function pickPhoto({ title, intro = 'Pick a photo you sent from your phone, or choose an image file from this computer.' }) {
   let items = [];
-  const local = await backend() === 'local';
+  const local = await backend() === 'local', cloud = local && cloudActive();
   const lazyImg = (url, alt) => { const img = el('img', { alt, loading: 'lazy' }); mediaUrl(url).then(u => { img.src = u; }); return img; };
   try { items = (await api('GET', '/api/inbox')).items; } catch { /* offline: file only */ }
   let chosen = null;
   const grid = el('div', { class: 'inbox-grid' }, items.length ? items.map(it =>
     el('button', { class: 'inbox-item', title: it.name, onclick: () => { chosen = it; closer('ok'); } },
-      lazyImg(`api/inbox/${it.id}`, it.name))) : el('p', { class: 'muted', text: local
-        ? 'No photos saved yet. Choose one from this device below (on a phone, that can open the camera).'
-        : 'Your phone inbox is empty. Open this site on your phone and choose “Phone upload page” to send a photo.' }));
+      lazyImg(`api/inbox/${it.id}`, it.name))) : el('p', { class: 'muted', text: cloud
+        ? 'Your account has no photos yet. Open the Phone upload page on your phone, sign in, and send one.'
+        : local
+          ? 'No photos saved yet. Choose one from this device below (on a phone, that can open the camera). To send photos from a phone, link your account on the Animator’s home page.'
+          : 'Your phone inbox is empty. Open this site on your phone and choose “Phone upload page” to send a photo.' }));
   let closer = () => {};
   const content = el('div', {},
-    el('p', { class: 'muted', text: 'Pick a photo you sent from your phone, or choose an image file from this computer.' }),
+    el('p', { class: 'muted', text: intro }),
     grid,
     el('button', { text: 'Choose a file from this computer…', onclick: async () => { const file = await pickFile('image/*'); if (file) { chosen = file; closer('ok'); } } }));
-  const r = await dialog({ title: 'Import photo as pencil sketch', content, buttons: [['Cancel', null]], onOpen: (box, done) => { closer = done; } });
-  if (!r || !chosen) return;
-  if (chosen instanceof Blob) return sketchDialog(chosen, chosen.name || 'photo');
-  try {
-    const blob = await getBlob(`api/inbox/${chosen.id}`);
-    if (!blob) throw new Error('Could not load the photo');
-    await sketchDialog(blob, chosen.name);
-  } catch (err) { toast(err.message); }
+  const r = await dialog({ title, content, buttons: [['Cancel', null]], onOpen: (box, done) => { closer = done; } });
+  if (!r || !chosen) return null;
+  if (chosen instanceof Blob) return { blob: chosen, name: chosen.name || 'photo' };
+  const blob = await getBlob(`api/inbox/${chosen.id}`);
+  if (!blob) { toast('Could not load the photo'); return null; }
+  return { blob, name: chosen.name };
+}
+
+/* Entry point: choose a photo from the phone inbox or from this computer. */
+export async function importSketch() {
+  const p = await pickPhoto({ title: 'Import photo as pencil sketch' });
+  if (!p) return;
+  try { await sketchDialog(p.blob, p.name); } catch (err) { toast(err.message); }
 }

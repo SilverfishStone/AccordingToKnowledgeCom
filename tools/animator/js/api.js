@@ -2,6 +2,7 @@
 //   - with the Animator server (node server.js): accounts, projects on the computer, phone uploads
 //   - as plain files on any website: no server, so everything is kept in this browser (local-store.js)
 import { localApi } from './local-store.js';
+import { cloudActive, cloudInbox, cloudPhotoLimit } from './cloud.js';
 
 let modeP = null;
 /* 'server' or 'local' — decided once, by asking the server who is signed in */
@@ -16,9 +17,12 @@ export function backend() {
   return modeP;
 }
 const rel = url => url.replace(/^\//, '');           // pages may live in a sub-folder of a website
+// With no server of its own, the photo inbox moves online when the Animator is linked to an account (see cloud.js)
+const inCloud = async url => /^api\/inbox(\/|\?|$)/.test(rel(url)) && cloudActive() && await backend() === 'local';
 
 /* An image (layer picture, thumbnail, inbox photo) as a Blob, or null if there isn't one. */
 export async function getBlob(url) {
+  if (await inCloud(url)) { try { return await cloudInbox('GET', rel(url)); } catch { return null; } }
   if (await backend() === 'local') { try { return await localApi('GET', rel(url)); } catch { return null; } }
   const res = await fetch(rel(url), { credentials: 'same-origin' });
   return res.ok ? res.blob() : null;
@@ -31,6 +35,7 @@ export async function mediaUrl(url) {
 }
 
 export async function api(method, url, body, headers = {}) {
+  if (await inCloud(url)) return cloudInbox(method, rel(url), body, headers);
   if (await backend() === 'local') return localApi(method, rel(url), body, headers);
   url = rel(url);
   const opts = { method, headers: { ...headers }, credentials: 'same-origin' };
@@ -62,16 +67,26 @@ export function timeAgo(ms) {
   return new Date(ms).toLocaleDateString();
 }
 
-// Shrink a photo before upload: applies the camera's rotation and caps the long side.
+// Shrink a photo before upload: applies the camera's rotation and caps the long side. A photo kept in an online account
+// also has to fit the account's size limit, so it is scaled and compressed until it does.
 export async function preparePhoto(file, maxSide = 3000) {
+  const online = cloudActive() && await backend() === 'local';
+  const limit = online ? cloudPhotoLimit() * 0.96 : 0;
+  if (online) maxSide = Math.min(maxSide, 2600);
   try {
     const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
-    const k = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
-    const c = document.createElement('canvas');
-    c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
-    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    let k = Math.min(1, maxSide / Math.max(bmp.width, bmp.height)), blob = null;
+    for (let attempt = 0; attempt < 6; attempt++, k *= 0.8) {
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(bmp.width * k)); c.height = Math.max(1, Math.round(bmp.height * k));
+      c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+      for (const q of limit ? [0.9, 0.8, 0.7, 0.6] : [0.92]) {
+        blob = await new Promise(r => c.toBlob(r, 'image/jpeg', q));
+        if (!blob || !limit || blob.size <= limit) break;
+      }
+      if (!blob || !limit || blob.size <= limit) break;
+    }
     bmp.close?.();
-    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.92));
     if (blob) return blob;
   } catch { /* fall back to the original file */ }
   return file;

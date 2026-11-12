@@ -13,6 +13,7 @@ const DEF = {
   motion: 'slither', amplitude: 35, waves: 1.2, bendAngle: 60, anchor: 'tail',
   swing: 280, vibration: 30, harmonic: 1, decay: 50,
   period: 1, fit: true, segmentGroups: true, from: 1, to: 0, keyEvery: 2,
+  turn: 'auto',
 };
 
 /* ---------- 3D maths ---------- */
@@ -108,13 +109,14 @@ function build(doc, p, art) {
   const g = newGroup(doc, p.name);
   g.sortByDepth = true;
   g.outline = p.style === 'solid' && p.outlineWidth > 0 ? { width: p.outlineWidth, color: p.outlineColor } : null;
-  const segs = [];
+  const segs = [], fRest = [];
   for (let i = 0; i < n; i++) {
     const r = p.thickHead + (p.thickTail - p.thickHead) * (i / (n - 1)), si = rest[i].s, rc = r * si;
     // how much of the tube's length shows across the picture here (0 = pointing straight at you)
     const a = rest[Math.max(0, i - 1)], b = rest[Math.min(n - 1, i + 1)];
     const span = (Math.min(n - 1, i + 1) - Math.max(0, i - 1)) * ds * si;
     const f = clamp(Math.hypot(a.x - b.x, a.y - b.y) / (span || 1), 0, 1);
+    fRest[i] = f;
     let ra = rc * (1 - f) + rc * p.roundness / 100 * f;
     if (p.style === 'solid') ra = Math.max(ra, ds * si * 1.4 * f);
     let pic;
@@ -141,7 +143,13 @@ function build(doc, p, art) {
   }
   const animated = p.motion !== 'none';
   const frames = animated ? keyFrames(f0, f1, p.keyEvery) : [f0];
-  const prevRot = new Array(n).fill(null);
+  // Each segment turns to follow the body's direction on screen, which is what keeps a long oval lying along the body.
+  // A tube that points at the camera is built from round segments (nothing to line up), and the body direction on screen
+  // is then just the side-to-side wobble, flipping left and right: the segments, and anything drawn into them, would spin
+  // for no reason. So by default a segment only turns as much as it is drawn long. 'turn' always follows; 'never' never does.
+  const prevRot = new Array(n).fill(null), baseRot = new Array(n).fill(null);
+  const turnMode = ['turn', 'auto', 'never'].includes(p.turn) ? p.turn : 'auto';
+  const smooth = t => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
   const vals = segs.map(() => ({ x: [], y: [], rotation: [], scaleX: [], scaleY: [], depth: [] }));
   for (const fr of frames) {
     const tau = f1 > f0 ? (fr - f0) / (f1 - f0 + 1) : 0;    // the frame after the last equals the first: loops cleanly
@@ -149,9 +157,14 @@ function build(doc, p, art) {
     q.forEach((pt, i) => {
       const L = segs[i], k = pt.s / rest[i].s * 100;
       const c = L.isGroup ? { x: r2(ox + pt.x - doc.width / 2), y: r2(oy + pt.y - doc.height / 2) } : centreAt(L, ox + pt.x, oy + pt.y);
-      prevRot[i] = unwrap(prevRot[i], ang[i]);
+      // how much of the body's length shows across the picture at this segment right now (0 = pointing at you)
+      const na = q[Math.max(0, i - 1)], nb = q[Math.min(n - 1, i + 1)];
+      const seen = clamp(Math.hypot(na.x - nb.x, na.y - nb.y) / ((Math.min(n - 1, i + 1) - Math.max(0, i - 1)) * ds * pt.s || 1), 0, 1);
+      if (turnMode === 'turn' || seen > 0.12 || prevRot[i] == null) prevRot[i] = unwrap(prevRot[i], ang[i]);   // end-on, the angle is noise: keep the last good one
+      if (baseRot[i] == null) baseRot[i] = prevRot[i];
+      const rot = turnMode === 'turn' ? prevRot[i] : turnMode === 'never' ? baseRot[i] : baseRot[i] + smooth((fRest[i] - 0.15) / 0.45) * (prevRot[i] - baseRot[i]);
       const v = vals[i];
-      v.x.push(c.x); v.y.push(c.y); v.rotation.push(prevRot[i]); v.scaleX.push(k); v.scaleY.push(k); v.depth.push(pt.z);
+      v.x.push(c.x); v.y.push(c.y); v.rotation.push(rot); v.scaleX.push(k); v.scaleY.push(k); v.depth.push(pt.z);
     });
   }
   segs.forEach((L, i) => { for (const prop in vals[i]) bake(L, prop, frames, vals[i][prop]); });
@@ -187,6 +200,7 @@ function fields(p, ctx) {
     { key: 'length', label: 'Length', type: 'range', min: 100, max: 3000, step: 10, value: p.length, unit: 'px' },
     { key: 'thickHead', label: 'Thickness at head', type: 'range', min: 1, max: 400, value: p.thickHead, unit: 'px' },
     { key: 'thickTail', label: 'Thickness at tail', type: 'range', min: 1, max: 400, value: p.thickTail, unit: 'px' },
+    { key: 'turn', label: 'Segments turn', type: 'select', value: p.turn, options: [['auto', 'With the body, but not round segments (pointing at you)'], ['turn', 'Always with the body'], ['never', 'Never (they keep their starting angle)']], title: 'Each segment turns to follow the body. When the tube points at the camera its segments are round and the turning is only a spin, so by default they turn only as much as they are drawn long.' },
     { key: 'roundness', label: 'Segment roundness', type: 'range', min: 20, max: 150, value: p.roundness, unit: '%' },
     { key: 'style', label: 'Look', type: 'select', value: p.style, options: [['solid', 'Solid tube (segments blend together)'], ['separate', 'Separate segments']] },
     { key: 'shape', label: 'Segment shape', type: 'select', value: ctx.editing && p.shape === 'custom' && p.customArt ? 'custom' : 'oval', options: shapeOpts },
