@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bingo Card Maker</title>
+<meta name="description" content="Make a bingo card with your own title, size and squares, then share a link so others can play along or check your marks." />
+<meta name="theme-color" content="#000000" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%230b0d10'/%3E%3Cpath d='M8 4v16M16 4v16M4 8h16M4 16h16' stroke='%238ab4ff' stroke-width='1.6' fill='none'/%3E%3C/svg%3E" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :root { --bg: #000; --panel: #0b0d10; --line: #2f3336; --text: #e7e9ea; --dim: #8b949e; --accent: #8ab4ff; --ok: #7fe3b0; --bad: #ff9b9b; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 "Segoe UI", system-ui, -apple-system, Arial, sans-serif; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  h1 { margin: 0; font-size: 22px; }
+  h2 { margin: 18px 0 6px; font: 700 12px/1.2 "Cascadia Mono", Consolas, monospace; letter-spacing: .16em; text-transform: uppercase; color: #8fa0c4; }
+  h2:first-child { margin-top: 0; }
+  .muted { color: var(--dim); font-size: 13px; }
+  .hidden { display: none !important; }
+
+  .top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; max-width: 1180px; margin: 0 auto; padding: 14px 16px 0; }
+  .top h1 { flex: 1 1 auto; }
+  .tabs { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .tabs button { border: 0; background: none; padding: 7px 18px; }
+  .tabs button[aria-pressed="true"] { background: rgba(138, 180, 255, .2); color: #fff; font-weight: 600; }
+  .layout { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 16px; max-width: 1180px; margin: 0 auto; padding: 14px 16px 40px; align-items: start; }
+  body.solo .layout { grid-template-columns: minmax(0, 1fr); }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; min-width: 0; }
+
+  label { display: block; margin: 10px 0 4px; font-size: 13px; color: var(--dim); }
+  input[type=text], input[type=number], select, textarea { width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: #000; }
+  textarea { min-height: 110px; resize: vertical; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .row > * { flex: 0 1 auto; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { padding: 5px 11px; border: 1px solid var(--line); border-radius: 999px; background: #151a22; }
+  .chip[aria-pressed="true"] { border-color: var(--accent); background: rgba(138, 180, 255, .2); }
+  .chip:hover { border-color: var(--accent); }
+  .btn { padding: 8px 14px; border: 1px solid var(--line); border-radius: 8px; background: #151a22; }
+  .btn:hover:not(:disabled) { border-color: var(--accent); }
+  .btn.primary { border-color: var(--accent); background: rgba(138, 180, 255, .18); font-weight: 600; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .check { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; color: var(--text); font-size: 14px; }
+  .check input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .dims { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+  .swatch { width: 34px; height: 34px; border-radius: 8px; border: 2px solid transparent; padding: 0; }
+  .swatch[aria-pressed="true"] { border-color: #fff; }
+
+  /* the card */
+  #stage { --cbg: #12151b; --ccell: #1c212b; --cline: #394152; --ctext: #eef1f6; --cmark: #8ab4ff; --cmarkText: #07121f; --cfree: #2a3140; }
+  #sheet { background: var(--cbg); color: var(--ctext); border-radius: 14px; padding: clamp(10px, 3vw, 24px); max-width: 760px; margin: 0 auto; }
+  #cardTitle { margin: 0 0 12px; text-align: center; font-size: clamp(20px, 4.5vw, 34px); line-height: 1.15; overflow-wrap: anywhere; }
+  #cardTitle[contenteditable="true"] { outline: none; border-bottom: 1px dashed var(--cline); }
+  #grid { display: grid; gap: clamp(4px, 1vw, 8px); }
+  .cell {
+    position: relative; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; text-align: center;
+    padding: 5px; overflow: hidden; overflow-wrap: normal; word-break: normal; line-height: 1.15; font-weight: 600;
+    background: var(--ccell); color: var(--ctext); border: 2px solid var(--cline); border-radius: 10px; font-family: inherit; user-select: none;
+  }
+  .cell[contenteditable="true"] { user-select: text; cursor: text; }
+  .cell.free { background: var(--cfree); font-style: italic; }
+  button.cell:hover:not(:disabled) { border-color: var(--cmark); }
+  .cell.on { background: var(--cmark); color: var(--cmarkText); border-color: var(--cmark); }
+  .cell.on::after { content: ""; position: absolute; inset: 5px; border: 2px solid currentColor; border-radius: 6px; opacity: .35; pointer-events: none; }
+  .cell.win { box-shadow: 0 0 0 3px var(--cmark), 0 0 14px 2px var(--cmark); z-index: 1; }
+  button.cell:disabled { opacity: 1; cursor: default; }
+  #banner { margin: 0 auto 12px; max-width: 760px; text-align: center; min-height: 1.6em; }
+  #banner .bingo { display: inline-block; padding: 6px 18px; border-radius: 999px; background: var(--ok); color: #04210f; font-weight: 800; letter-spacing: .12em; animation: pop .6s ease-out; }
+  @keyframes pop { 0% { transform: scale(.6); opacity: 0; } 70% { transform: scale(1.12); } 100% { transform: scale(1); opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { #banner .bingo { animation: none; } }
+  .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 14px 0 0; }
+  #viewNote { max-width: 760px; margin: 0 auto 12px; padding: 10px 14px; border: 1px solid #55397a; border-radius: 10px; background: rgba(160, 120, 255, .08); }
+
+  dialog { width: min(640px, 94vw); background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+  dialog::backdrop { background: rgba(0, 0, 0, .7); }
+  .linkbox { display: flex; gap: 6px; }
+  .linkbox input { flex: 1; font: 12px "Cascadia Mono", Consolas, monospace; }
+  .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); padding: 8px 16px; border: 1px solid var(--line); border-radius: 8px; background: #000d; z-index: 50; }
+
+  @media print {
+    body { background: #fff; }
+    .top, #side, .actions, #banner .muted, .toast { display: none !important; }
+    .layout { display: block; padding: 0; }
+    #stage { border: 0; padding: 0; background: none; }
+    #sheet { max-width: none; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Bingo card maker</h1>
+  <div class="tabs" role="group" aria-label="Mode">
+    <button type="button" id="tabMake" aria-pressed="true">Make</button>
+    <button type="button" id="tabPlay" aria-pressed="false">Play</button>
+  </div>
+  <button type="button" class="btn primary" id="shareBtn">Share…</button>
+</header>
+
+<div class="layout">
+  <aside class="panel" id="side" aria-label="Card settings">
+    <h2>Card</h2>
+    <label for="titleIn">Title</label>
+    <input type="text" id="titleIn" maxlength="80" placeholder="e.g. Conference call bingo" />
+
+    <h2>Size</h2>
+    <div class="chips" id="sizeChips" role="group" aria-label="Square sizes"></div>
+    <label>Or choose rows and columns (2 to 8)</label>
+    <div class="dims">
+      <input type="number" id="rowsIn" min="2" max="8" aria-label="Rows" />
+      <span class="muted">×</span>
+      <input type="number" id="colsIn" min="2" max="8" aria-label="Columns" />
+    </div>
+    <label class="check" id="freeRow"><input type="checkbox" id="freeIn" /> Free space in the middle</label>
+    <div id="freeTextRow"><label for="freeText">Free space says</label><input type="text" id="freeText" maxlength="20" /></div>
+    <p class="muted" id="freeNote"></p>
+
+    <h2>Fill it in</h2>
+    <p class="muted">Type straight into the squares, or paste a list (one per line) and fill the card from it. A longer list is picked from at random.</p>
+    <textarea id="listIn" placeholder="Someone says “synergy”&#10;Mic is muted&#10;…" aria-label="List of squares"></textarea>
+    <label class="check"><input type="checkbox" id="shuffleIn" checked /> Shuffle the list</label>
+    <div class="row" style="margin-top:8px">
+      <button type="button" class="btn" id="fillBtn">Fill from list</button>
+      <button type="button" class="btn" id="shuffleBtn" title="Mix up the squares already on the card">Shuffle squares</button>
+      <button type="button" class="btn" id="clearBtn">Clear</button>
+    </div>
+
+    <h2>Colours</h2>
+    <div class="swatches" id="swatches" role="group" aria-label="Colour theme"></div>
+  </aside>
+
+  <section class="panel" id="stage" aria-label="Bingo card">
+    <div id="viewNote" class="hidden"></div>
+    <div id="banner" aria-live="polite"></div>
+    <div id="sheet">
+      <div id="cardTitle" role="heading" aria-level="2"></div>
+      <div id="grid"></div>
+    </div>
+    <div class="actions" id="actions"></div>
+  </section>
+</div>
+
+<dialog id="shareDlg" aria-labelledby="shareTitle">
+  <h2 id="shareTitle" style="margin-top:0">Share this card</h2>
+  <p class="muted">The whole card is inside the link, so there's no account and nothing stored on a server. Anyone with a link can open it.</p>
+  <label for="linkPlay">Play along: they get the card and mark their own squares</label>
+  <div class="linkbox"><input type="text" id="linkPlay" readonly /><button type="button" class="btn" data-copy="linkPlay">Copy</button></div>
+  <label for="linkMarks">Check my work: the card with the squares I've marked so far</label>
+  <div class="linkbox"><input type="text" id="linkMarks" readonly /><button type="button" class="btn" data-copy="linkMarks">Copy</button></div>
+  <p class="muted" id="marksNote"></p>
+  <div class="row" style="margin-top:12px">
+    <button type="button" class="btn" id="nativeShare">Share with…</button>
+    <button type="button" class="btn" id="pngPlain">Save picture</button>
+    <button type="button" class="btn" id="pngMarks">Save picture with my marks</button>
+    <button type="button" class="btn" id="printBtn">Print</button>
+  </div>
+  <div class="row" style="justify-content:flex-end;margin-top:16px"><button type="button" class="btn primary" id="shareClose">Done</button></div>
+</dialog>
+<div class="toast hidden" id="toast" role="status"></div>
+
+<script>
+"use strict";
+/* ---------- themes ---------- */
+const THEMES = [
+  { n: 'Night',  bg: '#12151b', cell: '#1c212b', line: '#394152', text: '#eef1f6', mark: '#8ab4ff', markText: '#07121f', free: '#2a3140' },
+  { n: 'Paper',  bg: '#faf7ef', cell: '#ffffff', line: '#cfc7b3', text: '#2a2620', mark: '#e0603a', markText: '#ffffff', free: '#efe8d4' },
+  { n: 'Mint',   bg: '#e9f7f0', cell: '#ffffff', line: '#a8d5c2', text: '#173d2e', mark: '#2e9e72', markText: '#ffffff', free: '#d3efe2' },
+  { n: 'Sunset', bg: '#2b1626', cell: '#3b2036', line: '#6d3b58', text: '#ffe9d6', mark: '#ff9f55', markText: '#2b1020', free: '#4d2a44' },
+  { n: 'Ocean',  bg: '#0e2a3a', cell: '#14384d', line: '#2f6685', text: '#e3f4ff', mark: '#4cc9f0', markText: '#04202e', free: '#1d4a64' },
+  { n: 'Berry',  bg: '#f6e8f3', cell: '#ffffff', line: '#d9b4d0', text: '#3a1534', mark: '#b02a8f', markText: '#ffffff', free: '#ecd3e6' },
+];
+const MAXTEXT = 120, MAXTITLE = 80;
+const $ = id => document.getElementById(id);
+
+/* ---------- the card ---------- */
+let card = blank(5, 5);
+let mode = 'make';            // make | play | view (someone else's marks, read-only)
+let marks = new Set();        // squares marked on this device
+let seen = null;              // marks from a link (view mode)
+let key = '';                 // identifies this card, for remembering marks
+
+function blank(r, c) { return { t: '', r, c, f: true, ft: 'FREE', x: Array(r * c).fill(''), th: 0 }; }
+const clampInt = (v, lo, hi, d) => { v = Math.round(Number(v)); return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d; };
+function clean(o) {
+  const r = clampInt(o && o.r, 2, 8, 5), c = clampInt(o && o.c, 2, 8, 5);
+  const x = Array.from({ length: r * c }, (_, i) => String((o && o.x && o.x[i]) ?? '').slice(0, MAXTEXT));
+  return { t: String((o && o.t) ?? '').slice(0, MAXTITLE), r, c, f: !!(o && o.f), ft: String((o && o.ft) || 'FREE').slice(0, 20), x, th: clampInt(o && o.th, 0, THEMES.length - 1, 0) };
+}
+const freeIndex = k => (k.f && k.r % 2 === 1 && k.c % 2 === 1 ? Math.floor(k.r / 2) * k.c + Math.floor(k.c / 2) : -1);
+const cardText = (k, i) => (i === freeIndex(k) ? k.ft : k.x[i]);
+
+/* every row, column and (on a square card) both diagonals */
+function lines(k) {
+  const out = [];
+  for (let r = 0; r < k.r; r++) out.push(Array.from({ length: k.c }, (_, c) => r * k.c + c));
+  for (let c = 0; c < k.c; c++) out.push(Array.from({ length: k.r }, (_, r) => r * k.c + c));
+  if (k.r === k.c) {
+    out.push(Array.from({ length: k.r }, (_, i) => i * k.c + i));
+    out.push(Array.from({ length: k.r }, (_, i) => i * k.c + (k.c - 1 - i)));
+  }
+  return out;
+}
+function score(k, on) {
+  const f = freeIndex(k), has = i => i === f || on.has(i);
+  const done = lines(k).filter(l => l.every(has));
+  return { done, cells: new Set(done.flat()), marked: [...on].filter(i => i !== f).length, total: k.r * k.c - (f >= 0 ? 1 : 0) };
+}
+
+/* ---------- links: the card (compressed) and the marks live in the address ---------- */
+const b64u = bytes => { let s = ''; for (let i = 0; i < bytes.length; i += 8192) s += String.fromCharCode(...bytes.subarray(i, i + 8192)); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+const unb64u = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), ch => ch.charCodeAt(0));
+async function encode(k) {
+  const bytes = new TextEncoder().encode(JSON.stringify({ v: 1, t: k.t, r: k.r, c: k.c, f: k.f ? 1 : 0, ft: k.ft, x: k.x, th: k.th }));
+  if (window.CompressionStream) {
+    try { return 'd' + b64u(new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer())); } catch { /* plain below */ }
+  }
+  return 'j' + b64u(bytes);
+}
+async function decode(code) {
+  const bytes = unb64u(code.slice(1));
+  let json;
+  if (code[0] === 'd') json = await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+  else if (code[0] === 'j') json = new TextDecoder().decode(bytes);
+  else throw new Error('unknown format');
+  return clean(JSON.parse(json));
+}
+const marksToHex = (on, n) => { let s = ''; for (let i = 0; i < n; i += 4) { let v = 0; for (let b = 0; b < 4; b++) if (on.has(i + b)) v |= 1 << b; s += v.toString(16); } return s; };
+const hexToMarks = (hex, n) => { const on = new Set(); for (let i = 0; i < n; i++) { const v = parseInt(hex[Math.floor(i / 4)] || '0', 16) || 0; if (v & (1 << (i % 4))) on.add(i); } return on; };
+const hash32 = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); };
+const baseUrl = () => location.origin === 'null' || location.protocol === 'file:' ? location.href.split('#')[0] : location.origin + location.pathname;
+
+/* ---------- storage (this device only) ---------- */
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch { /* blocked */ } },
+};
+let saveTimer = 0;
+const saveDraft = () => { clearTimeout(saveTimer); saveTimer = setTimeout(() => store.set('bingo.draft', JSON.stringify(card)), 300); };
+const saveMarks = () => { if (key) store.set('bingo.marks.' + key, marksToHex(marks, card.r * card.c)); };
+
+/* ---------- drawing the card ---------- */
+function applyTheme() {
+  const t = THEMES[card.th], s = $('stage').style;
+  s.setProperty('--cbg', t.bg); s.setProperty('--ccell', t.cell); s.setProperty('--cline', t.line); s.setProperty('--ctext', t.text);
+  s.setProperty('--cmark', t.mark); s.setProperty('--cmarkText', t.markText); s.setProperty('--cfree', t.free);
+}
+function fitText(node) {
+  if (!node.clientWidth) return;
+  const max = Math.max(11, Math.min(30, node.clientWidth / 3.6));
+  let fs = max;
+  const over = () => node.scrollHeight > node.clientHeight + 1 || node.scrollWidth > node.clientWidth + 1;
+  node.style.overflowWrap = 'normal';
+  node.style.fontSize = fs + 'px';
+  while (fs > 9 && over()) { fs -= 1; node.style.fontSize = fs + 'px'; }
+  if (over()) {                       // a word still too long even when small: let it break
+    node.style.overflowWrap = 'anywhere'; fs = Math.max(fs, 12); node.style.fontSize = fs + 'px';
+    while (fs > 8 && over()) { fs -= 1; node.style.fontSize = fs + 'px'; }
+  }
+}
+const fitAll = () => document.querySelectorAll('#grid .cell').forEach(fitText);
+let resizeTimer = 0;
+// re-fit the text whenever the card changes size (window resized, panel shown, fonts loaded)
+new ResizeObserver(() => { clearTimeout(resizeTimer); resizeTimer = setTimeout(fitAll, 60); }).observe($('grid'));
+
+function render({ keepFocus = false } = {}) {
+  applyTheme();
+  document.title = (card.t ? card.t + ' · ' : '') + 'Bingo Card Maker';
+  const editing = mode === 'make';
+  document.body.classList.toggle('solo', mode !== 'make');
+  $('side').classList.toggle('hidden', mode !== 'make');
+  $('tabMake').setAttribute('aria-pressed', String(mode === 'make'));
+  $('tabPlay').setAttribute('aria-pressed', String(mode !== 'make'));
+  $('shareBtn').classList.toggle('hidden', mode === 'view');
+
+  const title = $('cardTitle');
+  title.textContent = card.t || (editing ? 'Untitled bingo card' : 'Bingo');
+  title.style.opacity = card.t || !editing ? 1 : .55;
+  title.setAttribute('contenteditable', editing ? 'true' : 'false');
+  if (editing) title.setAttribute('aria-label', 'Card title (click to edit)');
+
+  const grid = $('grid'), on = mode === 'view' ? seen : marks, sc = score(card, on), free = freeIndex(card);
+  if (!keepFocus) {
+    grid.style.gridTemplateColumns = `repeat(${card.c}, minmax(0, 1fr))`;
+    grid.replaceChildren(...card.x.map((_, i) => {
+      const isFree = i === free;
+      const cell = document.createElement(editing ? 'div' : 'button');
+      cell.className = 'cell' + (isFree ? ' free' : '');
+      cell.dataset.i = i;
+      cell.textContent = cardText(card, i);
+      if (editing && !isFree) { cell.contentEditable = 'true'; cell.setAttribute('role', 'textbox'); cell.setAttribute('aria-label', `Square ${Math.floor(i / card.c) + 1}, ${i % card.c + 1}`); }
+      else if (!editing) { cell.type = 'button'; cell.disabled = mode === 'view' || isFree; cell.setAttribute('aria-pressed', String(isFree || on.has(i))); }
+      return cell;
+    }));
+  }
+  grid.querySelectorAll('.cell').forEach(cell => {
+    const i = Number(cell.dataset.i), lit = !editing && (i === free || on.has(i));
+    cell.classList.toggle('on', lit);
+    cell.classList.toggle('win', !editing && sc.cells.has(i));
+    if (!editing) cell.setAttribute('aria-pressed', String(lit));
+  });
+  requestAnimationFrame(fitAll);
+
+  // banner, notes and the buttons under the card
+  const banner = $('banner');
+  banner.replaceChildren();
+  if (!editing) {
+    if (sc.done.length) { const b = document.createElement('span'); b.className = 'bingo'; b.textContent = sc.done.length > 1 ? `BINGO ×${sc.done.length}` : 'BINGO!'; banner.append(b, ' '); }
+    const m = document.createElement('span'); m.className = 'muted';
+    m.textContent = `${sc.marked} of ${sc.total} marked · ${sc.done.length} line${sc.done.length === 1 ? '' : 's'}`;
+    banner.append(m);
+  }
+  const note = $('viewNote');
+  note.classList.toggle('hidden', mode !== 'view');
+  if (mode === 'view') note.textContent = `You're looking at someone else's marks on this card (read-only): ${sc.marked} of ${sc.total} squares and ${sc.done.length} line${sc.done.length === 1 ? '' : 's'} complete.`;
+
+  const act = $('actions');
+  act.replaceChildren();
+  const btn = (text, fn, primary) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn' + (primary ? ' primary' : ''); b.textContent = text; b.onclick = fn; act.append(b); };
+  if (mode === 'make') btn('Play this card', () => go('play'), true);
+  if (mode === 'play') { btn('Clear my marks', () => { marks = new Set(); saveMarks(); render({ keepFocus: true }); }); btn('Edit a copy', editCopy); btn('Print', () => print()); }
+  if (mode === 'view') { btn('Play my own copy', () => playOwn(), true); btn('Edit a copy', editCopy); }
+  if (mode === 'make') btn('Print', () => print());
+  $('freeNote').textContent = free < 0 && card.f ? 'A free space needs an odd number of rows and columns.' : '';
+}
+
+/* ---------- switching between making and playing ---------- */
+async function setKey() { key = hash32(await encode(card)); marks = hexToMarks(store.get('bingo.marks.' + key) || '', card.r * card.c); }
+async function go(next) {
+  if (next === 'play') {
+    mode = 'play';
+    await setKey();
+    history.replaceState(null, '', '#b=' + await encode(card));
+  } else {
+    mode = 'make'; seen = null;
+    history.replaceState(null, '', location.pathname + location.search);
+  }
+  render();
+}
+async function playOwn() { mode = 'play'; seen = null; await setKey(); history.replaceState(null, '', '#b=' + await encode(card)); render(); }
+function editCopy() { card = clean(card); store.set('bingo.draft', JSON.stringify(card)); mode = 'make'; seen = null; history.replaceState(null, '', location.pathname + location.search); syncControls(); render(); toast('This is now your own copy to edit'); }
+
+$('tabMake').onclick = () => go('make');
+$('tabPlay').onclick = () => go('play');
+$('grid').addEventListener('click', e => {
+  const cell = e.target.closest('button.cell');
+  if (!cell || mode !== 'play') return;
+  const i = Number(cell.dataset.i), before = score(card, marks).done.length;
+  if (marks.has(i)) marks.delete(i); else marks.add(i);
+  saveMarks();
+  render({ keepFocus: true });
+  if (score(card, marks).done.length > before) toast('BINGO!');
+});
+
+/* ---------- editing ---------- */
+function resize(r, c) {
+  const old = card, next = blank(r, c);
+  next.t = old.t; next.f = old.f; next.ft = old.ft; next.th = old.th;
+  for (let y = 0; y < Math.min(r, old.r); y++) for (let x = 0; x < Math.min(c, old.c); x++) next.x[y * c + x] = old.x[y * old.c + x];
+  card = next;
+  syncControls(); render(); saveDraft();
+}
+function syncControls() {
+  $('titleIn').value = card.t;
+  $('rowsIn').value = card.r; $('colsIn').value = card.c;
+  $('freeIn').checked = card.f; $('freeText').value = card.ft;
+  $('freeTextRow').classList.toggle('hidden', !card.f);
+  document.querySelectorAll('#sizeChips .chip').forEach(b => b.setAttribute('aria-pressed', String(card.r === card.c && card.r === Number(b.dataset.n))));
+  document.querySelectorAll('#swatches .swatch').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.i) === card.th)));
+}
+for (const n of [3, 4, 5, 6, 7]) {
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.dataset.n = n; b.textContent = `${n} × ${n}`;
+  b.onclick = () => resize(n, n); $('sizeChips').append(b);
+}
+THEMES.forEach((t, i) => {
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'swatch'; b.dataset.i = i; b.title = t.n; b.setAttribute('aria-label', t.n + ' colours');
+  b.style.background = `linear-gradient(135deg, ${t.bg} 0 50%, ${t.mark} 50%)`;
+  b.onclick = () => { card.th = i; syncControls(); render({ keepFocus: true }); saveDraft(); };
+  $('swatches').append(b);
+});
+$('titleIn').oninput = e => { card.t = e.target.value.slice(0, MAXTITLE); const t = $('cardTitle'); t.textContent = card.t || 'Untitled bingo card'; t.style.opacity = card.t ? 1 : .55; document.title = (card.t ? card.t + ' · ' : '') + 'Bingo Card Maker'; saveDraft(); };
+$('cardTitle').addEventListener('input', e => { if (mode !== 'make') return; card.t = e.target.textContent.slice(0, MAXTITLE); $('titleIn').value = card.t; saveDraft(); });
+$('cardTitle').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
+$('cardTitle').addEventListener('blur', () => { if (mode === 'make') render({ keepFocus: true }); });
+const dim = () => resize(clampInt($('rowsIn').value, 2, 8, card.r), clampInt($('colsIn').value, 2, 8, card.c));
+$('rowsIn').onchange = dim; $('colsIn').onchange = dim;
+$('freeIn').onchange = e => { card.f = e.target.checked; syncControls(); render(); saveDraft(); };
+$('freeText').oninput = e => { card.ft = e.target.value.slice(0, 20) || 'FREE'; render(); saveDraft(); };
+$('grid').addEventListener('input', e => {
+  const cell = e.target.closest('.cell[contenteditable]');
+  if (!cell) return;
+  card.x[Number(cell.dataset.i)] = cell.textContent.slice(0, MAXTEXT);
+  fitText(cell); saveDraft();
+});
+$('grid').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.isContentEditable) { e.preventDefault(); e.target.blur(); } });
+$('grid').addEventListener('paste', e => {
+  if (!e.target.isContentEditable) return;
+  e.preventDefault();
+  document.execCommand('insertText', false, (e.clipboardData.getData('text/plain') || '').replace(/\s+/g, ' '));
+});
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const slots = () => card.x.map((_, i) => i).filter(i => i !== freeIndex(card));
+$('fillBtn').onclick = () => {
+  let items = $('listIn').value.split(/\r?\n/).map(s => s.trim().replace(/\s+/g, ' ').slice(0, MAXTEXT)).filter(Boolean);
+  if (!items.length) return toast('Paste a list first, one square per line');
+  items = [...new Set(items)];
+  const at = slots();
+  if ($('shuffleIn').checked) shuffle(items);
+  at.forEach((i, k) => { card.x[i] = items[k] || ''; });
+  render(); saveDraft();
+  toast(items.length < at.length ? `${at.length - items.length} square${at.length - items.length === 1 ? '' : 's'} still empty: add more to your list` : items.length > at.length ? `Used ${at.length} of your ${items.length} items` : 'Card filled');
+};
+$('shuffleBtn').onclick = () => { const at = slots(), vals = shuffle(at.map(i => card.x[i])); at.forEach((i, k) => { card.x[i] = vals[k]; }); render(); saveDraft(); };
+$('clearBtn').onclick = () => { if (card.x.some(Boolean) && !confirm('Clear every square on this card?')) return; card.x = card.x.map(() => ''); render(); saveDraft(); };
+
+/* ---------- sharing ---------- */
+const toastEl = $('toast');
+let toastTimer = 0;
+function toast(msg) { toastEl.textContent = msg; toastEl.classList.remove('hidden'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.add('hidden'), 2600); }
+async function copyText(id) {
+  const input = $(id);
+  try { await navigator.clipboard.writeText(input.value); }
+  catch { input.select(); try { document.execCommand('copy'); } catch { return toast('Press Ctrl+C to copy'); } }
+  toast('Link copied');
+}
+document.querySelectorAll('[data-copy]').forEach(b => { b.onclick = () => copyText(b.dataset.copy); });
+['linkPlay', 'linkMarks'].forEach(id => $(id).addEventListener('focus', e => e.target.select()));
+
+$('shareBtn').onclick = async () => {
+  const code = await encode(card), n = card.r * card.c, k = hash32(code);
+  const mine = mode === 'play' ? marks : hexToMarks(store.get('bingo.marks.' + k) || '', n);
+  const play = baseUrl() + '#b=' + code;
+  $('linkPlay').value = play;
+  $('linkMarks').value = play + '&m=' + marksToHex(mine, n);
+  $('marksNote').textContent = mine.size
+    ? `This link shows ${score(card, mine).marked} marked square${score(card, mine).marked === 1 ? '' : 's'} and any lines you've completed. Copy it again after you mark more.`
+    : 'You haven\'t marked any squares yet. Press Play, mark squares as they happen, then copy this link again.';
+  $('nativeShare').classList.toggle('hidden', !navigator.share);
+  $('shareDlg').showModal();
+};
+$('shareClose').onclick = () => $('shareDlg').close();
+$('nativeShare').onclick = () => navigator.share({ title: card.t || 'Bingo card', text: card.t || 'Bingo card', url: $('linkPlay').value }).catch(() => {});
+$('printBtn').onclick = () => { $('shareDlg').close(); setTimeout(() => print(), 100); };
+
+/* a picture of the card */
+function wrap(ctx, text, maxW) {
+  const words = text.split(' '), out = [];
+  let line = '';
+  for (const w of words) {
+    const t = line ? line + ' ' + w : w;
+    if (ctx.measureText(t).width <= maxW || !line) line = t; else { out.push(line); line = w; }
+  }
+  if (line) out.push(line);
+  return out;
+}
+function drawPicture(withMarks) {
+  const t = THEMES[card.th], size = 1400, pad = 50, gap = 12, titleH = card.t ? 130 : 30;
+  const cw = (size - pad * 2 - gap * (card.c - 1)) / card.c, ch = cw;
+  const H = pad + titleH + card.r * ch + (card.r - 1) * gap + pad;
+  const cv = document.createElement('canvas'); cv.width = size; cv.height = H;
+  const x = cv.getContext('2d');
+  x.fillStyle = t.bg; x.fillRect(0, 0, size, H);
+  x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = t.text;
+  if (card.t) { x.font = '700 64px "Segoe UI", system-ui, sans-serif'; let fs = 64; while (x.measureText(card.t).width > size - pad * 2 && fs > 24) { fs -= 2; x.font = `700 ${fs}px "Segoe UI", system-ui, sans-serif`; } x.fillText(card.t, size / 2, pad + 50); }
+  const f = freeIndex(card), on = withMarks ? marks : new Set(), sc = score(card, on);
+  card.x.forEach((_, i) => {
+    const cx0 = pad + (i % card.c) * (cw + gap), cy0 = pad + titleH + Math.floor(i / card.c) * (ch + gap);
+    const lit = withMarks && (i === f || on.has(i));
+    x.beginPath(); x.roundRect(cx0, cy0, cw, ch, 18);
+    x.fillStyle = lit ? t.mark : i === f ? t.free : t.cell; x.fill();
+    x.lineWidth = withMarks && sc.cells.has(i) ? 8 : 3; x.strokeStyle = withMarks && sc.cells.has(i) ? t.mark : t.line; x.stroke();
+    const text = cardText(card, i);
+    if (!text) return;
+    let fs = Math.min(60, cw / 3), lines;
+    for (; fs > 14; fs -= 2) { x.font = `600 ${fs}px "Segoe UI", system-ui, sans-serif`; lines = wrap(x, text, cw - 28); if (lines.length * fs * 1.2 <= ch - 28 && lines.every(l => x.measureText(l).width <= cw - 24)) break; }
+    x.fillStyle = lit ? t.markText : t.text;
+    lines.forEach((l, k) => x.fillText(l, cx0 + cw / 2, cy0 + ch / 2 + (k - (lines.length - 1) / 2) * fs * 1.2));
+  });
+  return cv;
+}
+function savePicture(withMarks) {
+  drawPicture(withMarks).toBlob(blob => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = ((card.t || 'bingo').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') || 'bingo') + (withMarks ? '-marked' : '') + '.png';
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 20000);
+  }, 'image/png');
+}
+$('pngPlain').onclick = () => savePicture(false);
+$('pngMarks').onclick = async () => { if (mode !== 'play') { const k = hash32(await encode(card)); marks = hexToMarks(store.get('bingo.marks.' + k) || '', card.r * card.c); } savePicture(true); };
+
+/* ---------- start ---------- */
+async function start() {
+  const p = new URLSearchParams(location.hash.slice(1));
+  if (p.get('b')) {
+    try {
+      card = await decode(p.get('b'));
+      await setKey();
+      if (p.get('m') != null) { seen = hexToMarks(p.get('m'), card.r * card.c); mode = 'view'; } else mode = 'play';
+      syncControls(); render();
+      return;
+    } catch { toast('That card link couldn\'t be opened. It may be cut short.'); }
+  }
+  try { const saved = JSON.parse(store.get('bingo.draft') || 'null'); if (saved) card = clean(saved); } catch { /* start fresh */ }
+  mode = 'make'; seen = null;
+  syncControls(); render();
+}
+window.addEventListener('hashchange', () => { if (mode !== 'make' || location.hash.length > 1) start(); });
+start();
+</script>
+</body>
+</html>

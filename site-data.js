@@ -53,6 +53,14 @@ const SITE = {
       icon: "brush",
       embed: true,
     },
+    {
+      id: "bingo",
+      title: "Bingo Card Maker",
+      desc: "Make a bingo card with your own title, size and squares. Share a link so others can play along or check your marks.",
+      url: "tools/bingo/index.html",
+      icon: "grid",
+      embed: true,
+    },
     // Copy a block above to add another tool.
   ],
 
